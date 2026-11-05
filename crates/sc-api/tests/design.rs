@@ -59,7 +59,16 @@ async fn messages(State(seen): State<Seen>, Json(body): Json<Value>) -> Json<Val
             s.as_object_mut().unwrap().entry(k).or_insert(v);
         }
     }
+    for e in spec["examples"].as_array_mut().unwrap() {
+        e["assumes"] = json!([]);
+    }
     let first = body["messages"][0]["content"].as_str().unwrap_or_default().to_string();
+    if first.contains("assume something") && turn == 0 {
+        // An example that depends on the open question: refused, then dropped on turn 1.
+        spec["examples"][0]["assumes"] = json!(["Should count wrap at 255?"]);
+    } else if first.contains("assume something") {
+        spec["examples"] = json!([]);
+    }
     if first.contains("decide for me") {
         // Turn 0: the model makes a choice itself; turn 1 (after the push back): it asks instead.
         if turn == 0 {
@@ -237,10 +246,30 @@ async fn spec_examples_and_drafting(db: PgPool) {
     assert_eq!(s, 200, "{d}");
     assert_eq!(d["spec"]["decisions"], json!([]));
     assert_eq!(d["spec"]["questions"][0]["question"], "Should count wrap at 255?");
+    {
+        let seen = seen_handle.lock().unwrap();
+        let feedback = &seen[3]["messages"].as_array().unwrap().last().unwrap()["content"][0];
+        assert!(
+            feedback["content"].as_str().unwrap().contains("These decisions are new: \"Should count wrap at 255?\""),
+            "{feedback}"
+        );
+    }
+
+    // Examples that depend on an open question are refused until rewritten or left out.
+    let (s, d) = call(
+        &addr,
+        &ada,
+        M::POST,
+        &format!("/projects/{id}/spec/draft"),
+        Some(json!({ "instruction": "A counter; assume something" })),
+    )
+    .await;
+    assert_eq!(s, 200, "{d}");
+    assert_eq!(d["spec"]["examples"], json!([]));
     let seen = seen_handle.lock().unwrap();
-    let feedback = &seen[3]["messages"].as_array().unwrap().last().unwrap()["content"][0];
+    let feedback = &seen[5]["messages"].as_array().unwrap().last().unwrap()["content"][0];
     assert!(
-        feedback["content"].as_str().unwrap().contains("These decisions are new: \"Should count wrap at 255?\""),
+        feedback["content"].as_str().unwrap().contains("depends on the open question \"Should count wrap at 255?\""),
         "{feedback}"
     );
 }

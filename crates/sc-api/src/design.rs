@@ -225,7 +225,10 @@ behaviour (names, coding style). The user is not an expert: phrase questions in 
 instruction answers a question, move it to decisions with that answer and add or update the examples.
 - examples: 3-8 short, focused examples covering the main behaviour and the important edge cases, but only \
 behaviour that is decided: an example must not assume an answer to an open question (it comes once the \
-question is answered). Keep the ids of existing examples. id: lowercase letters, digits, _. params: overrides \
+question is answered). Before submitting, check each example against each open question: would a \
+different answer change a step or an expected value (for example an output's value right after reset, or an \
+exact cycle count)? List those questions in the example's `assumes`; such examples must be left out or \
+rewritten until the question is answered. Keep the ids of existing examples. id: lowercase letters, digits, _. params: overrides \
 for that example (e.g. PARITY=1).
 
 Example steps run on the falling clock edge; the design samples inputs on the rising edge. Before step 1 all \
@@ -263,9 +266,10 @@ fn draft_tool() -> Value {
             "given": s("The situation, in plain words"),
             "expect": s("What should happen, in plain words"),
             "params": { "type": "array", "items": obj(json!({ "name": s("Setting name"), "value": s("Number") }), &["name", "value"]) },
-            "steps": { "type": "array", "items": step }
+            "steps": { "type": "array", "items": step },
+            "assumes": { "type": "array", "items": { "type": "string" }, "description": "Every question in `questions` (exact text) whose answer would change this example's steps or expected values. Empty only if the example holds whatever the answers are. The server refuses examples that depend on an open question." }
         }),
-        &["id", "title", "given", "expect", "params", "steps"],
+        &["id", "title", "given", "expect", "params", "steps", "assumes"],
     );
     let spec = obj(
         json!({
@@ -290,6 +294,24 @@ fn draft_tool() -> Value {
         "strict": true,
         "input_schema": obj(json!({ "spec": spec, "note": s("One paragraph to the user: what you changed and why, and what you need from them") }), &["spec", "note"])
     }])
+}
+
+/// Examples that say they depend on a question that is still open.
+fn assumes_open(raw: &Value, spec: &Spec) -> Vec<String> {
+    let norm = |q: &str| q.trim().trim_end_matches('?').trim().to_lowercase();
+    let open: Vec<String> = spec.questions.iter().map(|q| norm(&q.question)).collect();
+    let mut out = Vec::new();
+    for e in raw["examples"].as_array().into_iter().flatten() {
+        for q in e["assumes"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+            if open.contains(&norm(q)) {
+                out.push(format!(
+                    "example \"{}\" depends on the open question \"{q}\": leave it out until the user answers, or rewrite it so it holds for every answer",
+                    e["title"].as_str().unwrap_or_default()
+                ));
+            }
+        }
+    }
+    out
 }
 
 /// The tool's input (clock and reset as possibly-empty objects) as a [`Spec`].
@@ -407,6 +429,7 @@ pub async fn draft(
             Err(e) => vec![e],
             Ok(spec) => {
                 let mut p = spec.validate();
+                p.extend(assumes_open(&call["input"]["spec"], &spec));
                 let invented: Vec<&str> = spec
                     .decisions
                     .iter()
