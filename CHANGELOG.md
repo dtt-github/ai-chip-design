@@ -8,6 +8,10 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Added
 
+- The simulator runs **functions, tasks and generate blocks**: Verilog-2001 and ANSI functions and
+  tasks with locals, loops and `return`, constant functions in parameters and ranges, and generate
+  `for`/`if`/`case` and named blocks (including references such as `g[2].w`). Checked against Icarus
+  Verilog by two new conformance testbenches. The agent is told it may use them.
 - **Design evals** for the assistant and the agent (`evals/design/`, [docs/evals.md](docs/evals.md)):
   16 tasks (11 clear, 5 with open points), each with a reference spec, design and hidden testbench;
   a runner that drafts specs or proposes designs through the API, grades them with simulation, and

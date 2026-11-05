@@ -78,11 +78,7 @@ pub fn parse(files: &[(&str, &str)]) -> Result<(Vec<ast::Module>, u64)> {
 
 /// Modules that nothing instantiates; testbench-looking names first.
 pub fn top_candidates(modules: &[ast::Module]) -> Vec<String> {
-    let used: HashSet<&str> = modules
-        .iter()
-        .flat_map(|m| m.items.iter())
-        .filter_map(|i| if let ast::Item::Instance { module, .. } = i { Some(module.as_str()) } else { None })
-        .collect();
+    let used: HashSet<&str> = modules.iter().flat_map(|m| m.instantiated()).collect();
     let mut tops: Vec<&ast::Module> = modules.iter().filter(|m| !used.contains(m.name.as_str())).collect();
     let looks_like_tb = |n: &str| {
         let n = n.to_ascii_lowercase();

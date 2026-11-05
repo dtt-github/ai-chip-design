@@ -38,9 +38,18 @@ values, radix, signal picker), with a VCD download.
 `sc-sim` is an event-driven simulator with Verilog's active, non-blocking and postponed regions. It
 supports modules, parameters and hierarchy, `wire`/`reg`/`logic`/`integer`, memories, continuous
 and procedural assignments, `if`/`case`/`casez`/loops/`wait`, `#` delays and `@` events,
-`$display`/`$write`/`$strobe`/`$monitor`/`$finish`, `$time`, `$signed` and `$clog2`. It is 2-state
-(x and z read as 0) and limited to 64-bit signals; functions, tasks and `generate` are not supported
-yet and are reported with file and line. Every testbench in `crates/sc-sim/tests/conformance/` must
+`$display`/`$write`/`$strobe`/`$monitor`/`$finish`, `$time`, `$signed` and `$clog2`, and:
+
+- **functions and tasks**, in Verilog-2001 and ANSI style, with local variables, loops and `return`.
+  Each call is expanded where it is made; a function's variables are static (one copy per module
+  instance), so `automatic` (recursive) functions are refused. Functions used in parameters and
+  ranges (a hand-written `clog2`) are evaluated while the design is built.
+- **generate**: `for` loops, `if` and `case` on parameters, and named blocks, with their own names
+  and parameters (`g[2].w`, `%m` printing `tb.g[2].u`).
+
+It is 2-state (x and z read as 0) and limited to 64-bit signals; anything else it doesn't support is
+reported with file and line. `%t` prints time in the timescale's unit, not its precision as Icarus
+Verilog does. Every testbench in `crates/sc-sim/tests/conformance/` must
 print exactly what Icarus Verilog prints. Natively it runs a 1M-cycle counter testbench in about
 0.5 s (`cargo run -p sc-sim --release --example bench`); `cargo run -p sc-sim --example run -- *.v`
 is a command-line runner.

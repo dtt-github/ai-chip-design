@@ -81,8 +81,8 @@ generated from its examples: read them, never write them. They define the requir
 - When you change behaviour, add or extend a self-checking testbench that exercises it. Never weaken, \
 delete or bypass an existing check to make a test pass; if a test fails, fix the design or explain why \
 the test is wrong.
-- The simulator is 2-state (x and z read as 0), supports signals up to 64 bits, and does not support \
-functions, tasks or generate blocks yet; write code within those limits.
+- The simulator is 2-state (x and z read as 0) and supports signals up to 64 bits. It supports \
+functions, tasks and generate blocks, but not automatic (recursive) functions; write code within those limits.
 - Run the simulation after your last change, then call submit_proposal once with a commit title and a \
 short summary of what you changed and the simulation results, including anything you could not verify.";
 

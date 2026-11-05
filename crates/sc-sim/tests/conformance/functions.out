@@ -1,0 +1,8 @@
+AW=4 addr all ones=15 clog2(1)=0 clog2(17)=5
+show: a=0f r=f0 n=4 onehot=1000
+show: a=a1 r=85 n=11 onehot=0010
+popcount(0)=0 decode(3)=1000 negate(5)=-5 negate(-7)=7
+nested=4 twice=3
+crc8 of 1234 = c2
+t=3 sum=42
+t=4 seen=242

@@ -1,0 +1,9 @@
+5 + 15 = 20
+8 + 14 = 22
+11 + 13 = 24
+14 + 12 = 26
+rev=11001011 grid=011100100
+pick: d3 2c 3d
+shape: 0 6 f
+instance tb.g[0].u
+instance tb.g[1].u

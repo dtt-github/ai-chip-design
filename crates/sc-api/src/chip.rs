@@ -246,10 +246,8 @@ fn files_used(files: &BTreeMap<String, String>, top: &str) -> Vec<String> {
         if !seen.insert(n) {
             continue;
         }
-        for item in by.get(n).map(|m| m.items.as_slice()).unwrap_or_default() {
-            if let sc_sim::ast::Item::Instance { module, .. } = item {
-                stack.push(module.as_str());
-            }
+        if let Some(m) = by.get(n) {
+            stack.extend(m.instantiated());
         }
     }
     let used: BTreeSet<String> = seen.iter().filter_map(|n| by.get(n)).map(|m| m.file.clone()).collect();
