@@ -16,6 +16,12 @@ All notable changes to SiliconCommons are recorded here. The format follows
 - Credit to DigitalTwin Technology GmbH as the initiator of the project (README, NOTICE, package
   metadata).
 
+### Fixed
+
+- Example checks look 1 ps after the falling clock edge, so combinational outputs have settled
+  (an example of a design without a clock could see the value from before the last `set`). The
+  "what actually happened" replay samples at the same moment.
+
 ### Changed
 
 - Gate-level simulation and Health say how many testbenches test a block rather than the chip, and
