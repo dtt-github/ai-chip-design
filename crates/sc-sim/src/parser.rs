@@ -21,10 +21,6 @@ const MAX_DEPTH: usize = 512;
 const MAX_CHAIN: usize = 1000;
 
 const NOT_SUPPORTED: &[&str] = &[
-    "function",
-    "task",
-    "generate",
-    "genvar",
     "specify",
     "primitive",
     "interface",
@@ -331,6 +327,70 @@ impl<'a> Parser<'a> {
                     items.push(Item::Initial { body, line });
                     return Ok(());
                 }
+                // A generate region is just its items.
+                "generate" | "endgenerate" => {
+                    self.bump();
+                    return Ok(());
+                }
+                "genvar" => {
+                    self.bump();
+                    loop {
+                        self.ident()?;
+                        if !self.eat_op(",") {
+                            break;
+                        }
+                    }
+                    return self.expect_op(";");
+                }
+                "function" | "task" => {
+                    self.bump();
+                    let task = kw == "task";
+                    let sp = self.subprog(task)?;
+                    items.push(if task { Item::Task(sp) } else { Item::Function(sp) });
+                    return Ok(());
+                }
+                "for" => return self.gen_for(items),
+                "if" => {
+                    self.bump();
+                    self.expect_op("(")?;
+                    let cond = self.expr()?;
+                    self.expect_op(")")?;
+                    let then = self.gen_block()?;
+                    let els = if self.eat_kw("else") { Some(self.gen_block()?) } else { None };
+                    items.push(Item::GenIf { cond, then, els, line });
+                    return Ok(());
+                }
+                "case" => {
+                    self.bump();
+                    self.expect_op("(")?;
+                    let sel = self.expr()?;
+                    self.expect_op(")")?;
+                    let mut arms = Vec::new();
+                    let mut default = None;
+                    while !self.eat_kw("endcase") {
+                        if *self.peek() == Tok::Eof {
+                            return self.err("missing 'endcase'");
+                        }
+                        if self.eat_kw("default") {
+                            self.eat_op(":");
+                            default = Some(self.gen_block()?);
+                            continue;
+                        }
+                        let mut labels = vec![self.expr()?];
+                        while self.eat_op(",") {
+                            labels.push(self.expr()?);
+                        }
+                        self.expect_op(":")?;
+                        arms.push((labels, self.gen_block()?));
+                    }
+                    items.push(Item::GenCase { sel, arms, default, line });
+                    return Ok(());
+                }
+                "begin" => {
+                    let b = self.gen_block()?;
+                    items.push(Item::GenBlock(b));
+                    return Ok(());
+                }
                 _ => {}
             }
             // Module instance: `name [#(...)] inst (...);`
@@ -342,6 +402,147 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
         self.err(format!("unexpected {} in module body", describe(self.peek())))
+    }
+
+    /// The body of a generate construct: `begin [: label] items end [: label]`, or one item.
+    fn gen_block(&mut self) -> Result<GenBlock> {
+        self.nested(|p| {
+            let mut items = Vec::new();
+            if !p.eat_kw("begin") {
+                p.item(&mut items)?;
+                return Ok(GenBlock { label: None, items });
+            }
+            let mut label = if p.eat_op(":") { Some(p.ident()?) } else { None };
+            while !p.eat_kw("end") {
+                if *p.peek() == Tok::Eof {
+                    return p.err("missing 'end' of a generate block");
+                }
+                p.item(&mut items)?;
+            }
+            if p.eat_op(":") {
+                let l = p.ident()?;
+                label.get_or_insert(l);
+            }
+            Ok(GenBlock { label, items })
+        })
+    }
+
+    /// `for ([genvar] i = init; cond; i = next) block`
+    fn gen_for(&mut self, items: &mut Vec<Item>) -> Result<()> {
+        let line = self.line();
+        self.bump();
+        self.expect_op("(")?;
+        self.eat_kw("genvar");
+        let var = self.ident()?;
+        self.expect_op("=")?;
+        let init = self.expr()?;
+        self.expect_op(";")?;
+        let cond = self.expr()?;
+        self.expect_op(";")?;
+        let step = match self.assignment_stmt(false)? {
+            Stmt::Blocking { lhs: Expr::Ident(n, _), rhs, .. } if n == var => rhs,
+            _ => return self.err(format!("the generate loop must step its own variable ({var} = ...)")),
+        };
+        self.expect_op(")")?;
+        let block = self.gen_block()?;
+        items.push(Item::GenFor { var, init, cond, step, block, line });
+        Ok(())
+    }
+
+    /// A function or task, after its keyword:
+    /// `[automatic] [type] name [(ANSI arguments)]; declarations statements end{function|task}`.
+    fn subprog(&mut self, task: bool) -> Result<Subprog> {
+        let line = self.line();
+        let end = if task { "endtask" } else { "endfunction" };
+        if self.eat_kw("automatic") {
+            self.err(if task {
+                "automatic tasks are not supported yet (remove 'automatic': each module instance then has one copy)"
+            } else {
+                "automatic functions are not supported yet (remove 'automatic' unless the function calls itself)"
+            })?;
+        }
+        self.eat_kw("static");
+        let (mut ret_signed, mut ret_range, mut ret_integer) = (false, None, false);
+        if !task && !self.eat_kw("void") {
+            let (kind, signed, range) = self.type_spec()?;
+            ret_integer = kind == Some(Kind::Integer);
+            ret_signed = signed;
+            ret_range = range;
+        }
+        let name = self.ident()?;
+        let mut sp = Subprog {
+            name,
+            line,
+            ret_signed,
+            ret_range,
+            ret_integer,
+            args: Vec::new(),
+            decls: Vec::new(),
+            body: Stmt::Null,
+        };
+        if self.eat_op("(") {
+            let mut last: Option<(Dir, TypeSpec)> = None;
+            while !self.is_op(")") {
+                let dl = self.line();
+                let (dir, (kind, signed, range)) = if self.is_kw("input") || self.is_kw("output") || self.is_kw("inout")
+                {
+                    let dir = self.direction()?;
+                    (dir, self.type_spec()?)
+                } else if let Some(l) = &last {
+                    l.clone()
+                } else {
+                    // `function f(a, b)` without directions: inputs (SystemVerilog).
+                    (Dir::Input, self.type_spec()?)
+                };
+                let n = self.ident()?;
+                sp.args.push((n.clone(), dir));
+                sp.decls.push(Decl {
+                    dir: Some(dir),
+                    kind,
+                    signed,
+                    range: range.clone(),
+                    names: vec![DeclName { name: n, array: None, init: None }],
+                    line: dl,
+                });
+                last = Some((dir, (kind, signed, range)));
+                if !self.eat_op(",") {
+                    break;
+                }
+            }
+            self.expect_op(")")?;
+        }
+        self.expect_op(";")?;
+        // Declarations, then statements.
+        loop {
+            let dl = self.line();
+            if self.is_kw("input") || self.is_kw("output") || self.is_kw("inout") {
+                let dir = self.direction()?;
+                let (kind, signed, range) = self.type_spec()?;
+                let names = self.decl_names()?;
+                sp.args.extend(names.iter().map(|n| (n.name.clone(), dir)));
+                sp.decls.push(Decl { dir: Some(dir), kind, signed, range, names, line: dl });
+            } else if ["reg", "logic", "bit", "integer", "int"].iter().any(|k| self.is_kw(k)) {
+                let (kind, signed, range) = self.type_spec()?;
+                let names = self.decl_names()?;
+                sp.decls.push(Decl { dir: None, kind, signed, range, names, line: dl });
+            } else if self.is_kw("parameter") || self.is_kw("localparam") {
+                return self.err("parameters inside functions and tasks are not supported; declare them in the module");
+            } else {
+                break;
+            }
+        }
+        let mut body = Vec::new();
+        while !self.eat_kw(end) {
+            if *self.peek() == Tok::Eof {
+                return self.err(format!("missing '{end}' for {}", sp.name));
+            }
+            body.push(self.stmt()?);
+        }
+        if self.eat_op(":") {
+            self.ident()?;
+        }
+        sp.body = Stmt::Block(body);
+        Ok(sp)
     }
 
     fn decl_names(&mut self) -> Result<Vec<DeclName>> {
@@ -578,6 +779,22 @@ impl<'a> Parser<'a> {
                 self.expect_op(")")?;
                 Ok(Stmt::Wait(c, Box::new(self.stmt()?)))
             }
+            "return" => {
+                self.bump();
+                let e = if self.is_op(";") { None } else { Some(self.expr()?) };
+                self.expect_op(";")?;
+                Ok(Stmt::Return(e, line))
+            }
+            // A task call: `name(args);` or `name;`.
+            _ if !is_keyword(&kw)
+                && !kw.is_empty()
+                && (matches!(self.peek_at(1), Tok::Op("(")) || matches!(self.peek_at(1), Tok::Op(";"))) =>
+            {
+                let name = self.ident()?;
+                let args = if self.eat_op("(") { self.call_args()? } else { Vec::new() };
+                self.expect_op(";")?;
+                Ok(Stmt::TaskCall { name, args, line })
+            }
             "disable" | "fork" | "assert" | "assume" | "cover" | "force" | "release" | "deassign" => {
                 self.err(format!("'{kw}' is not supported by the browser simulator yet"))
             }
@@ -682,13 +899,29 @@ impl<'a> Parser<'a> {
         self.selects(Expr::Ident(name, line))
     }
 
-    /// `a.b.c` hierarchical names (read-only use in testbenches).
+    /// `a.b.c` hierarchical names (read-only use in testbenches), including generate blocks
+    /// (`g[2].w`: a constant index followed by a dot).
     fn hier_ident(&mut self) -> Result<String> {
         let mut name = self.ident()?;
-        while self.is_op(".") && matches!(self.peek_at(1), Tok::Ident(_)) {
-            self.bump();
-            name.push('.');
-            name.push_str(&self.ident()?);
+        loop {
+            if self.is_op("[")
+                && matches!(self.peek_at(1), Tok::Number(_))
+                && matches!(self.peek_at(2), Tok::Op("]"))
+                && matches!(self.peek_at(3), Tok::Op("."))
+                && matches!(self.peek_at(4), Tok::Ident(_))
+            {
+                self.bump();
+                let Tok::Number(n) = self.bump() else { unreachable!("checked above") };
+                self.bump();
+                name.push_str(&format!("[{}]", n.value));
+            }
+            if self.is_op(".") && matches!(self.peek_at(1), Tok::Ident(_)) {
+                self.bump();
+                name.push('.');
+                name.push_str(&self.ident()?);
+            } else {
+                break;
+            }
         }
         Ok(name)
     }
@@ -852,13 +1085,37 @@ impl<'a> Parser<'a> {
             }
             Tok::Ident(_) => {
                 let name = self.hier_ident()?;
-                if self.is_op("(") {
-                    return self.err(format!("function calls ({name}(...)) are not supported yet"));
+                if self.eat_op("(") {
+                    if name.contains('.') {
+                        return self.err(format!("calling a function in another module ({name}) is not supported"));
+                    }
+                    let args = self.call_args()?;
+                    return Ok(Expr::Call(name, args, line));
                 }
                 self.selects(Expr::Ident(name, line))
             }
             t => self.err(format!("expected an expression, found {}", describe(&t))),
         }
+    }
+}
+
+impl Parser<'_> {
+    /// Arguments after `name(`, through the closing `)`.
+    fn call_args(&mut self) -> Result<Vec<Expr>> {
+        let mut args = Vec::new();
+        if !self.is_op(")") {
+            loop {
+                if self.is_op(".") {
+                    return self.err("named arguments (.a(x)) in calls are not supported; pass them in order");
+                }
+                args.push(self.expr()?);
+                if !self.eat_op(",") {
+                    break;
+                }
+            }
+        }
+        self.expect_op(")")?;
+        Ok(args)
     }
 }
 
@@ -901,6 +1158,14 @@ fn is_keyword(s: &str) -> bool {
             | "signed"
             | "unsigned"
             | "wait"
+            | "function"
+            | "endfunction"
+            | "task"
+            | "endtask"
+            | "generate"
+            | "endgenerate"
+            | "genvar"
+            | "return"
     ) || NOT_SUPPORTED.contains(&s)
 }
 

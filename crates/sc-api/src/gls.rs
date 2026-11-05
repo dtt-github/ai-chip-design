@@ -111,19 +111,7 @@ pub fn plan(files: &BTreeMap<String, String>, config: &Value) -> Result<Plan, St
         .map_err(|e| format!("cannot elaborate {design}: {e}"))?;
     let params = build.instances[0].params.clone();
 
-    let children: HashMap<&str, Vec<&str>> = modules
-        .iter()
-        .map(|m| {
-            let kids = m
-                .items
-                .iter()
-                .filter_map(|i| {
-                    if let sc_sim::ast::Item::Instance { module, .. } = i { Some(module.as_str()) } else { None }
-                })
-                .collect();
-            (m.name.as_str(), kids)
-        })
-        .collect();
+    let children: HashMap<&str, Vec<&str>> = modules.iter().map(|m| (m.name.as_str(), m.instantiated())).collect();
     let reach = |root: &str| {
         let mut seen = BTreeSet::new();
         let mut stack = vec![root.to_string()];

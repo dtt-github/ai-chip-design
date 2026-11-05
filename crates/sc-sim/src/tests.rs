@@ -178,7 +178,7 @@ fn errors_point_at_the_line() {
     let e = simulate(&[("bad.v", "module m;\n  reg a;\n  initial a = b;\nendmodule")], None, Limits::default())
         .unwrap_err();
     assert_eq!(e, Error::Elab { file: "bad.v".into(), line: 3, msg: "'b' is not declared in m".into() });
-    let e = simulate(&[("bad.v", "module m;\n function f;\nendmodule")], None, Limits::default()).unwrap_err();
+    let e = simulate(&[("bad.v", "module m;\n specify\nendmodule")], None, Limits::default()).unwrap_err();
     assert!(matches!(e, Error::Syntax { line: 2, .. }), "{e}");
     let e = simulate(&[("bad.v", "module m;\n reg [127:0] w;\nendmodule")], None, Limits::default()).unwrap_err();
     assert!(e.to_string().contains("up to 64"), "{e}");
@@ -283,4 +283,65 @@ module tb;
     end
 endmodule"#);
     assert_eq!(l, vec!["1 1 0 0 5a", "10"]);
+}
+
+#[test]
+fn functions_see_module_signals_and_wake_their_callers() {
+    // `scaled` reads `gain` from the module, not from an argument: changing it must rerun the block.
+    let l = log(r#"
+module tb;
+    reg [7:0] gain, x;
+    reg [7:0] y;
+    function [7:0] scaled(input [7:0] v);
+        scaled = v * gain;
+    endfunction
+    always @(*) y = scaled(x);
+    initial begin
+        gain = 2; x = 3;
+        #1 $display("%0d", y);
+        gain = 5;
+        #1 $display("%0d", y);
+    end
+endmodule"#);
+    assert_eq!(l, vec!["6", "15"]);
+}
+
+#[test]
+fn unsupported_calls_say_why() {
+    let err = |src: &str| simulate(&[("t.v", src)], None, Limits::default()).unwrap_err().to_string();
+    let e = err(
+        "module m;\n function [3:0] f(input [3:0] x);\n  f = f(x);\n endfunction\n initial $display(\"%0d\", f(1));\nendmodule",
+    );
+    assert!(e.contains("calls itself"), "{e}");
+    let e = err("module m;\n function automatic [3:0] f(input [3:0] x);\n  f = x;\n endfunction\nendmodule");
+    assert!(e.contains("automatic functions are not supported"), "{e}");
+    let e = err(
+        "module m;\n function f(input a);\n  f = a;\n endfunction\n initial $display(\"%0d\", f(1, 2));\nendmodule",
+    );
+    assert!(e.contains("takes 1 argument(s), not 2"), "{e}");
+    let e = err("module m;\n reg a;\n initial a = g(1);\nendmodule");
+    assert!(e.contains("unknown function 'g'"), "{e}");
+    let e = err(
+        "module m;\n reg c;\n function f(input a);\n  f = a;\n endfunction\n initial @(posedge f(c)) c = 0;\nendmodule",
+    );
+    assert!(e.contains("can't be called here"), "{e}");
+    let e = err("module m;\n genvar i;\n for (i = 0; i >= 0; i = i + 1) begin : g\n end\nendmodule");
+    assert!(e.contains("generate loops run more than"), "{e}");
+}
+
+#[test]
+fn generate_blocks_see_outer_names_and_keep_their_own() {
+    // `w` exists at module level and in each block; each block's `w` shadows the module's.
+    let l = log(r#"
+module tb;
+    wire [3:0] w = 4'd9;
+    wire [3:0] out [0:1];
+    genvar i;
+    for (i = 0; i < 2; i = i + 1) begin : g
+        wire [3:0] w = i + 1;
+        assign out[i] = w + tb.w;
+    end
+    initial #1 $display("%0d %0d %0d", out[0], out[1], g[1].w);
+endmodule"#);
+    assert_eq!(l, vec!["10 11 2"]);
 }

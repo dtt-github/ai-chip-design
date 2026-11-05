@@ -342,7 +342,16 @@ pub fn elaborate_with(modules: &[Module], top: &str, overrides: &HashMap<String,
         line: 0,
         msg: format!("no module named {top}"),
     })?;
-    let mut e = Elab { by_name: &by_name, d: Design { top: top.to_string(), ..Default::default() }, tmp: 0 };
+    let mut e = Elab {
+        by_name: &by_name,
+        d: Design { top: top.to_string(), ..Default::default() },
+        tmp: 0,
+        hoist: None,
+        rets: Vec::new(),
+        calling: Vec::new(),
+        made: BTreeSet::new(),
+        const_depth: std::cell::Cell::new(0),
+    };
     if let Some(name) = overrides
         .keys()
         .find(|k| !m.items.iter().any(|i| matches!(i, Item::Param { name, local: false, .. } if name == *k)))
@@ -370,14 +379,42 @@ struct Elab<'a> {
     by_name: &'a HashMap<&'a str, &'a Module>,
     d: Design,
     tmp: usize,
+    /// While compiling an expression in a statement: the operations its function calls need first.
+    hoist: Option<Vec<Op>>,
+    /// Functions and tasks being compiled: return variable, and `return` jumps to patch.
+    rets: Vec<(Option<usize>, Vec<usize>)>,
+    /// Function and task calls being expanded (`inst.name`), to refuse recursion.
+    calling: Vec<String>,
+    /// Functions and tasks whose variables exist (`inst.name`).
+    made: BTreeSet<String>,
+    /// Nesting of constant-function evaluation.
+    const_depth: std::cell::Cell<usize>,
 }
 
-/// Per-instance name scope.
+/// A name scope: an instance, a generate block in it, or a function or task.
+#[derive(Clone)]
 struct Scope<'m> {
+    /// Where new names go and what `%m` prints (`tb.dut.g[2]`).
     path: String,
+    /// The module instance (`tb.dut`): functions and tasks belong to it.
+    inst: String,
+    /// Enclosing scopes to search after `path`, innermost first.
+    outer: Vec<String>,
     module: &'m Module,
     params: HashMap<String, i64>,
 }
+
+/// A generate block after expansion: its names live under `prefix` in the instance.
+struct GenCtx {
+    /// `g[2].inner.` (relative to the instance, with a trailing dot); empty for the module itself.
+    prefix: String,
+    /// Prefixes to search for names, innermost first, ending with "" (the module).
+    chain: Vec<String>,
+    params: HashMap<String, i64>,
+}
+
+/// Generate loops may not run more often than this in one instance.
+const MAX_GENERATE: usize = 100_000;
 
 struct MergedDecl {
     dir: Option<Dir>,
@@ -401,7 +438,13 @@ impl<'a> Elab<'a> {
                 msg: "instance hierarchy too deep (recursive?)".into(),
             });
         }
-        let mut s = Scope { path: path.to_string(), module: m, params: HashMap::new() };
+        let mut s = Scope {
+            path: path.to_string(),
+            inst: path.to_string(),
+            outer: Vec::new(),
+            module: m,
+            params: HashMap::new(),
+        };
         // Parameters in order, so later ones can use earlier ones.
         for item in &m.items {
             if let Item::Param { name, value, local, line } = item {
@@ -421,13 +464,20 @@ impl<'a> Elab<'a> {
             })
             .collect();
         self.d.instances.push(InstanceInfo { path: path.to_string(), module: m.name.clone(), params });
+        // Generate blocks expanded: every item with the generate scope it belongs to.
+        let mut ctxs = vec![GenCtx { prefix: String::new(), chain: vec![String::new()], params: s.params.clone() }];
+        let mut flat = Vec::new();
+        let (mut genblk, mut budget) = (0, MAX_GENERATE);
+        self.flatten(&s, &m.items, 0, &mut ctxs, &mut flat, &mut genblk, &mut budget)?;
+        let scopes: Vec<Scope> = ctxs.iter().map(|c| self.ctx_scope(&s, c)).collect();
         // Merge declarations per name (a port may be declared as `output` and again as `reg`).
-        let mut decls: Vec<(String, MergedDecl)> = Vec::new();
-        for item in &m.items {
+        let mut decls: Vec<(String, usize, MergedDecl)> = Vec::new();
+        for &(ctx, item) in &flat {
             let Item::Decl(dl) = item else { continue };
             for n in &dl.names {
-                match decls.iter_mut().find(|(k, _)| *k == n.name) {
-                    Some((_, md)) => {
+                let full = format!("{}{}", ctxs[ctx].prefix, n.name);
+                match decls.iter_mut().find(|(k, _, _)| *k == full) {
+                    Some((_, _, md)) => {
                         md.dir = md.dir.or(dl.dir);
                         md.kind = md.kind.or(dl.kind);
                         md.signed |= dl.signed;
@@ -439,7 +489,8 @@ impl<'a> Elab<'a> {
                         }
                     }
                     None => decls.push((
-                        n.name.clone(),
+                        full,
+                        ctx,
                         MergedDecl {
                             dir: dl.dir,
                             kind: dl.kind,
@@ -453,29 +504,30 @@ impl<'a> Elab<'a> {
             }
         }
         for p in &m.ports {
-            if !decls.iter().any(|(k, _)| k == p) {
+            if !decls.iter().any(|(k, _, _)| k == p) {
                 return self.err(&s, m.line, format!("port '{p}' of module {} has no direction declaration", m.name));
             }
         }
-        for (name, md) in &decls {
+        for (name, ctx, md) in &decls {
+            let ds = &scopes[*ctx];
             let (msb, lsb) = match &md.range {
-                Some((a, b)) => (self.const_eval(&s, a, md.line)?, self.const_eval(&s, b, md.line)?),
+                Some((a, b)) => (self.const_eval(ds, a, md.line)?, self.const_eval(ds, b, md.line)?),
                 None if md.kind == Some(Kind::Integer) => (31, 0),
                 None => (0, 0),
             };
             let width = (msb - lsb).unsigned_abs() as u32 + 1;
             if width > MAX_WIDTH {
                 return self.err(
-                    &s,
+                    ds,
                     md.line,
                     format!("'{name}' is {width} bits wide; the browser simulator supports up to {MAX_WIDTH}"),
                 );
             }
             let array = match &md.array {
                 Some((a, b)) => {
-                    let (a, b) = (self.const_eval(&s, a, md.line)?, self.const_eval(&s, b, md.line)?);
+                    let (a, b) = (self.const_eval(ds, a, md.line)?, self.const_eval(ds, b, md.line)?);
                     if (a - b).abs() > 1 << 20 {
-                        return self.err(&s, md.line, format!("memory '{name}' is too large"));
+                        return self.err(ds, md.line, format!("memory '{name}' is too large"));
                     }
                     Some((a.min(b), a.max(b)))
                 }
@@ -485,18 +537,22 @@ impl<'a> Elab<'a> {
             self.add_signal(format!("{path}.{name}"), width, signed, msb, lsb, array, false);
         }
         // Declaration initialisers: `reg r = 1;` runs at time 0, `wire w = e;` is a continuous assign.
-        for item in &m.items {
+        for &(ctx, item) in &flat {
             let Item::Decl(dl) = item else { continue };
+            let ds = &scopes[ctx];
             for n in &dl.names {
                 if let Some(init) = &n.init {
-                    let lv = self.lval(&s, &Expr::Ident(n.name.clone(), dl.line))?;
+                    let lv = self.lval(ds, &Expr::Ident(n.name.clone(), dl.line))?;
                     if dl.kind == Some(Kind::Wire) {
-                        self.continuous(&s, lv, init, dl.line)?;
+                        self.continuous(ds, lv, init, dl.line)?;
                     } else {
-                        let rhs = self.expr(&s, init)?;
+                        let mut ops = Vec::new();
+                        let rhs = self.sexpr(ds, init, &mut ops)?;
+                        ops.push(Op::Assign(lv, rhs));
+                        ops.push(Op::Halt);
                         self.d.processes.push(Process {
-                            ops: vec![Op::Assign(lv, rhs), Op::Halt],
-                            scope: s.path.clone(),
+                            ops,
+                            scope: ds.path.clone(),
                             file: m.file.clone(),
                             line: dl.line,
                         });
@@ -504,29 +560,159 @@ impl<'a> Elab<'a> {
                 }
             }
         }
-        for item in &m.items {
+        for &(ctx, item) in &flat {
+            let ds = &scopes[ctx];
             match item {
                 Item::Assign { lhs, rhs, line } => {
-                    let lv = self.lval(&s, lhs)?;
-                    self.continuous(&s, lv, rhs, *line)?;
+                    let lv = self.lval(ds, lhs)?;
+                    self.continuous(ds, lv, rhs, *line)?;
                 }
                 Item::Initial { body, line } => {
                     let mut ops = Vec::new();
-                    self.stmt(&s, body, &mut ops)?;
+                    self.stmt(ds, body, &mut ops)?;
                     ops.push(Op::Halt);
-                    self.d.processes.push(Process { ops, scope: s.path.clone(), file: m.file.clone(), line: *line });
+                    self.d.processes.push(Process { ops, scope: ds.path.clone(), file: m.file.clone(), line: *line });
                 }
                 Item::Always { body, comb, line } => {
-                    let ops = self.always(&s, body, *comb, *line)?;
-                    self.d.processes.push(Process { ops, scope: s.path.clone(), file: m.file.clone(), line: *line });
+                    let ops = self.always(ds, body, *comb, *line)?;
+                    self.d.processes.push(Process { ops, scope: ds.path.clone(), file: m.file.clone(), line: *line });
                 }
                 Item::Instance { module, params, name, conns, line } => {
-                    self.child(&s, module, params, name, conns, *line, depth)?;
+                    self.child(ds, module, params, name, conns, *line, depth)?;
                 }
-                Item::Param { .. } | Item::Decl(_) => {}
+                // Generate constructs were expanded by `flatten`; functions and tasks are compiled where called.
+                Item::Param { .. }
+                | Item::Decl(_)
+                | Item::Function(_)
+                | Item::Task(_)
+                | Item::GenFor { .. }
+                | Item::GenIf { .. }
+                | Item::GenCase { .. }
+                | Item::GenBlock(_) => {}
             }
         }
         Ok(())
+    }
+
+    /// The scope of a generate block (or of the module itself, for the first one).
+    fn ctx_scope(&self, s: &Scope<'a>, c: &GenCtx) -> Scope<'a> {
+        let full = |p: &str| {
+            if p.is_empty() { s.inst.clone() } else { format!("{}.{}", s.inst, p.trim_end_matches('.')) }
+        };
+        Scope {
+            path: full(&c.prefix),
+            inst: s.inst.clone(),
+            outer: c.chain[1..].iter().map(|p| full(p)).collect(),
+            module: s.module,
+            params: c.params.clone(),
+        }
+    }
+
+    /// Expands generate loops, conditions and blocks into `(scope, item)` pairs.
+    #[allow(clippy::too_many_arguments)]
+    fn flatten(
+        &self,
+        s: &Scope<'a>,
+        items: &'a [Item],
+        ctx: usize,
+        ctxs: &mut Vec<GenCtx>,
+        out: &mut Vec<(usize, &'a Item)>,
+        genblk: &mut usize,
+        budget: &mut usize,
+    ) -> Result<()> {
+        for item in items {
+            match item {
+                Item::GenFor { var, init, cond, step, block, line } => {
+                    *genblk += 1;
+                    let name = block.label.clone().unwrap_or_else(|| format!("genblk{genblk}"));
+                    let mut params = ctxs[ctx].params.clone();
+                    let mut v = self.const_eval(&self.ctx_scope(s, &ctxs[ctx]), init, *line)?;
+                    loop {
+                        params.insert(var.clone(), v);
+                        let here = Scope { params: params.clone(), ..self.ctx_scope(s, &ctxs[ctx]) };
+                        if self.const_eval(&here, cond, *line)? == 0 {
+                            break;
+                        }
+                        if *budget == 0 {
+                            return self.err(s, *line, format!("generate loops run more than {MAX_GENERATE} times"));
+                        }
+                        *budget -= 1;
+                        self.enter(s, block, format!("{name}[{v}]"), params.clone(), ctx, ctxs, out, genblk, budget)?;
+                        v = self.const_eval(&here, step, *line)?;
+                    }
+                }
+                Item::GenIf { cond, then, els, line } => {
+                    *genblk += 1;
+                    let n = *genblk;
+                    let here = self.ctx_scope(s, &ctxs[ctx]);
+                    let chosen = if self.const_eval(&here, cond, *line)? != 0 { Some(then) } else { els.as_ref() };
+                    if let Some(b) = chosen {
+                        let name = b.label.clone().unwrap_or_else(|| format!("genblk{n}"));
+                        self.enter(s, b, name, here.params, ctx, ctxs, out, genblk, budget)?;
+                    }
+                }
+                Item::GenCase { sel, arms, default, line } => {
+                    *genblk += 1;
+                    let n = *genblk;
+                    let here = self.ctx_scope(s, &ctxs[ctx]);
+                    let v = self.const_eval(&here, sel, *line)?;
+                    let mut chosen = None;
+                    'arms: for (labels, b) in arms {
+                        for l in labels {
+                            if self.const_eval(&here, l, *line)? == v {
+                                chosen = Some(b);
+                                break 'arms;
+                            }
+                        }
+                    }
+                    if let Some(b) = chosen.or(default.as_ref()) {
+                        let name = b.label.clone().unwrap_or_else(|| format!("genblk{n}"));
+                        self.enter(s, b, name, here.params, ctx, ctxs, out, genblk, budget)?;
+                    }
+                }
+                Item::GenBlock(b) => {
+                    *genblk += 1;
+                    let name = b.label.clone().unwrap_or_else(|| format!("genblk{genblk}"));
+                    let params = ctxs[ctx].params.clone();
+                    self.enter(s, b, name, params, ctx, ctxs, out, genblk, budget)?;
+                }
+                // Parameters in generate blocks were evaluated by `enter`.
+                Item::Param { .. } if ctx != 0 => {}
+                _ => out.push((ctx, item)),
+            }
+        }
+        Ok(())
+    }
+
+    /// One generate block named `name` inside `parent`, with its own parameters evaluated in order.
+    #[allow(clippy::too_many_arguments)]
+    fn enter(
+        &self,
+        s: &Scope<'a>,
+        b: &'a GenBlock,
+        name: String,
+        mut params: HashMap<String, i64>,
+        parent: usize,
+        ctxs: &mut Vec<GenCtx>,
+        out: &mut Vec<(usize, &'a Item)>,
+        genblk: &mut usize,
+        budget: &mut usize,
+    ) -> Result<()> {
+        let prefix = format!("{}{name}.", ctxs[parent].prefix);
+        let mut chain = vec![prefix.clone()];
+        chain.extend(ctxs[parent].chain.iter().cloned());
+        let mut c = GenCtx { prefix, chain, params: HashMap::new() };
+        for it in &b.items {
+            if let Item::Param { name, value, line, .. } = it {
+                c.params = params.clone();
+                let v = self.const_eval(&self.ctx_scope(s, &c), value, *line)?;
+                params.insert(name.clone(), v);
+            }
+        }
+        c.params = params;
+        ctxs.push(c);
+        let id = ctxs.len() - 1;
+        self.flatten(s, &b.items, id, ctxs, out, genblk, budget)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -555,11 +741,15 @@ impl<'a> Elab<'a> {
 
     /// `assign lhs = rhs` → loop { lhs = rhs; wait for any input change }.
     fn continuous(&mut self, s: &Scope, lv: LVal, rhs: &Expr, line: u32) -> Result<()> {
-        let rhs = self.expr(s, rhs)?;
+        // Function calls in the expression run first, every time it is recomputed.
+        let mut ops = Vec::new();
+        let rhs = self.sexpr(s, rhs, &mut ops)?;
+        ops.push(Op::Assign(lv, rhs));
         let mut reads = BTreeSet::new();
-        rhs.reads(&mut reads);
-        lv.reads(&mut reads);
-        let mut ops = vec![Op::Assign(lv, rhs)];
+        for op in &ops {
+            op_reads(op, &mut reads);
+        }
+        reads.retain(|&sig| !self.d.signals[sig].hidden);
         if !reads.is_empty() {
             ops.push(Op::Wait(self.any_change(&reads)));
             ops.push(Op::Jump(0));
@@ -652,7 +842,8 @@ impl<'a> Elab<'a> {
         let path = format!("{}.{name}", s.path);
         self.instance(cm, &path, &overrides, depth + 1)?;
 
-        let cs = Scope { path: path.clone(), module: cm, params: HashMap::new() };
+        let cs =
+            Scope { path: path.clone(), inst: path.clone(), outer: Vec::new(), module: cm, params: HashMap::new() };
         for (i, (pname, expr)) in conns.iter().enumerate() {
             let port = match pname {
                 Some(n) => {
@@ -706,8 +897,10 @@ impl<'a> Elab<'a> {
     // ---- name resolution ----
 
     fn lookup(&self, s: &Scope, name: &str, line: u32) -> Result<usize> {
-        if let Some(&id) = self.d.names.get(&format!("{}.{name}", s.path)) {
-            return Ok(id);
+        for p in std::iter::once(&s.path).chain(&s.outer) {
+            if let Some(&id) = self.d.names.get(&format!("{p}.{name}")) {
+                return Ok(id);
+            }
         }
         // Absolute hierarchical name (top.a.b).
         if let Some(&id) = self.d.names.get(name) {
@@ -765,13 +958,306 @@ impl<'a> Elab<'a> {
                     ce(f)?
                 }
             }
-            Expr::Call(name, args, l) if name == "$clog2" && args.len() == 1 => {
+            Expr::Call(name, args, _) if name == "$clog2" && args.len() == 1 => {
                 let v = ce(&args[0])?;
                 if v <= 1 { 0 } else { 64 - ((v - 1) as u64).leading_zeros() as i64 }
+            }
+            Expr::Call(name, args, l) if !name.starts_with('$') => self.const_call(s, name, args, *l)?,
+            Expr::Index(base, i) if self.param_base(s, base).is_some() => {
+                (self.param_base(s, base).unwrap() >> ce(i)?.clamp(0, 63)) & 1
+            }
+            Expr::Range(base, a, b) if self.param_base(s, base).is_some() => {
+                let (a, b) = (ce(a)?, ce(b)?);
+                let (lo, hi) = (a.min(b).clamp(0, 63), a.max(b).clamp(0, 63));
+                let w = hi - lo + 1;
+                let v = (self.param_base(s, base).unwrap() as u64) >> lo;
+                (if w >= 64 { v } else { v & ((1 << w) - 1) }) as i64
             }
             Expr::Call(name, _, l) => return self.err(s, *l, format!("{name} is not allowed in a constant")),
             _ => return self.err(s, line, "expected a constant expression"),
         })
+    }
+
+    /// A function evaluated at elaboration time (a "constant function", e.g. a hand-written clog2
+    /// used in a parameter or a range).
+    fn const_call(&self, s: &Scope, name: &str, args: &[Expr], line: u32) -> Result<i64> {
+        let Some(f) = s.module.subprog(name, false) else {
+            return self.err(s, line, format!("unknown function '{name}' in {}", s.module.name));
+        };
+        if args.len() != f.args.len() {
+            return self.err(s, line, format!("{name} takes {} argument(s), not {}", f.args.len(), args.len()));
+        }
+        if self.const_depth.get() >= 64 {
+            return self.err(s, line, format!("{name} calls itself too deeply"));
+        }
+        let vals = args.iter().map(|a| self.const_eval(s, a, line)).collect::<Result<Vec<_>>>()?;
+        let mut sc = s.clone();
+        let mut widths = HashMap::new();
+        let width = |sc: &Scope, range: &Option<(Expr, Expr)>, integer: bool, signed: bool| -> Result<(u32, bool)> {
+            Ok(match range {
+                Some((a, b)) => {
+                    ((self.const_eval(sc, a, line)? - self.const_eval(sc, b, line)?).unsigned_abs() as u32 + 1, signed)
+                }
+                None if integer => (32, true),
+                None => (1, signed),
+            })
+        };
+        widths.insert(f.name.clone(), width(s, &f.ret_range, f.ret_integer, f.ret_signed)?);
+        for d in &f.decls {
+            let w = width(s, &d.range, d.kind == Some(Kind::Integer), d.signed)?;
+            for n in &d.names {
+                widths.insert(n.name.clone(), w);
+                sc.params.insert(n.name.clone(), 0);
+            }
+        }
+        sc.params.insert(f.name.clone(), 0);
+        for ((n, _), v) in f.args.iter().zip(vals) {
+            sc.params.insert(n.clone(), fit(v, widths[n]));
+        }
+        let mut budget = 1_000_000usize;
+        self.const_depth.set(self.const_depth.get() + 1);
+        let r = self.const_exec(&mut sc, &f.body, &f.name, &widths, &mut budget, line);
+        self.const_depth.set(self.const_depth.get() - 1);
+        r?;
+        Ok(sc.params[&f.name])
+    }
+
+    /// Runs a constant function's statement; `Ok(true)` when it executed `return`.
+    fn const_exec(
+        &self,
+        sc: &mut Scope,
+        st: &Stmt,
+        fname: &str,
+        widths: &HashMap<String, (u32, bool)>,
+        budget: &mut usize,
+        line: u32,
+    ) -> Result<bool> {
+        let tick = |budget: &mut usize| {
+            *budget = budget.saturating_sub(1);
+            *budget > 0
+        };
+        match st {
+            Stmt::Null | Stmt::SysTask { .. } => {}
+            Stmt::Block(v) => {
+                for x in v {
+                    if self.const_exec(sc, x, fname, widths, budget, line)? {
+                        return Ok(true);
+                    }
+                }
+            }
+            Stmt::Blocking { lhs, rhs, line } => {
+                let v = self.const_eval(sc, rhs, *line)?;
+                let (name, new) = match lhs {
+                    Expr::Ident(n, _) => (n, v),
+                    Expr::Index(b, i) => match b.as_ref() {
+                        Expr::Ident(n, _) => {
+                            let i = self.const_eval(sc, i, *line)?.clamp(0, 63);
+                            let old = sc.params.get(n).copied().unwrap_or(0);
+                            (n, (old & !(1 << i)) | ((v & 1) << i))
+                        }
+                        _ => return self.err(sc, *line, "a constant function can only assign its own variables"),
+                    },
+                    _ => return self.err(sc, *line, "a constant function can only assign whole variables or bits"),
+                };
+                let Some(w) = widths.get(name) else {
+                    return self.err(sc, *line, format!("a constant function can't assign '{name}'"));
+                };
+                sc.params.insert(name.clone(), fit(new, *w));
+            }
+            Stmt::If(c, t, f) => {
+                if self.const_eval(sc, c, line)? != 0 {
+                    return self.const_exec(sc, t, fname, widths, budget, line);
+                } else if let Some(f) = f {
+                    return self.const_exec(sc, f, fname, widths, budget, line);
+                }
+            }
+            Stmt::Case { sel, items, default, line, .. } => {
+                let v = self.const_eval(sc, sel, *line)?;
+                for (labels, body) in items {
+                    for l in labels {
+                        if self.const_eval(sc, l, *line)? == v {
+                            return self.const_exec(sc, body, fname, widths, budget, *line);
+                        }
+                    }
+                }
+                if let Some(d) = default {
+                    return self.const_exec(sc, d, fname, widths, budget, *line);
+                }
+            }
+            Stmt::For { init, cond, step, body } => {
+                self.const_exec(sc, init, fname, widths, budget, line)?;
+                while self.const_eval(sc, cond, line)? != 0 {
+                    if !tick(budget) {
+                        return self.err(sc, line, "a constant function's loop runs too long");
+                    }
+                    if self.const_exec(sc, body, fname, widths, budget, line)? {
+                        return Ok(true);
+                    }
+                    self.const_exec(sc, step, fname, widths, budget, line)?;
+                }
+            }
+            Stmt::While(c, body) => {
+                while self.const_eval(sc, c, line)? != 0 {
+                    if !tick(budget) {
+                        return self.err(sc, line, "a constant function's loop runs too long");
+                    }
+                    if self.const_exec(sc, body, fname, widths, budget, line)? {
+                        return Ok(true);
+                    }
+                }
+            }
+            Stmt::Repeat(n, body) => {
+                for _ in 0..self.const_eval(sc, n, line)?.max(0) {
+                    if !tick(budget) {
+                        return self.err(sc, line, "a constant function's loop runs too long");
+                    }
+                    if self.const_exec(sc, body, fname, widths, budget, line)? {
+                        return Ok(true);
+                    }
+                }
+            }
+            Stmt::Return(e, line) => {
+                if let Some(e) = e {
+                    let v = self.const_eval(sc, e, *line)?;
+                    sc.params.insert(fname.to_string(), fit(v, widths[fname]));
+                }
+                return Ok(true);
+            }
+            _ => return self.err(sc, line, "only assignments, if, case and loops can run in a constant function"),
+        }
+        Ok(false)
+    }
+
+    /// Compiles `e`; the operations its function calls need are added to `ops` first.
+    fn sexpr(&mut self, s: &Scope, e: &Expr, ops: &mut Vec<Op>) -> Result<CExpr> {
+        let saved = self.hoist.replace(Vec::new());
+        let r = self.expr(s, e);
+        let pre = std::mem::replace(&mut self.hoist, saved).unwrap_or_default();
+        let c = r?;
+        append(ops, pre);
+        Ok(c)
+    }
+
+    /// The variables of a function or task in this instance (static: one copy, hidden from waveforms).
+    fn storage(&mut self, s: &Scope, sp: &Subprog, task: bool) -> Result<()> {
+        let key = format!("{}.{}", s.inst, sp.name);
+        if !self.made.insert(key.clone()) {
+            return Ok(());
+        }
+        let width = |e: &Self, range: &Option<(Expr, Expr)>, integer: bool| -> Result<(i64, i64)> {
+            Ok(match range {
+                Some((a, b)) => (e.const_eval(s, a, sp.line)?, e.const_eval(s, b, sp.line)?),
+                None if integer => (31, 0),
+                None => (0, 0),
+            })
+        };
+        let mut vars = Vec::new();
+        for d in &sp.decls {
+            let (msb, lsb) = width(self, &d.range, d.kind == Some(Kind::Integer))?;
+            for n in &d.names {
+                let array = match &n.array {
+                    Some((a, b)) => {
+                        let (a, b) = (self.const_eval(s, a, d.line)?, self.const_eval(s, b, d.line)?);
+                        Some((a.min(b), a.max(b)))
+                    }
+                    None => None,
+                };
+                vars.push((n.name.clone(), msb, lsb, d.signed || d.kind == Some(Kind::Integer), array));
+            }
+        }
+        if let Some((n, _)) = sp.args.iter().find(|(n, _)| !vars.iter().any(|v| v.0 == *n)) {
+            return self.err(s, sp.line, format!("argument '{n}' of {} has no declaration", sp.name));
+        }
+        if !task {
+            let (msb, lsb) = width(self, &sp.ret_range, sp.ret_integer)?;
+            vars.push((sp.name.clone(), msb, lsb, sp.ret_signed || sp.ret_integer, None));
+        }
+        for (n, msb, lsb, signed, array) in vars {
+            let w = (msb - lsb).unsigned_abs() as u32 + 1;
+            if w > MAX_WIDTH {
+                return self.err(
+                    s,
+                    sp.line,
+                    format!("'{n}' in {} is {w} bits wide; the limit is {MAX_WIDTH}", sp.name),
+                );
+            }
+            self.add_signal(format!("{key}.{n}"), w, signed, msb, lsb, array, true);
+        }
+        Ok(())
+    }
+
+    /// Expands a call of a function (`task` false; returns where the result is) or a task into
+    /// `ops`: arguments in, the body, outputs back.
+    fn call(
+        &mut self,
+        s: &Scope,
+        name: &str,
+        args: &[Expr],
+        line: u32,
+        task: bool,
+        ops: &mut Vec<Op>,
+    ) -> Result<Option<(usize, u32, bool)>> {
+        let module = s.module;
+        let Some(sp) = module.subprog(name, task) else {
+            let what = if task { "task" } else { "function" };
+            return self.err(s, line, format!("unknown {what} '{name}' in {}", module.name));
+        };
+        if args.len() != sp.args.len() {
+            return self.err(s, line, format!("{name} takes {} argument(s), not {}", sp.args.len(), args.len()));
+        }
+        let key = format!("{}.{name}", s.inst);
+        if self.calling.contains(&key) {
+            return self.err(s, line, format!("{name} calls itself; recursive functions and tasks are not supported"));
+        }
+        self.storage(s, sp, task)?;
+        let var = |e: &Self, n: &str| e.d.names[&format!("{key}.{n}")];
+        for ((n, dir), a) in sp.args.iter().zip(args) {
+            if *dir != Dir::Output {
+                let v = self.sexpr(s, a, ops)?;
+                ops.push(Op::Assign(LVal::Sig(var(self, n)), v));
+            }
+        }
+        // The body sees its own variables, then the module's (not the caller's).
+        let fs = Scope {
+            path: key.clone(),
+            inst: s.inst.clone(),
+            outer: vec![s.inst.clone()],
+            module,
+            params: s.params.clone(),
+        };
+        let ret = (!task).then(|| var(self, name));
+        let saved = self.hoist.take();
+        self.calling.push(key.clone());
+        self.rets.push((ret, Vec::new()));
+        let mut body = Vec::new();
+        let r = self.stmt(&fs, &sp.body, &mut body);
+        let (_, returns) = self.rets.pop().expect("pushed above");
+        self.calling.pop();
+        self.hoist = saved;
+        r?;
+        let end = body.len();
+        for i in returns {
+            body[i] = Op::Jump(end);
+        }
+        append(ops, body);
+        for ((n, dir), a) in sp.args.iter().zip(args) {
+            if *dir != Dir::Input {
+                let lv = self.lval(s, a).map_err(|_| Error::Elab {
+                    file: module.file.clone(),
+                    line,
+                    msg: format!("output argument '{n}' of {name} must be a variable"),
+                })?;
+                let sg = &self.d.signals[var(self, n)];
+                ops.push(Op::Assign(lv, CExpr::Sig { sig: var(self, n), w: sg.width, signed: sg.signed }));
+            }
+        }
+        let Some(ret) = ret else { return Ok(None) };
+        // A copy per call, so f(a) + f(b) keeps both results.
+        let (w, signed) = (self.d.signals[ret].width, self.d.signals[ret].signed);
+        self.tmp += 1;
+        let tmp = self.add_signal(format!("{}.$call{}", s.path, self.tmp), w, signed, w as i64 - 1, 0, None, true);
+        ops.push(Op::Assign(LVal::Sig(tmp), CExpr::Sig { sig: ret, w, signed }));
+        Ok(Some((tmp, w, signed)))
     }
 
     // ---- expressions ----
@@ -898,6 +1384,20 @@ impl<'a> Elab<'a> {
             Expr::Ternary(c, t, f) => {
                 CExpr::Ternary(Box::new(self.expr(s, c)?), Box::new(self.expr(s, t)?), Box::new(self.expr(s, f)?))
             }
+            Expr::Call(name, args, line) if !name.starts_with('$') => {
+                if self.hoist.is_none() {
+                    return self.err(
+                        s,
+                        *line,
+                        format!("{name}(...) can't be called here (an event control, a wait condition or the index of an assignment target); call it in a statement and use a variable"),
+                    );
+                }
+                let mut ops = Vec::new();
+                let (sig, w, signed) =
+                    self.call(s, name, args, *line, false, &mut ops)?.expect("functions return a value");
+                append(self.hoist.as_mut().expect("checked above"), ops);
+                CExpr::Sig { sig, w, signed }
+            }
             Expr::Call(name, args, line) => match (name.as_str(), args.len()) {
                 ("$time" | "$stime" | "$realtime", 0) => CExpr::Time,
                 ("$random" | "$urandom", 0) => CExpr::Random(None),
@@ -1004,17 +1504,20 @@ impl<'a> Elab<'a> {
             }
             Stmt::Blocking { lhs, rhs, .. } => {
                 let lv = self.lval(s, lhs)?;
-                let rhs = self.expr(s, rhs)?;
+                let rhs = self.sexpr(s, rhs, ops)?;
                 ops.push(Op::Assign(lv, rhs));
             }
             Stmt::NonBlocking { lhs, rhs, delay, .. } => {
                 let lv = self.lval(s, lhs)?;
-                let rhs = self.expr(s, rhs)?;
-                let delay = delay.as_ref().map(|d| self.expr(s, d)).transpose()?;
+                let rhs = self.sexpr(s, rhs, ops)?;
+                let delay = match delay {
+                    Some(d) => Some(self.sexpr(s, d, ops)?),
+                    None => None,
+                };
                 ops.push(Op::NbAssign(lv, rhs, delay));
             }
             Stmt::If(c, t, f) => {
-                let c = self.expr(s, c)?;
+                let c = self.sexpr(s, c, ops)?;
                 let jz = ops.len();
                 ops.push(Op::Halt); // patched
                 self.stmt(s, t, ops)?;
@@ -1031,7 +1534,7 @@ impl<'a> Elab<'a> {
             }
             Stmt::Case { kind, sel, items, default, line } => {
                 // Evaluate the selector once into a temporary.
-                let sel_c = self.expr(s, sel)?;
+                let sel_c = self.sexpr(s, sel, ops)?;
                 let tmp = self.temp(s);
                 let sel_w = sel_c.width(&self.d);
                 let label_w = items
@@ -1087,7 +1590,7 @@ impl<'a> Elab<'a> {
             Stmt::For { init, cond, step, body } => {
                 self.stmt(s, init, ops)?;
                 let top = ops.len();
-                let c = self.expr(s, cond)?;
+                let c = self.sexpr(s, cond, ops)?;
                 let jz = ops.len();
                 ops.push(Op::Halt);
                 self.stmt(s, body, ops)?;
@@ -1097,7 +1600,7 @@ impl<'a> Elab<'a> {
             }
             Stmt::While(c, body) => {
                 let top = ops.len();
-                let c = self.expr(s, c)?;
+                let c = self.sexpr(s, c, ops)?;
                 let jz = ops.len();
                 ops.push(Op::Halt);
                 self.stmt(s, body, ops)?;
@@ -1106,7 +1609,7 @@ impl<'a> Elab<'a> {
             }
             Stmt::Repeat(n, body) => {
                 let tmp = self.temp(s);
-                let n = self.expr(s, n)?;
+                let n = self.sexpr(s, n, ops)?;
                 ops.push(Op::Assign(LVal::Sig(tmp), n));
                 let top = ops.len();
                 let t = CExpr::Sig { sig: tmp, w: 64, signed: false };
@@ -1130,7 +1633,7 @@ impl<'a> Elab<'a> {
                 ops.push(Op::Jump(top));
             }
             Stmt::Delay(d, body) => {
-                let d = self.expr(s, d)?;
+                let d = self.sexpr(s, d, ops)?;
                 ops.push(Op::Delay(d));
                 self.stmt(s, body, ops)?;
             }
@@ -1171,8 +1674,11 @@ impl<'a> Elab<'a> {
                         "$monitor" => DisplayKind::Monitor,
                         _ => DisplayKind::Display,
                     };
-                    let args = args.iter().map(|a| self.expr(s, a)).collect::<Result<_>>()?;
-                    ops.push(Op::Display { kind, args, scope: s.path.clone(), line: *line });
+                    let mut cargs = Vec::new();
+                    for a in args {
+                        cargs.push(self.sexpr(s, a, ops)?);
+                    }
+                    ops.push(Op::Display { kind, args: cargs, scope: s.path.clone(), line: *line });
                 }
                 "$finish" | "$stop" => ops.push(Op::Finish),
                 "$dumpfile" | "$dumpvars" | "$dumpon" | "$dumpoff" | "$dumpall" | "$dumpflush" | "$timeformat"
@@ -1203,9 +1709,48 @@ impl<'a> Elab<'a> {
                 }
                 other => return self.err(s, *line, format!("{other} is not supported by the browser simulator")),
             },
+            // A function called as a statement discards its result.
+            Stmt::TaskCall { name, args, line } => {
+                let task = s.module.subprog(name, true).is_some();
+                self.call(s, name, args, *line, task, ops)?;
+            }
+            Stmt::Return(e, line) => {
+                let Some(ret) = self.rets.last().map(|r| r.0) else {
+                    return self.err(s, *line, "return is only allowed in a function or a task");
+                };
+                if let Some(e) = e {
+                    let Some(ret) = ret else {
+                        return self.err(s, *line, "a task's return can't have a value");
+                    };
+                    let v = self.sexpr(s, e, ops)?;
+                    ops.push(Op::Assign(LVal::Sig(ret), v));
+                }
+                // Jumps to the end of the body (patched by `call`).
+                self.rets.last_mut().expect("checked above").1.push(ops.len());
+                ops.push(Op::Halt);
+            }
         }
         Ok(())
     }
+}
+
+/// Appends `more` to `ops`, moving its jump targets (each op list numbers from its own start).
+fn append(ops: &mut Vec<Op>, more: Vec<Op>) {
+    let base = ops.len();
+    ops.extend(more.into_iter().map(|op| match op {
+        Op::Jump(t) => Op::Jump(t + base),
+        Op::JumpIfZero(c, t) => Op::JumpIfZero(c, t + base),
+        o => o,
+    }));
+}
+
+/// `v` as a `w`-bit value, sign-extended if `signed`.
+fn fit(v: i64, (w, signed): (u32, bool)) -> i64 {
+    if w >= 64 {
+        return v;
+    }
+    let m = (v as u64) & ((1u64 << w) - 1);
+    if signed && (m >> (w - 1)) & 1 == 1 { (m | !((1u64 << w) - 1)) as i64 } else { m as i64 }
 }
 
 fn op_reads(op: &Op, out: &mut BTreeSet<usize>) {

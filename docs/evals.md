@@ -19,7 +19,7 @@ Each task has:
   answers can be graded), the kind, tags and, for vague tasks, the open points with keywords that
   show the assistant asked about them;
 - `spec.json`: the reference spec, with the decisions for the open points and 2-3 examples;
-- `ref.v`: a reference design written for the simulator (no functions or `generate`);
+- `ref.v`: a reference design written for the simulator;
 - `hidden_tb.v`: a hidden testbench, never shown to the AI. Clocked tasks get thousands of cycles
   of pseudo-random stimulus, with a reset in the middle, checked cycle by cycle against a
   behavioural model; `parity8` tries every input; `uart_rx` sends 150 random frames, some with a

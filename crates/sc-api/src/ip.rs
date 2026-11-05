@@ -130,11 +130,7 @@ fn analyse(all: &BTreeMap<String, String>, top: &str) -> Result<Analysis, ApiErr
             continue;
         }
         if let Some(m) = by_name.get(name) {
-            for item in &m.items {
-                if let sc_sim::ast::Item::Instance { module, .. } = item {
-                    stack.push(module.as_str());
-                }
-            }
+            stack.extend(m.instantiated());
         }
     }
     let paths: BTreeSet<&str> = seen.iter().filter_map(|n| by_name.get(n)).map(|m| m.file.as_str()).collect();
