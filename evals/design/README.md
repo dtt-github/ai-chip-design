@@ -7,4 +7,5 @@ proposals). See [docs/evals.md](../../docs/evals.md) for what is measured and ho
 - `tasks/<id>/`: `task.json`, `spec.json`, `ref.v`, `hidden_tb.v`
 - `run-eval.mjs`: the runner
 - `list-tasks.mjs`: regenerates `TASKS.md`
+- `summary.mjs`: pass rate and cost per task for result folders
 - `results/`: run output (not committed)

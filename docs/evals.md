@@ -94,11 +94,19 @@ the web app does. Results go to `evals/design/results/` (not committed).
    node evals/design/run-eval.mjs --eval assistant --mode live --reps 2 --flow evals/design/results/assistant --approve-harness
    ```
 
-4. Build the report: `results.jsonl` follows the eval report schema, so the report builder from
-   Anthropic's claude-api skill (`build-report-lite.mjs`) turns a flow directory into one HTML page.
+4. Summarise pass rate and cost per task (Markdown):
+
+   ```bash
+   node evals/design/summary.mjs evals/design/results/assistant evals/design/results/agent
+   ```
+
+   `results.jsonl` follows the eval report schema, so the report builder from Anthropic's
+   claude-api skill (`build-report-lite.mjs <flow-dir>`) also turns a flow directory into an HTML
+   page with every case. To make it lead with `pass`, declare the metrics in the flow's
+   `_state.json`, e.g. `"metrics": [{"id": "pass", "kind": "binary"}, {"id": "hidden_pass", "kind": "binary"}]`.
 
 Options: `--reps N` (repeats per task; 2 shows how much results vary), `--concurrency N`
-(default 4), `--timeout-s N` (per task, default 1800). `SC_EVAL_TASKS=uart_tx,fifo4` runs a subset.
+(default 4; the agent eval uses at most 2, the server's limit per person), `--timeout-s N` (per task, default 1800). `SC_EVAL_TASKS=uart_tx,fifo4` runs a subset.
 A run resumes where it stopped; delete the flow directory to start over. `--approve-harness`
 records a hash of the runner, and later runs refuse to start if the runner changed without a new
 approval.
@@ -111,5 +119,10 @@ that account.
 ## Cost
 
 A live run costs what the model is billed for the drafts or proposals, priced as the server prices
-them. Measure it with a small run first (`SC_EVAL_TASKS=blinker --reps 1`) and multiply by the
-task count and repeats before running everything.
+them (the runner's figures match the server's `ai_usage` records). Measure it with a small run
+first (`SC_EVAL_TASKS=blinker --reps 1`) and multiply by the task count and repeats.
+
+The first pilot (2026-11-05; Claude Opus 5.5 via OpenRouter; blinker, uart_tx and traffic, one
+run each) passed all 6 runs and cost $1.32: $0.28 per spec draft (71-103 s) and $0.16 per agent
+proposal (35-66 s, 4-7 turns). At that rate the whole set, 16 tasks with 2 repeats on both evals,
+costs about $14; larger tasks such as `uart_rx` and `fifo4` will likely cost more.

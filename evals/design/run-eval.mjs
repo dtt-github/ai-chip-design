@@ -416,6 +416,8 @@ function parseArgs(argv) {
     eprint('--eval must be assistant or agent, and --mode live, oracle or null');
     usage(); process.exit(2);
   }
+  // The server runs at most 2 agent proposals per person at once (crates/sc-api/src/agent.rs).
+  if (a.eval === 'agent' && a.concurrency > 2) a.concurrency = 2;
   if (!/^(baseline|v[1-9]\d*)$/.test(a.variant)) {
     // The report only reads directories named 'baseline' or 'v<N>' - any other
     // name runs to completion but spends the pass into a directory the Summary,
