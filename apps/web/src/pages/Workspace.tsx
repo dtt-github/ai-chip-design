@@ -6,6 +6,7 @@ import { api, ApiError, type Change, type CommitInfo, type Project } from "../ap
 import { languageFor } from "../monaco";
 import { FileTree } from "../components/FileTree";
 import { VerilogLsp, type LspStatus } from "../lsp";
+import { RunsList, RunView } from "../components/Runs";
 
 /** An open or edited file. `base` is the committed content (`null` for a new file). */
 interface Buffer {
@@ -28,6 +29,8 @@ export function WorkspacePage() {
   const [history, setHistory] = useState<CommitInfo[]>([]);
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<{ kind: "error" | "info"; text: string } | null>(null);
+  const [panelTab, setPanelTab] = useState<"changes" | "runs">("changes");
+  const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [committing, setCommitting] = useState(false);
   const messageRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -286,9 +289,29 @@ export function WorkspacePage() {
           <span className="spacer" />
           {status && <span className={status.kind === "error" ? "error" : ""}>{status.text}</span>}
         </footer>
+        {selectedJob && <RunView jobId={selectedJob} canCancel={!readOnly} onClose={() => setSelectedJob(null)} />}
       </section>
 
       <aside className="panel">
+        <div className="panel-tabs" role="tablist">
+          <button role="tab" aria-selected={panelTab === "changes"} className={panelTab === "changes" ? "active" : ""} onClick={() => setPanelTab("changes")}>
+            Changes{changes.length ? ` (${changes.length})` : ""}
+          </button>
+          <button role="tab" aria-selected={panelTab === "runs"} className={panelTab === "runs" ? "active" : ""} onClick={() => setPanelTab("runs")}>
+            Runs
+          </button>
+        </div>
+        {panelTab === "runs" ? (
+          <RunsList
+            projectId={id}
+            head={head}
+            canRun={!readOnly}
+            dirty={changes.length > 0}
+            selected={selectedJob}
+            onSelect={(j) => setSelectedJob(j.id)}
+          />
+        ) : (
+          <>
         <h3>Changes ({changes.length})</h3>
         <ul className="changes">
           {changes.map(([p, b]) => (
@@ -334,6 +357,8 @@ export function WorkspacePage() {
             </li>
           ))}
         </ol>
+          </>
+        )}
       </aside>
     </div>
   );

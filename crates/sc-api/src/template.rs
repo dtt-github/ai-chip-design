@@ -27,6 +27,8 @@ pub fn starter_files(name: &str, slug: &str) -> Vec<(String, Vec<u8>)> {
         "VERILOG_FILES": format!("dir::src/{top}.v"),
         "CLOCK_PORT": "clk",
         "CLOCK_PERIOD": 20,
+        // Leave room for hold buffers; tiny designs fail detailed placement when packed tighter.
+        "FP_CORE_UTIL": 40,
     }))
     .expect("static json")
         + "\n";

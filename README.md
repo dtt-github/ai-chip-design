@@ -1,7 +1,8 @@
 # SiliconCommons
 
-Open, browser-based, physics-aware chip design platform. Design Verilog in the browser, keep every
-project in Git, and (from Sprint 2) push it through LibreLane on the IHP SG13G2 130 nm open PDK.
+Open, browser-based, physics-aware chip design platform. Design Verilog in the browser with a real
+language server, keep every project in Git, and run it from RTL to GDS with LibreLane on the IHP
+SG13G2 130 nm open PDK.
 
 Licensed under [Apache-2.0](LICENSE).
 
@@ -11,6 +12,7 @@ Licensed under [Apache-2.0](LICENSE).
 crates/
   sc-api/      axum HTTP API (binary: siliconcommons-api), Postgres via sqlx, OIDC bearer auth
   sc-git/      per-project bare Git repositories (libgit2), commits without a worktree
+  sc-jobs/     job backends: LibreLane in Docker, metrics summary
 apps/
   web/         React + TypeScript shell with the Monaco editor (Vite)
 deploy/
@@ -24,6 +26,13 @@ Prerequisites: Rust (stable), Node 22 with pnpm (`corepack enable pnpm`), Docker
 ```bash
 ./scripts/fetch-verible.sh
 ```
+
+```bash
+./scripts/fetch-pdk.sh
+```
+
+`fetch-pdk.sh` pulls the LibreLane image (`ghcr.io/librelane/librelane:3.0.16`, about 7.5 GB) and
+installs the IHP SG13G2 PDK version that image pins into the Docker volume `siliconcommons_pdk`.
 
 ```bash
 docker compose -f deploy/compose/docker-compose.yml up -d
@@ -73,6 +82,12 @@ curl -s -X POST localhost:8180/auth/v1/oidc/token -d grant_type=password -d clie
 DATABASE_URL=postgres://sc:sc@127.0.0.1:5442/siliconcommons cargo test --workspace
 ```
 
+The real LibreLane runs (about a minute) are opt-in:
+
+```bash
+cargo test -p sc-jobs --test docker -- --ignored
+```
+
 The API tests create a throwaway database per test (`sqlx::test`) and sign their own tokens, so
 Rauthy does not need to be running.
 
@@ -93,9 +108,33 @@ All `/api` routes need `Authorization: Bearer <access token>`.
 | GET    | `/api/projects/{id}/members`       | Members and roles                                |
 | POST   | `/api/projects/{id}/members`       | `{email, role}` (owner only)                     |
 | GET    | `/api/projects/{id}/lsp`           | WebSocket to the Verilog language server         |
+| POST   | `/api/projects/{id}/jobs`          | Queue an RTL→GDS run `{commit?, config?}`        |
+| GET    | `/api/projects/{id}/jobs`          | Recent runs                                      |
+| GET    | `/api/jobs/{id}`                   | Run status, error excerpt, sign-off summary      |
+| GET    | `/api/jobs/{id}/log?offset=`       | Log from `offset`; poll until `done`             |
+| POST   | `/api/jobs/{id}/cancel`            | Cancel a queued or running run (editor)          |
+| GET    | `/api/jobs/{id}/artifacts`         | Files in the run's `final/` directory            |
+| GET    | `/api/jobs/{id}/artifacts/{path}`  | Download one (GDS, DEF, netlists, render, ...)   |
 
 Commits are optimistic: pass the `parent` you edited against and you get `409` if `main` moved.
 Roles are `owner` > `editor` > `viewer`; public projects are readable by any signed-in user.
+
+### Flow runs
+
+"Run RTL → GDS" queues a job for the last commit. Jobs are rows in Postgres, claimed by workers
+inside the API (`FOR UPDATE SKIP LOCKED`, `SC_JOB_WORKERS`, default 2). Each run:
+
+- exports the project at the job's commit to `data/jobs/<job id>/work/`;
+- runs `librelane --manual-pdk --pdk ihp-sg13g2 --run-tag sc config.json` in a throwaway
+  container with no network, the PDK volume mounted read-only, CPU/memory/PID limits
+  (`SC_JOB_CPUS`, `SC_JOB_MEMORY`) and the API's own uid;
+- streams output to `data/jobs/<job id>/flow.log`;
+- records the image digest, the commit, the exit code, the flow's ERROR lines and a summary of
+  `metrics.json` (area, cells, timing, power, IR drop, DRC/LVS/antenna) with a sign-off verdict.
+
+The web app shows the live log, the summary, the KLayout render and downloads for every file in
+`final/`. On startup the API marks runs interrupted by a restart as failed and kills their
+containers. Artifacts stay on local disk for now; object storage is a later backend.
 
 ### Verilog language server
 
@@ -115,8 +154,9 @@ URI. `SC_VERIBLE_LS` sets the binary (default `.tools/verible/bin/verible-verilo
 - **Rust everywhere on the server**: axum instead of FastAPI; Rauthy instead of Keycloak.
 - **Git**: bare repos on disk via libgit2, behind `sc-git`. Forgejo can come later for hosted
   Git remotes and pull requests; nothing in the API depends on it.
-- **Jobs**: Sprint 2 runs LibreLane in local Docker containers behind a runner trait; Kubernetes
-  is a later backend. Temporal is deferred; job state will live in Postgres.
+- **Jobs**: LibreLane runs in local Docker containers behind the `sc_jobs::Backend` trait;
+  Kubernetes is a later backend. Temporal is deferred: job state lives in Postgres.
+- **Results**: on local disk under `data/jobs/`, not object storage yet.
 - **Language server transport**: a Rust WebSocket bridge (`sc-api/src/lsp.rs`) and a small
   client in `apps/web/src/lsp.ts`, instead of Monaco's bundled LSP client, which cannot be torn
   down when you switch projects.

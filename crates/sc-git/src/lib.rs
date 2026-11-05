@@ -124,6 +124,11 @@ impl ProjectRepo {
         }
     }
 
+    /// Full commit id for a revision (commit id, prefix, branch or tag).
+    pub fn resolve(&self, rev: &str) -> Result<String> {
+        Ok(self.resolve_commit(Some(rev))?.id().to_string())
+    }
+
     fn resolve_commit(&self, rev: Option<&str>) -> Result<git2::Commit<'_>> {
         let oid = match rev {
             Some(r) => self

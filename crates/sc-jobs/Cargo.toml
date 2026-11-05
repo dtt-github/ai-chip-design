@@ -1,0 +1,18 @@
+[package]
+name = "sc-jobs"
+description = "Job backends for SiliconCommons: run EDA flows in containers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util = "0.7"
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

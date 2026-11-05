@@ -4,9 +4,11 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use sc_api::auth::{JwksVerifier, Verifier};
+use sc_api::jobs::JobService;
 use sc_api::lsp::LspConfig;
 use sc_api::{AppState, MIGRATOR, router};
 use sc_git::RepoStore;
+use sc_jobs::{Backend, DockerBackend, DockerConfig};
 use sqlx::postgres::PgPoolOptions;
 use tracing_subscriber::EnvFilter;
 
@@ -45,12 +47,34 @@ async fn main() -> anyhow::Result<()> {
     };
     let max_lsp: usize = env("SC_LSP_MAX_SESSIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(32);
 
+    let docker = DockerConfig {
+        docker: env("SC_DOCKER").unwrap_or_else(|_| "docker".into()),
+        image: env("SC_LIBRELANE_IMAGE").unwrap_or_else(|_| "ghcr.io/librelane/librelane:3.0.16".into()),
+        pdk_volume: env("SC_PDK_VOLUME").unwrap_or_else(|_| "siliconcommons_pdk".into()),
+        cpus: env("SC_JOB_CPUS").ok().and_then(|v| v.parse().ok()).unwrap_or(4.0),
+        memory: env("SC_JOB_MEMORY").unwrap_or_else(|_| "8g".into()),
+        user: current_user().await,
+    };
+    let backend: Option<Arc<dyn Backend>> = match DockerBackend::new(docker).await {
+        Ok(b) => {
+            tracing::info!(toolchain = %b.toolchain(), "flow runs enabled");
+            Some(Arc::new(b))
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "flow runs disabled");
+            None
+        }
+    };
+    let workers: usize = env("SC_JOB_WORKERS").ok().and_then(|v| v.parse().ok()).unwrap_or(2);
+
     let state = AppState {
         db,
         repos: Arc::new(RepoStore::new(data_dir.join("repos"))?),
         verifier: Arc::new(Verifier::Jwks(JwksVerifier::new(issuer, audiences))),
         lsp: Arc::new(LspConfig::new(verible_ls, max_lsp)),
+        jobs: Arc::new(JobService::new(backend, data_dir.join("jobs"))),
     };
+    sc_api::jobs::start_workers(state.clone(), workers).await?;
 
     let listener = tokio::net::TcpListener::bind(bind).await?;
     tracing::info!(%bind, "siliconcommons-api listening");
@@ -60,4 +84,13 @@ async fn main() -> anyhow::Result<()> {
         })
         .await?;
     Ok(())
+}
+
+/// `uid:gid` of this process, so job containers write files we can read and delete.
+async fn current_user() -> Option<String> {
+    let id = |flag: &'static str| async move {
+        let out = tokio::process::Command::new("id").arg(flag).output().await.ok()?;
+        out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
+    };
+    Some(format!("{}:{}", id("-u").await?, id("-g").await?))
 }

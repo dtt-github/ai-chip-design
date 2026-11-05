@@ -2,14 +2,16 @@
 
 pub mod auth;
 pub mod error;
+pub mod jobs;
 pub mod lsp;
 pub mod projects;
 mod template;
+pub mod workspace;
 
 use std::sync::Arc;
 
 use axum::extract::DefaultBodyLimit;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use sc_git::RepoStore;
 use serde_json::json;
@@ -26,6 +28,7 @@ pub struct AppState {
     pub repos: Arc<RepoStore>,
     pub verifier: Arc<Verifier>,
     pub lsp: Arc<lsp::LspConfig>,
+    pub jobs: Arc<jobs::JobService>,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -38,7 +41,13 @@ pub fn router(state: AppState) -> Router {
         .route("/projects/{id}/files/{*path}", get(p::read_file))
         .route("/projects/{id}/commits", get(p::log).post(p::commit))
         .route("/projects/{id}/members", get(p::members).post(p::add_member))
-        .route("/projects/{id}/lsp", get(lsp::handler));
+        .route("/projects/{id}/lsp", get(lsp::handler))
+        .route("/projects/{id}/jobs", get(jobs::list).post(jobs::create))
+        .route("/jobs/{id}", get(jobs::get))
+        .route("/jobs/{id}/log", get(jobs::log))
+        .route("/jobs/{id}/cancel", post(jobs::cancel))
+        .route("/jobs/{id}/artifacts", get(jobs::artifacts))
+        .route("/jobs/{id}/artifacts/{*path}", get(jobs::artifact));
 
     Router::new()
         .route("/healthz", get(|| async { Json(json!({ "status": "ok" })) }))

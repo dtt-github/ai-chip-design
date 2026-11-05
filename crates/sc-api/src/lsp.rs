@@ -32,7 +32,6 @@ use crate::projects::{Role, authorize};
 
 const MAX_MESSAGE_BYTES: usize = 16 * 1024 * 1024;
 const HELLO_TIMEOUT: Duration = Duration::from_secs(10);
-const MAX_WORKSPACE_FILES: usize = 5000;
 const HDL_EXTENSIONS: [&str; 4] = ["v", "vh", "sv", "svh"];
 
 pub struct LspConfig {
@@ -157,33 +156,13 @@ async fn session(state: AppState, id: Uuid, mut socket: WebSocket) -> anyhow::Re
     Ok(())
 }
 
-/// Writes the project's files at the branch tip into `dir`, plus a
-/// `verible.filelist` naming the HDL sources. Returns the HDL file count.
+/// Exports the project at the branch tip into `dir` with a `verible.filelist`
+/// naming its HDL sources. Returns the HDL file count.
 async fn materialize(state: &AppState, id: Uuid, dir: PathBuf) -> anyhow::Result<usize> {
-    let repos = state.repos.clone();
-    let count = tokio::task::spawn_blocking(move || -> anyhow::Result<usize> {
-        let repo = repos.open(&id.to_string())?;
-        if repo.head()?.is_none() {
-            return Ok(0);
-        }
-        let mut hdl = Vec::new();
-        for entry in repo.list_files(None)?.into_iter().take(MAX_WORKSPACE_FILES) {
-            let target = dir.join(&entry.path);
-            if let Some(parent) = target.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            std::fs::write(&target, repo.read_file(None, &entry.path)?)?;
-            if is_hdl(&entry.path) {
-                hdl.push(entry.path);
-            }
-        }
-        let mut list = hdl.join("\n");
-        list.push('\n');
-        std::fs::write(dir.join("verible.filelist"), list)?;
-        Ok(hdl.len())
-    })
-    .await??;
-    Ok(count)
+    let files = crate::workspace::export(state.repos.clone(), id, None, dir.clone()).await?;
+    let hdl: Vec<String> = files.into_iter().filter(|p| is_hdl(p)).collect();
+    tokio::fs::write(dir.join("verible.filelist"), hdl.iter().map(|p| format!("{p}\n")).collect::<String>()).await?;
+    Ok(hdl.len())
 }
 
 fn is_hdl(path: &str) -> bool {

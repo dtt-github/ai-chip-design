@@ -41,6 +41,45 @@ export interface CommitInfo {
   time: number;
 }
 
+export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "canceled";
+
+export interface JobSummary {
+  signoff_clean: boolean;
+  checks: Record<"drc" | "lvs" | "antenna" | "setup" | "hold", boolean | null>;
+  [metric: string]: unknown;
+}
+
+export interface Job {
+  id: string;
+  project_id: string;
+  created_by: string;
+  kind: string;
+  commit_id: string;
+  config_path: string;
+  pdk: string;
+  toolchain: string;
+  status: JobStatus;
+  exit_code: number | null;
+  error: string | null;
+  summary: JobSummary | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface LogChunk {
+  content: string;
+  offset: number;
+  done: boolean;
+}
+
+export interface Artifact {
+  path: string;
+  size: number;
+}
+
+export const isFinished = (s: JobStatus) => s === "succeeded" || s === "failed" || s === "canceled";
+
 export type Change = { op: "write"; path: string; content: string } | { op: "delete"; path: string };
 
 export class ApiError extends Error {
@@ -54,6 +93,12 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await send(method, path, body);
+  return (res.headers.get("content-type")?.includes("json") ? await res.json() : null) as T;
+}
+
+/** Sends an authenticated request; throws `ApiError` on a non-2xx answer. */
+async function send(method: string, path: string, body?: unknown): Promise<Response> {
   const user = await currentUser();
   if (!user) {
     await login();
@@ -67,12 +112,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const data = res.headers.get("content-type")?.includes("json") ? await res.json() : null;
   if (!res.ok) {
+    const data = res.headers.get("content-type")?.includes("json") ? await res.json() : null;
     if (res.status === 401) await login();
     throw new ApiError(res.status, data?.error ?? "error", data?.message ?? res.statusText);
   }
-  return data as T;
+  return res;
 }
 
 const enc = encodeURIComponent;
@@ -89,4 +134,13 @@ export const api = {
   log: (id: string) => request<CommitInfo[]>("GET", `/projects/${enc(id)}/commits`),
   commit: (id: string, body: { message: string; parent: string | null; changes: Change[] }) =>
     request<CommitInfo>("POST", `/projects/${enc(id)}/commits`, body),
+  createJob: (id: string, body: { commit?: string; config?: string } = {}) =>
+    request<Job>("POST", `/projects/${enc(id)}/jobs`, body),
+  listJobs: (id: string) => request<Job[]>("GET", `/projects/${enc(id)}/jobs`),
+  getJob: (job: string) => request<Job>("GET", `/jobs/${enc(job)}`),
+  jobLog: (job: string, offset: number) => request<LogChunk>("GET", `/jobs/${enc(job)}/log?offset=${offset}`),
+  cancelJob: (job: string) => request<Job>("POST", `/jobs/${enc(job)}/cancel`),
+  artifacts: (job: string) => request<Artifact[]>("GET", `/jobs/${enc(job)}/artifacts`),
+  artifactBlob: async (job: string, path: string) =>
+    (await send("GET", `/jobs/${enc(job)}/artifacts/${filePath(path)}`)).blob(),
 };

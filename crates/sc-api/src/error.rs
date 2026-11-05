@@ -17,6 +17,8 @@ pub enum ApiError {
     Conflict(String),
     #[error("{0}")]
     PayloadTooLarge(String),
+    #[error("{0}")]
+    Unavailable(String),
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -32,6 +34,7 @@ impl ApiError {
             ApiError::NotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
             ApiError::Conflict(_) => (StatusCode::CONFLICT, "conflict"),
             ApiError::PayloadTooLarge(_) => (StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large"),
+            ApiError::Unavailable(_) => (StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
             ApiError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal"),
         }
     }

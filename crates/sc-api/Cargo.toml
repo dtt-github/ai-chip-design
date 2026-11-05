@@ -12,6 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 sc-git = { path = "../sc-git" }
+sc-jobs = { path = "../sc-jobs" }
 anyhow.workspace = true
 axum.workspace = true
 chrono.workspace = true
@@ -23,6 +24,7 @@ sqlx.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tokio-util = { version = "0.7", features = ["io"] }
 tower-http.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
@@ -30,6 +32,7 @@ uuid.workspace = true
 dotenvy = "0.15"
 
 [dev-dependencies]
+sc-jobs = { path = "../sc-jobs" }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 tokio-tungstenite = "0.30"
 tower.workspace = true
