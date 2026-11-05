@@ -1,5 +1,7 @@
 // Bundle Monaco locally (no CDN) with only the languages a chip project uses.
 import * as monaco from "monaco-editor/editor/editor.api";
+// Editor UI contributions: hover, suggest, find, go-to-error, peek, rename, folding, ...
+import "monaco-editor/features/register.all";
 import "monaco-editor/languages/definitions/systemverilog/register";
 import "monaco-editor/languages/definitions/markdown/register";
 import "monaco-editor/languages/definitions/yaml/register";

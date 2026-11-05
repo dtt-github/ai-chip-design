@@ -1,22 +1,18 @@
 //! End-to-end API tests against a real Postgres (one fresh database per test).
 //! Run with `DATABASE_URL` pointing at a server where the user may create databases.
 
-use std::sync::Arc;
+mod common;
 
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
+use common::token;
 use http_body_util::BodyExt;
-use jsonwebtoken::{EncodingKey, Header, encode};
-use sc_api::auth::Verifier;
-use sc_api::{AppState, router};
-use sc_git::RepoStore;
+use sc_api::lsp::LspConfig;
+use sc_api::router;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use tower::ServiceExt;
-
-const SECRET: &[u8] = b"test-secret";
-const ISSUER: &str = "https://issuer.test/";
 
 struct Harness {
     app: Router,
@@ -24,25 +20,8 @@ struct Harness {
 }
 
 fn harness(db: PgPool) -> Harness {
-    let dir = tempfile::tempdir().unwrap();
-    let state = AppState {
-        db,
-        repos: Arc::new(RepoStore::new(dir.path().join("repos")).unwrap()),
-        verifier: Arc::new(Verifier::SharedSecret {
-            secret: SECRET.to_vec(),
-            issuer: ISSUER.into(),
-            audiences: vec!["web".into()],
-        }),
-    };
+    let (state, dir) = common::state(db, LspConfig::disabled());
     Harness { app: router(state), _dir: dir }
-}
-
-fn token(sub: &str, email: &str) -> String {
-    let claims = json!({
-        "iss": ISSUER, "aud": "web", "sub": sub, "email": email,
-        "given_name": sub, "exp": chrono::Utc::now().timestamp() + 600,
-    });
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(SECRET)).unwrap()
 }
 
 impl Harness {

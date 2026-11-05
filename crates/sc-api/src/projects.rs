@@ -62,7 +62,12 @@ pub struct ProjectView {
 
 /// Loads a project and checks the caller has at least `needed` on it.
 /// Public projects are readable by every signed-in user.
-async fn authorize(state: &AppState, user: &AuthUser, id: Uuid, needed: Role) -> ApiResult<(Project, Option<Role>)> {
+pub(crate) async fn authorize(
+    state: &AppState,
+    user: &AuthUser,
+    id: Uuid,
+    needed: Role,
+) -> ApiResult<(Project, Option<Role>)> {
     let project: Option<Project> =
         sqlx::query_as("SELECT * FROM projects WHERE id = $1").bind(id).fetch_optional(&state.db).await?;
     let Some(project) = project else {

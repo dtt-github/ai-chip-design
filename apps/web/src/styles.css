@@ -471,3 +471,22 @@ code {
     min-height: 50vh;
   }
 }
+
+.lsp-status::before {
+  content: "●";
+  margin-right: 4px;
+  color: var(--muted);
+}
+
+.lsp-status.ready::before {
+  color: var(--ok);
+}
+
+.lsp-status.connecting::before,
+.lsp-status.disconnected::before {
+  color: var(--warn);
+}
+
+.lsp-status.unavailable::before {
+  color: var(--danger);
+}

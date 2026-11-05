@@ -22,6 +22,10 @@ deploy/
 Prerequisites: Rust (stable), Node 22 with pnpm (`corepack enable pnpm`), Docker.
 
 ```bash
+./scripts/fetch-verible.sh
+```
+
+```bash
 docker compose -f deploy/compose/docker-compose.yml up -d
 ```
 
@@ -88,9 +92,23 @@ All `/api` routes need `Authorization: Bearer <access token>`.
 | POST   | `/api/projects/{id}/commits`       | `{message, parent?, changes:[{op,path,content?}]}` |
 | GET    | `/api/projects/{id}/members`       | Members and roles                                |
 | POST   | `/api/projects/{id}/members`       | `{email, role}` (owner only)                     |
+| GET    | `/api/projects/{id}/lsp`           | WebSocket to the Verilog language server         |
 
 Commits are optimistic: pass the `parent` you edited against and you get `409` if `main` moved.
 Roles are `owner` > `editor` > `viewer`; public projects are readable by any signed-in user.
+
+### Verilog language server
+
+The editor gets diagnostics (syntax and lint), hover, completion, go to definition across project
+files, references, outline, formatting, quick fixes and rename from
+[Verible](https://github.com/chipsalliance/verible)'s `verible-verilog-ls`.
+
+`/api/projects/{id}/lsp` is a WebSocket. The client first sends `{"token": "<access token>"}`, gets
+`{"type":"ready"}`, then exchanges one JSON-RPC message per text frame. Each session runs its own
+language server over a temporary copy of the project (with a `verible.filelist`). Documents are
+named `file:///<project id>/<path>`, and the bridge drops any message that names another `file:`
+URI. `SC_VERIBLE_LS` sets the binary (default `.tools/verible/bin/verible-verilog-ls`), and
+`SC_LSP_MAX_SESSIONS` caps concurrent sessions (default 32).
 
 ## Where this differs from the plan
 
@@ -99,5 +117,6 @@ Roles are `owner` > `editor` > `viewer`; public projects are readable by any sig
   Git remotes and pull requests; nothing in the API depends on it.
 - **Jobs**: Sprint 2 runs LibreLane in local Docker containers behind a runner trait; Kubernetes
   is a later backend. Temporal is deferred; job state will live in Postgres.
-- **Verilog language server**: Monaco has Verilog/SystemVerilog highlighting now; the Verible LSP
-  bridge is still to do.
+- **Language server transport**: a Rust WebSocket bridge (`sc-api/src/lsp.rs`) and a small
+  client in `apps/web/src/lsp.ts`, instead of Monaco's bundled LSP client, which cannot be torn
+  down when you switch projects.

@@ -208,51 +208,56 @@ impl FromRequestParts<AppState> for AuthUser {
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.strip_prefix("Bearer "))
             .ok_or_else(|| ApiError::Unauthorized("missing bearer token".into()))?;
-        let mut claims = state.verifier.verify(token).await?;
-        let email = claims.email.clone().unwrap_or_default();
+        authenticate(state, token).await
+    }
+}
 
-        // Without name claims, ask userinfo for new users and about once a day
-        // (to pick up renames); otherwise keep the stored name.
-        let mut has_name = claims.has_name();
-        if !has_name {
-            let fresh: Option<bool> = sqlx::query_scalar(
-                "SELECT last_seen_at > now() - interval '1 day' FROM users
+/// Verifies an access token and returns the matching user, creating it on first sight.
+pub async fn authenticate(state: &AppState, token: &str) -> Result<AuthUser, ApiError> {
+    let mut claims = state.verifier.verify(token).await?;
+    let email = claims.email.clone().unwrap_or_default();
+
+    // Without name claims, ask userinfo for new users and about once a day
+    // (to pick up renames); otherwise keep the stored name.
+    let mut has_name = claims.has_name();
+    if !has_name {
+        let fresh: Option<bool> = sqlx::query_scalar(
+            "SELECT last_seen_at > now() - interval '1 day' FROM users
                  WHERE oidc_issuer = $1 AND oidc_subject = $2",
-            )
-            .bind(&claims.iss)
-            .bind(&claims.sub)
-            .fetch_optional(&state.db)
-            .await?;
-            if fresh != Some(true)
-                && let Some(info) = state.verifier.userinfo(token).await.filter(|i| i.sub == claims.sub)
-            {
-                claims.name = info.name;
-                claims.given_name = info.given_name;
-                claims.family_name = info.family_name;
-                claims.preferred_username = info.preferred_username;
-                has_name = claims.has_name();
-            }
+        )
+        .bind(&claims.iss)
+        .bind(&claims.sub)
+        .fetch_optional(&state.db)
+        .await?;
+        if fresh != Some(true)
+            && let Some(info) = state.verifier.userinfo(token).await.filter(|i| i.sub == claims.sub)
+        {
+            claims.name = info.name;
+            claims.given_name = info.given_name;
+            claims.family_name = info.family_name;
+            claims.preferred_username = info.preferred_username;
+            has_name = claims.has_name();
         }
-        let display_name = claims.display_name();
-        let (id, display_name): (Uuid, String) = sqlx::query_as(
-            "INSERT INTO users (id, oidc_issuer, oidc_subject, email, display_name)
+    }
+    let display_name = claims.display_name();
+    let (id, display_name): (Uuid, String) = sqlx::query_as(
+        "INSERT INTO users (id, oidc_issuer, oidc_subject, email, display_name)
              VALUES ($1, $2, $3, $4, $5)
              ON CONFLICT (oidc_issuer, oidc_subject) DO UPDATE
                SET email = EXCLUDED.email,
                    display_name = CASE WHEN $6 THEN EXCLUDED.display_name ELSE users.display_name END,
                    last_seen_at = now()
              RETURNING id, display_name",
-        )
-        .bind(Uuid::new_v4())
-        .bind(&claims.iss)
-        .bind(&claims.sub)
-        .bind(&email)
-        .bind(&display_name)
-        .bind(has_name)
-        .fetch_one(&state.db)
-        .await?;
-        Ok(AuthUser { id, email, display_name })
-    }
+    )
+    .bind(Uuid::new_v4())
+    .bind(&claims.iss)
+    .bind(&claims.sub)
+    .bind(&email)
+    .bind(&display_name)
+    .bind(has_name)
+    .fetch_one(&state.db)
+    .await?;
+    Ok(AuthUser { id, email, display_name })
 }
 
 #[cfg(test)]

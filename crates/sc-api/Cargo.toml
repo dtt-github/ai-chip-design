@@ -20,6 +20,7 @@ reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tower-http.workspace = true
@@ -29,6 +30,7 @@ uuid.workspace = true
 dotenvy = "0.15"
 
 [dev-dependencies]
-tempfile.workspace = true
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+tokio-tungstenite = "0.30"
 tower.workspace = true
 http-body-util = "0.1"

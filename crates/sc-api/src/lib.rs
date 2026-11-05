@@ -2,6 +2,7 @@
 
 pub mod auth;
 pub mod error;
+pub mod lsp;
 pub mod projects;
 mod template;
 
@@ -24,6 +25,7 @@ pub struct AppState {
     pub db: PgPool,
     pub repos: Arc<RepoStore>,
     pub verifier: Arc<Verifier>,
+    pub lsp: Arc<lsp::LspConfig>,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -35,7 +37,8 @@ pub fn router(state: AppState) -> Router {
         .route("/projects/{id}/tree", get(p::tree))
         .route("/projects/{id}/files/{*path}", get(p::read_file))
         .route("/projects/{id}/commits", get(p::log).post(p::commit))
-        .route("/projects/{id}/members", get(p::members).post(p::add_member));
+        .route("/projects/{id}/members", get(p::members).post(p::add_member))
+        .route("/projects/{id}/lsp", get(lsp::handler));
 
     Router::new()
         .route("/healthz", get(|| async { Json(json!({ "status": "ok" })) }))

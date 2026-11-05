@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import Editor, { type OnMount } from "@monaco-editor/react";
+import * as monaco from "monaco-editor/editor/editor.api";
 import { api, ApiError, type Change, type CommitInfo, type Project } from "../api";
 import { languageFor } from "../monaco";
 import { FileTree } from "../components/FileTree";
+import { VerilogLsp, type LspStatus } from "../lsp";
 
 /** An open or edited file. `base` is the committed content (`null` for a new file). */
 interface Buffer {
@@ -28,6 +30,9 @@ export function WorkspacePage() {
   const [status, setStatus] = useState<{ kind: "error" | "info"; text: string } | null>(null);
   const [committing, setCommitting] = useState(false);
   const messageRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const pendingReveal = useRef<{ path: string; range: monaco.IRange } | null>(null);
+  const [lsp, setLsp] = useState<{ status: LspStatus; detail?: string }>({ status: "connecting" });
 
   const readOnly = !project?.role || project.role === "viewer";
 
@@ -52,6 +57,44 @@ export function WorkspacePage() {
       .catch((e: Error) => setStatus({ kind: "error", text: e.message }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh]);
+
+  // The language server needs the latest openFile (it closes over state).
+  const openFileRef = useRef<(path: string, range?: monaco.IRange) => void>(() => {});
+  openFileRef.current = (path, range) => {
+    if (range) pendingReveal.current = { path, range };
+    openFile(path);
+  };
+
+  useEffect(() => {
+    const client = new VerilogLsp({
+      projectId: id,
+      onStatus: (status, detail) => setLsp({ status, detail }),
+      openFile: (path, range) => openFileRef.current(path, range),
+    });
+    client.start();
+    return () => {
+      client.stop();
+      // Drop this project's editor models (the mounted one is disposed by the editor itself).
+      const prefix = VerilogLsp.uriFor(id, "");
+      for (const m of monaco.editor.getModels()) {
+        if (m.uri.toString().startsWith(prefix) && !m.isAttachedToEditor()) m.dispose();
+      }
+    };
+  }, [id]);
+
+  // Select a pending go-to-definition target once its file is showing. Runs
+  // after renders and from onMount, since a newly opened file remounts the editor.
+  const revealPending = () => {
+    const target = pendingReveal.current;
+    const editor = editorRef.current;
+    if (!target || !editor) return;
+    if (editor.getModel()?.uri.toString() !== VerilogLsp.uriFor(id, target.path)) return;
+    pendingReveal.current = null;
+    editor.setSelection(target.range);
+    editor.revealRangeInCenter(target.range);
+    editor.focus();
+  };
+  useEffect(revealPending);
 
   async function openFile(path: string, rev = head ?? undefined) {
     setTabs((t) => (t.includes(path) ? t : [...t, path]));
@@ -146,6 +189,8 @@ export function WorkspacePage() {
   const commitRef = useRef(commit);
   commitRef.current = commit;
   const onMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor;
+    revealPending();
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       if (messageRef.current && !messageRef.current.value) messageRef.current.focus();
       else commitRef.current();
@@ -209,7 +254,7 @@ export function WorkspacePage() {
         <div className="editor">
           {active && current && !current.binary ? (
             <Editor
-              path={active}
+              path={VerilogLsp.uriFor(id, active)}
               language={languageFor(active)}
               value={current.content}
               theme="vs-dark"
@@ -235,6 +280,9 @@ export function WorkspacePage() {
         <footer className="statusbar">
           <span>main @ {head?.slice(0, 8) ?? "—"}</span>
           {active && <span>{languageFor(active)}</span>}
+          <span className={`lsp-status ${lsp.status}`} title={lsp.detail}>
+            Verible: {lsp.status}
+          </span>
           <span className="spacer" />
           {status && <span className={status.kind === "error" ? "error" : ""}>{status.text}</span>}
         </footer>

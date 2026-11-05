@@ -8,7 +8,7 @@ export default defineConfig({
     strictPort: true,
     // The browser talks to one origin; Vite forwards API calls to the Rust server.
     proxy: {
-      "/api": "http://127.0.0.1:8090",
+      "/api": { target: "http://127.0.0.1:8090", ws: true },
       "/healthz": "http://127.0.0.1:8090",
     },
   },

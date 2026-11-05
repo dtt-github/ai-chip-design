@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use sc_api::auth::{JwksVerifier, Verifier};
+use sc_api::lsp::LspConfig;
 use sc_api::{AppState, MIGRATOR, router};
 use sc_git::RepoStore;
 use sqlx::postgres::PgPoolOptions;
@@ -33,10 +34,22 @@ async fn main() -> anyhow::Result<()> {
         .context("connecting to Postgres")?;
     MIGRATOR.run(&db).await.context("running migrations")?;
 
+    let verible_ls =
+        PathBuf::from(env("SC_VERIBLE_LS").unwrap_or_else(|_| ".tools/verible/bin/verible-verilog-ls".into()));
+    let verible_ls = match verible_ls.canonicalize() {
+        Ok(path) => Some(path),
+        Err(_) => {
+            tracing::warn!(path = %verible_ls.display(), "Verible language server not found; run scripts/fetch-verible.sh");
+            None
+        }
+    };
+    let max_lsp: usize = env("SC_LSP_MAX_SESSIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(32);
+
     let state = AppState {
         db,
         repos: Arc::new(RepoStore::new(data_dir.join("repos"))?),
         verifier: Arc::new(Verifier::Jwks(JwksVerifier::new(issuer, audiences))),
+        lsp: Arc::new(LspConfig::new(verible_ls, max_lsp)),
     };
 
     let listener = tokio::net::TcpListener::bind(bind).await?;
