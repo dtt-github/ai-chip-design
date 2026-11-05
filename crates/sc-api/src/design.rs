@@ -229,7 +229,9 @@ changes them.
 - decisions: only what the user has decided: things their own words settle, and their answers to questions. \
 Keep existing ones. Never record a choice of your own as a decision, however reasonable.
 - questions: every behaviour the user hasn't settled that an example would depend on: how many cycles until \
-something happens, what an output does right after reset, what happens on edge cases or conflicting inputs. \
+something happens, what an output does right after reset, what happens on edge cases or conflicting inputs, \
+whether an input from outside (a button, a sensor, another clock) is already in step with the clock or needs a \
+synchronizer, and whether a button needs debouncing (both change the timing). \
 Each with 2-3 short answer options, the one you recommend FIRST. Don't ask about things that don't change \
 behaviour (names, coding style). The user is not an expert: phrase questions in plain words. When the \
 instruction answers a question, move it to decisions with that answer and add or update the examples.
@@ -237,8 +239,11 @@ instruction answers a question, move it to decisions with that answer and add or
 behaviour that is decided: an example must not assume an answer to an open question (it comes once the \
 question is answered). Before submitting, check each example against each open question: would a \
 different answer change a step or an expected value (for example an output's value right after reset, or an \
-exact cycle count)? List those questions in the example's `assumes`; such examples must be left out or \
-rewritten until the question is answered. Keep the ids of existing examples. id: lowercase letters, digits, _. params: overrides \
+exact cycle count)? An example of the very situation a question is about (a pulse shorter or longer than N when \
+you asked about pulse lengths) always depends on it. List those questions in the example's `assumes`; such \
+examples must be left out or rewritten until the question is answered. Always write at least one example: \
+while questions are open, write ones that hold for every answer, for instance with wait_until and a generous \
+limit instead of an exact count, or an input held long enough for any delay or debouncing to pass. Keep the ids of existing examples. id: lowercase letters, digits, _. params: overrides \
 for that example (e.g. PARITY=1).
 
 If the project has a chip (blocks.json), examples can test the whole chip instead of the design: set target \
@@ -254,8 +259,13 @@ inputs are 0 and reset is held for 2 cycles, then released. Ops (unused fields: 
 - wait_until: wait until `signal` = `value`, failing after `cycles` cycles.
 - expect: `signal` must equal `value` now.
 - expect_for: `signal` must equal `value` for the next `cycles` cycles; time moves past them.
-Values are numbers: 1, 0x55, 0b1010. A pulse is set 1, wait 1, set 0. Work out timing cycle by cycle: after \
-`set start 1; wait 1`, the design has seen start on one rising edge. Prefer wait_until on an output over \
+Values are numbers: 1, 0x55, 0b1010. A pulse is set 1, wait 1, set 0. Count cycles explicitly; off-by-one \
+mistakes are the most common error. Call the time of step 1 cycle 0; wait N and expect_for N move time N cycles \
+on, set and expect don't. After `set start 1; wait 1` (cycle 1) the design has seen start on one rising edge, and \
+a register it updated on that edge shows the new value. Something that lasts exactly N cycles from cycle c is \
+still on at cycle c+N-1 and off at c+N; after K shifts a bit has moved K places. For every expected value, \
+write down the cycle and why, then recount before submitting. The simulator stops after 50 µs (2,500 cycles at \
+50 MHz): when the real setting is long (a 10 ms debounce), give the example a small value in its params. Prefer wait_until on an output over \
 counting exact latency when the request doesn't fix the latency; use exact counts when it does (\"each bit lasts \
 8 clocks\"). Add a short note to steps where it helps (\"start bit\", \"bit 0\").
 
@@ -331,9 +341,19 @@ fn assumes_open(raw: &Value, spec: &Spec) -> Vec<String> {
     out
 }
 
+/// The tool's `spec` as a JSON object. Models sometimes send the object as a JSON string; anything
+/// else goes back to the model as a problem instead of failing the request.
+fn spec_value(v: &Value) -> Result<Value, String> {
+    let v = match v {
+        Value::String(s) => serde_json::from_str(s).map_err(|_| "spec must be a JSON object, not text".to_string())?,
+        other => other.clone(),
+    };
+    if v.is_object() { Ok(v) } else { Err("spec must be a JSON object".into()) }
+}
+
 /// The tool's input (clock and reset as possibly-empty objects) as a [`Spec`].
 fn from_tool(v: &Value) -> Result<Spec, String> {
-    let mut v = v.clone();
+    let mut v = spec_value(v)?;
     for key in ["clock", "reset"] {
         if v[key]["port"].as_str().unwrap_or_default().is_empty() {
             v[key] = Value::Null;
@@ -429,6 +449,7 @@ pub async fn draft(
         })
         .collect();
     let mut pushed_back = false;
+    let mut asked_for_examples = false;
     let result: ApiResult<DraftResult> = async {
     for _ in 0..DRAFT_TURNS {
         let resp =
@@ -457,7 +478,7 @@ pub async fn draft(
             Err(e) => vec![e],
             Ok(spec) => {
                 let mut p = spec.check(chip.as_ref());
-                p.extend(assumes_open(&call["input"]["spec"], &spec));
+                p.extend(assumes_open(&spec_value(&call["input"]["spec"]).unwrap_or_default(), &spec));
                 let invented: Vec<&str> = spec
                     .decisions
                     .iter()
@@ -472,6 +493,16 @@ pub async fn draft(
                          question (your recommended answer first) and leave out examples that depend on it",
                         invented.iter().map(|q| format!("\"{q}\"")).collect::<Vec<_>>().join("; ")
                     ));
+                }
+                // One push back: a spec without examples tests nothing, and some behaviour can always be checked.
+                if p.is_empty() && spec.examples.is_empty() && !asked_for_examples {
+                    asked_for_examples = true;
+                    p.push(
+                        "There are no examples. Add at least one that holds whatever the open questions' answers are: \
+                         the main behaviour checked with wait_until and a generous limit instead of an exact count, or an \
+                         input held long enough for any delay or debouncing to pass"
+                            .into(),
+                    );
                 }
                 if p.is_empty() {
                     tracing::info!(project = %id, examples = spec.examples.len(), ?usage, "spec drafted");
@@ -499,4 +530,21 @@ pub async fn draft(
         crate::spend::record(&state, user.id, id, "draft", &usage).await;
     }
     result.map(Json)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_spec_sent_as_text_is_read_or_refused_without_panicking() {
+        let spec = json!({
+            "intent": "", "top": "t", "clock": { "port": "", "mhz": 0 }, "reset": { "port": "", "active_low": false },
+            "ports": [], "params": [], "decisions": [], "questions": [], "examples": []
+        });
+        assert_eq!(from_tool(&Value::String(spec.to_string())).expect("parsed").top, "t");
+        assert!(from_tool(&json!("not json")).unwrap_err().contains("JSON object"));
+        assert!(from_tool(&json!(42)).unwrap_err().contains("JSON object"));
+        assert!(from_tool(&spec).is_ok());
+    }
 }

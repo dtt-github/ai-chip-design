@@ -15,8 +15,10 @@ fills in:
 - **Questions** about anything your description leaves open. The suggested answer comes first;
   answering (or typing your own) updates the spec and adds the examples that depended on it.
 
-The assistant records only decisions you made: when it would have to guess, it asks instead, and
-it doesn't write examples that depend on an open question. Nothing is saved until you click **Save
+The assistant records only decisions you made: when it would have to guess, it asks instead
+(including whether an outside input needs a synchronizer or debouncing), and it doesn't write
+examples that depend on an open question. It always writes at least one example that holds
+whatever the answers are. Nothing is saved until you click **Save
 spec**; you can edit everything by hand, and **Ask for a change** sends an instruction in words.
 
 Saving commits `spec.json` and the generated example testbenches together.
@@ -35,7 +37,9 @@ for two cycles.
 | **Expect** | A connection must have a value now. |
 | **Expect for** | A connection must keep a value for the next N cycles (time moves past them). |
 
-Values are numbers: `1`, `0x55`, `0b1010`, `8'hA7`. Each example is compiled, by fixed rules (not
+Values are numbers: `1`, `0x55`, `0b1010`, `8'hA7`. An example must fit in the simulator's 50 µs
+(2,500 cycles at 50 MHz); for a long setting such as a 10 ms debounce, give the example a small
+value for that setting. Each example is compiled, by fixed rules (not
 by the AI), into a self-checking testbench `tb/examples/tb_ex_<id>.v`. Because these are ordinary
 testbenches, everything runs them: the server's simulation gate, the browser simulator, and
 gate-level simulation after a build. **Run examples** shows the result of each one;
