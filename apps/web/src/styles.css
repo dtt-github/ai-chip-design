@@ -253,6 +253,15 @@ code {
   grid-template-columns: 240px 1fr 280px;
 }
 
+.workspace.wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace.wide > .sidebar,
+.workspace.wide > .panel {
+  display: none;
+}
+
 .sidebar,
 .panel {
   background: var(--surface);
@@ -1979,4 +1988,207 @@ select.small {
 .first-run-steps li {
   display: flex;
   flex-direction: column;
+}
+
+/* Blocks view */
+.blocks {
+  max-width: none;
+}
+
+.blocks-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(220px, 280px);
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .blocks-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+  }
+
+  .blocks-palette {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .blocks-palette h3 {
+    display: none;
+  }
+
+  .blocks-group {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .blocks-mod {
+    padding: 4px 8px;
+  }
+
+  .blocks-mod .small {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .blocks-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.blocks-palette,
+.blocks-inspector {
+  gap: 8px;
+}
+
+.blocks-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.blocks-mod {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.blocks-mod:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.blocks-canvas-wrap {
+  padding: 6px;
+  overflow: auto;
+}
+
+.blocks-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: var(--bg);
+  border-radius: 6px;
+  user-select: none;
+}
+
+.blk-col {
+  font-size: 12px;
+  fill: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.blk-pin {
+  fill: var(--surface-2);
+  stroke: var(--border);
+  cursor: pointer;
+}
+
+.blk-pin.on,
+.blk-box.on {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.blk-box {
+  fill: var(--surface);
+  stroke: var(--border);
+}
+
+.blk-box.adapter {
+  stroke-dasharray: 4 3;
+}
+
+.blk-head {
+  fill: var(--surface-2);
+}
+
+.blk-title {
+  font-size: 13px;
+  font-weight: 600;
+  fill: var(--text);
+}
+
+.blk-mod {
+  font-weight: 400;
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.blk-label {
+  font-size: 12px;
+  font-family: var(--mono);
+  fill: var(--text);
+}
+
+.blk-end {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2;
+  cursor: crosshair;
+}
+
+.blk-end:hover,
+.blk-end.pending {
+  fill: var(--accent);
+}
+
+.blk-wire-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 12;
+  cursor: pointer;
+}
+
+.blk-wire {
+  fill: none;
+  stroke-width: 2.5;
+  pointer-events: none;
+}
+
+.blk-wire.ok {
+  stroke: var(--accent);
+}
+
+.blk-wire.warn {
+  stroke: var(--warn);
+  stroke-dasharray: 6 4;
+}
+
+.blk-wire.bad {
+  stroke: var(--danger);
+}
+
+.blk-wire.on {
+  stroke-width: 4;
+}
+
+.blocks-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.blocks-note.warning {
+  border-color: var(--warn);
+}
+
+.blocks-note button {
+  align-self: flex-start;
 }

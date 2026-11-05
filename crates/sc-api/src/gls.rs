@@ -261,7 +261,13 @@ pub async fn run(
     let failed: Vec<&&GlsRun> = ran.iter().filter(|r| r.verdict != "pass").collect();
     let skipped = runs.len() - ran.len();
     let (status, mut summary) = if ran.is_empty() {
-        ("skipped", "no testbench matches this build's parameters".to_string())
+        let other_top = runs.iter().all(|r| r.reason.as_deref().is_some_and(|w| w.starts_with("does not instantiate")));
+        let why = if other_top {
+            format!("no testbench uses {design} itself (they test its blocks)")
+        } else {
+            "no testbench matches this build's parameters".to_string()
+        };
+        ("skipped", why)
     } else if failed.is_empty() {
         ("passed", format!("{} of {} testbenches passed on the netlist", ran.len(), ran.len()))
     } else {

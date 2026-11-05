@@ -222,6 +222,81 @@ export interface SpecDraft {
   elapsed_ms: number;
 }
 
+export interface ChipPin {
+  name: string;
+  dir: "in" | "out";
+  width: number;
+  meaning: string;
+}
+
+export interface ChipBlock {
+  name: string;
+  module: string;
+  params: Record<string, string>;
+  x: number;
+  y: number;
+}
+
+export interface ChipWire {
+  from: string;
+  to: string;
+}
+
+/** blocks.json: the chip built from blocks. */
+export interface Blocks {
+  top: string;
+  clock: string | null;
+  reset: string | null;
+  pins: ChipPin[];
+  blocks: ChipBlock[];
+  wires: ChipWire[];
+}
+
+export interface BlockPort {
+  name: string;
+  dir: "in" | "out" | "inout";
+  width: number;
+}
+
+export interface BlockModule {
+  name: string;
+  file: string;
+  source: string;
+  params: Record<string, number>;
+  ports: BlockPort[];
+  description: string;
+}
+
+export interface BlockIssue {
+  level: "error" | "warning";
+  wire: number | null;
+  block: string | null;
+  message: string;
+}
+
+export interface BlocksCheck {
+  issues: BlockIssue[];
+  ports: Record<string, BlockPort[]>;
+  verilog: string | null;
+}
+
+export interface BlocksView {
+  head: string;
+  blocks: Blocks | null;
+  modules: BlockModule[];
+  problems: string[];
+  check: BlocksCheck | null;
+  design_name: string | null;
+  meanings: Record<string, Record<string, string>>;
+}
+
+export interface ReviewNote {
+  wire: number;
+  level: "ok" | "warning";
+  note: string;
+  adapter: "" | "sc_rise_pulse" | "sc_sync2" | "sc_invert" | "sc_resize";
+}
+
 /** Licences offered when creating a project (the server accepts any it knows). */
 export const PROJECT_LICENCES = [
   "Apache-2.0",
@@ -444,6 +519,12 @@ export const api = {
   createProject: (body: { name: string; description?: string; visibility?: string; licence?: string }) =>
     request<Project>("POST", "/projects", body),
   aiUsage: () => request<{ today_usd: number; limit_usd: number | null }>("GET", "/me/ai-usage"),
+  getBlocks: (id: string) => request<BlocksView>("GET", `/projects/${enc(id)}/blocks`),
+  checkBlocks: (id: string, blocks: Blocks) => request<BlocksCheck>("POST", `/projects/${enc(id)}/blocks/check`, { blocks }),
+  saveBlocks: (id: string, body: { blocks: Blocks; parent: string }) =>
+    request<{ commit: string; changed: boolean }>("PUT", `/projects/${enc(id)}/blocks`, body),
+  reviewBlocks: (id: string, blocks: Blocks) =>
+    request<{ notes: ReviewNote[]; summary: string }>("POST", `/projects/${enc(id)}/blocks/review`, { blocks }),
   getSpec: (id: string) => request<SpecView>("GET", `/projects/${enc(id)}/spec`),
   saveSpec: (id: string, body: { spec: Spec; parent: string; message?: string }) =>
     request<{ commit: string; changed: boolean }>("PUT", `/projects/${enc(id)}/spec`, body),

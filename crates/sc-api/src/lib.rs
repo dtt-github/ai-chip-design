@@ -2,6 +2,8 @@
 
 pub mod agent;
 pub mod auth;
+pub mod blocks;
+pub mod chip;
 pub mod claude;
 pub mod collab;
 pub mod design;
@@ -60,6 +62,9 @@ pub fn router(state: AppState) -> Router {
         .route("/projects/{id}/collab", get(collab::handler))
         .route("/projects/{id}/jobs", get(jobs::list).post(jobs::create))
         .route("/projects/{id}/agent", get(agent::list).post(agent::create))
+        .route("/projects/{id}/blocks", get(chip::get).put(chip::save))
+        .route("/projects/{id}/blocks/check", post(chip::check))
+        .route("/projects/{id}/blocks/review", post(chip::review))
         .route("/projects/{id}/spec", get(design::get).put(design::save))
         .route("/projects/{id}/spec/run", post(design::run))
         .route("/projects/{id}/spec/draft", post(design::draft))

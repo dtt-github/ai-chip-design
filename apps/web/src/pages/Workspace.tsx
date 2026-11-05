@@ -41,6 +41,9 @@ export function WorkspacePage() {
   const [panelTab, setPanelTab] = useState<"changes" | "runs" | "agent" | "ip">("changes");
   // Design: describe, examples, health. Code: the files and the editor (for Verilog experts).
   const [mode, setMode] = useState<"design" | "code">("design");
+  // The Blocks canvas takes the whole width (file tree and side panel hidden).
+  const [wideStep, setWideStep] = useState(false);
+  const wide = mode === "design" && wideStep;
   const [bottom, setBottom] = useState<Bottom>(null);
   const [maximized, setMaximized] = useState(false);
   const [committing, setCommitting] = useState(false);
@@ -289,7 +292,7 @@ export function WorkspacePage() {
       : session.status;
 
   return (
-    <div className="workspace">
+    <div className={`workspace ${wide ? "wide" : ""}`}>
       <style>{cursorCss}</style>
       <aside className="sidebar">
         <div className="sidebar-head">
@@ -354,6 +357,7 @@ export function WorkspacePage() {
           <DesignFlow
             projectId={id}
             startIntent={startIntent}
+            onWide={setWideStep}
             head={head}
             canEdit={!readOnly}
             onOpenFile={(path) => {

@@ -13,13 +13,16 @@ import {
 } from "../api";
 import { extendTestbench, fmt as fmtValue, replay, type Replay } from "../lib/replay";
 import { SimClient } from "../sim/client";
+import { BlocksStep } from "./Blocks";
 
-type Step = "describe" | "examples" | "health";
+type Step = "describe" | "examples" | "blocks" | "health";
 
 interface Props {
   projectId: string;
   /** Description to start a project without a spec with (from the starter ideas). */
   startIntent?: string | null;
+  /** Asks the page for the full width (the Blocks canvas). */
+  onWide?: (wide: boolean) => void;
   head: string | null;
   canEdit: boolean;
   /** Opens a file in the code view. */
@@ -65,8 +68,12 @@ function blankSpec(top: string, mhz: number | null): Spec {
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Intent-first design: describe the design, give examples (they become the tests), check its health. */
-export function DesignFlow({ projectId, startIntent, head, canEdit, onOpenFile, onShowRun, onShowProposal }: Props) {
+export function DesignFlow({ projectId, startIntent, onWide, head, canEdit, onOpenFile, onShowRun, onShowProposal }: Props) {
   const [step, setStep] = useState<Step>("describe");
+  useEffect(() => {
+    onWide?.(step === "blocks");
+    return () => onWide?.(false);
+  }, [step, onWide]);
   const [view, setView] = useState<SpecView | null>(null);
   const [draft, setDraft] = useState<Spec | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -177,6 +184,7 @@ export function DesignFlow({ projectId, startIntent, head, canEdit, onOpenFile, 
   const steps: [Step, string, string][] = [
     ["describe", "Describe", "What it should do"],
     ["examples", "Examples", "How you know it works"],
+    ["blocks", "Blocks", "What it is built from"],
     ["health", "Health", "Is it ready"],
   ];
 
@@ -260,8 +268,9 @@ export function DesignFlow({ projectId, startIntent, head, canEdit, onOpenFile, 
             }
           />
         )}
+        {step === "blocks" && <BlocksStep projectId={projectId} head={head} canEdit={canEdit} />}
         {step === "health" && (
-          <Health projectId={projectId} head={head} clockMhz={view.spec?.clock?.mhz ?? view.clock_mhz} run={run} canEdit={canEdit} onShowRun={onShowRun} />
+          <Health projectId={projectId} head={head} specTop={view.spec?.top ?? null} clockMhz={view.spec?.clock?.mhz ?? view.clock_mhz} run={run} canEdit={canEdit} onShowRun={onShowRun} />
         )}
       </div>
     </div>
@@ -1064,6 +1073,7 @@ function Health({
   projectId,
   head,
   clockMhz,
+  specTop,
   run,
   canEdit,
   onShowRun,
@@ -1072,6 +1082,8 @@ function Health({
   head: string | null;
   /** From the spec, else the flow config's CLOCK_PERIOD. */
   clockMhz: number | null;
+  /** The module the examples test. */
+  specTop: string | null;
   run: SpecRun | null;
   canEdit: boolean;
   onShowRun: (job: Job) => void;
@@ -1123,16 +1135,21 @@ function Health({
   const gRan = gEx.length - gSkip;
   const gatesOk = !gls || (gls.status !== "failed" && gPass === gRan);
   const works = exTotal > 0 && exPass === exTotal && gatesOk;
+  // The build is a chip made of blocks and no example drives the chip itself.
+  const chipUntested = !!gls && gRan === 0 && gEx.length > 0 && gEx.every((r) => r.reason?.startsWith("does not instantiate"));
   const onGates = !gls
     ? " Build the design to check them on the synthesised gates too."
     : gRan === 0
-      ? " None of them match this build's settings, so none ran on the synthesised gates."
+      ? gEx.length > 0 && gEx.every((r) => r.reason?.startsWith("does not instantiate"))
+        ? ` They test ${gls.design === specTop ? "the design" : `the block ${specTop ?? ""}`}, but this build is the whole chip ${gls.design}, so none ran on its gates.`
+        : " None of them match this build's settings, so none ran on the synthesised gates."
       : ` On the synthesised gates, ${gPass} of ${gRan} pass` +
         (gSkip ? `; ${gSkip} ${gSkip === 1 ? "is" : "are"} for a different setting, so not part of this build.` : ".");
   cards.push({
     id: "works",
-    ok: exTotal === 0 ? null : works,
-    title: exTotal === 0 ? "Works: no examples yet" : works ? "It works" : "Not working yet",
+    ok: exTotal === 0 || (works && chipUntested) ? null : works,
+    title:
+      exTotal === 0 ? "Works: no examples yet" : !works ? "Not working yet" : chipUntested ? "The blocks work; the chip isn't tested yet" : "It works",
     plain: exTotal === 0 ? "Add examples so there's something to check the design against." : `${exPass} of ${exTotal} examples pass on your design.${onGates}`,
     explain:
       "Each example is run in simulation on the Verilog. After a build, the testbenches that match the build's settings run again on the gate-level netlist the chip would be made from.",

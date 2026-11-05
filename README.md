@@ -206,6 +206,24 @@ tree and editor for those who do. Both work on the same files and Git history.
   "about N× faster", can be manufactured, size and power), each with "What does this mean?" and
   the expert numbers, plus what still needs an expert before a real chip run.
 
+### Blocks: the chip from blocks
+
+The Blocks step (`sc-api/src/blocks.rs`, `chip.rs`; `apps/web/src/components/Blocks.tsx`) puts
+the chip together on a canvas: the project's modules, imported IP and a small adapter library
+(`sc_rise_pulse` level to one-clock pulse, `sc_sync2` two-flop synchronizer, `sc_invert`,
+`sc_resize`), the chip's pins, and connections made by clicking two connection points.
+`blocks.json` is the source; saving (`PUT /api/projects/{id}/blocks`) checks it and commits the
+generated top `src/<top>.v`, `src/sc_adapters.v` when adapters are used, and `config.json` with
+`DESIGN_NAME` set to the chip and `VERILOG_FILES` set to exactly the files it uses.
+
+Checks need no judgement and run as you edit (`POST .../blocks/check`): every end exists, values
+flow from an output (or input pin) to an input (or output pin), widths match, each input has one
+source; unconnected inputs are tied to 0 with a warning; ports named like the clock and reset
+pins are connected to them automatically. Whether a connection makes sense is the assistant's
+part (`POST .../blocks/review`): a note per connection in plain words, and where it helps, one of
+the library adapters, which "Add adapter" puts into the connection. Examples test the module
+named in `spec.json`; the chip as a whole has no examples of its own yet, and Health says so.
+
 ### IP registry
 
 The IP tab publishes a project as a reusable block and imports blocks from other projects
