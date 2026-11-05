@@ -153,3 +153,28 @@ What the assistant got wrong:
 Provider errors: the OpenRouter account allows few requests per minute for a new account (429)
 and the key had a spending cap (402). Four agent runs stopped on those errors before finishing.
 The runner now counts such a run as a failed attempt to retry, not as a graded result.
+
+## Round 1: assistant drafting
+
+The drafting prompt now counts timing explicitly, asks about synchronizers and debouncing, treats an
+example of a question's own situation as depending on it, and always writes an example (a draft
+without one is sent back once). Rerun of the five tasks that failed at baseline, 2 repeats each
+(2026-11-05):
+
+| Task | Baseline | Round 1 | Cost per run (baseline → round 1) |
+|---|---|---|---|
+| edges | 0/2 | 2/2 | $0.14 → $0.17 |
+| sipo | 1/2 | 2/2 | $0.23 → $0.25 |
+| stretch | 1/2 | 2/2 | $0.29 → $0.24 |
+| toggle_led | 0/2 | 0/2 | $0.11 → $0.41 |
+| uart_tx | 1/2 | 2/2 | $0.36 → $0.35 |
+| **Total** | **3/10** | **8/10** | |
+
+toggle_led now writes examples, but fails differently: one draft added settings the task didn't ask
+for (`LED_START`, `PRESSED`), so its examples don't fit the requested design; the other chose a
+real debounce time, and its examples run longer than the simulation limit (50 µs, about 2,500
+cycles at 50 MHz), which the spec check doesn't catch yet. The ten tasks that passed at baseline
+were not rerun, so a regression there would not show.
+
+The rerun also found a server bug: when the model sent the spec as JSON text, the draft request
+crashed with no answer (fixed; it was probably the baseline's "fetch failed" on fifo4 too).
