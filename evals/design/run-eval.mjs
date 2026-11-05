@@ -277,6 +277,12 @@ async function propose(input, ctx) {
     await new Promise(r => setTimeout(r, POLL_MS));
     p = await api('GET', `/agent/${p.id}`);
   }
+  // A provider error (rate limit, credit, outage) says nothing about the model: fail the attempt
+  // so it lands in errors.jsonl and a resumed run retries it, instead of grading partial work.
+  if (p.status === 'failed' && /Claude API error (402|408|429|5\d\d)/.test(p.error ?? '')) {
+    throw Object.assign(new Error(`provider error, not graded: ${p.error.slice(0, 200)}`),
+                        { failure_class: 'provider_error', usage: p.evidence?.usage });
+  }
   const ev = p.evidence ?? {};
   return { project, proposal: p.id, request, files: p.files ?? {}, status: p.status, error: p.error, title: p.title,
            summary: p.summary, gate: p.gate, model: ev.models_served?.[0] ?? p.model, usage: ev.usage ?? {}, steps: ev.steps ?? [] };

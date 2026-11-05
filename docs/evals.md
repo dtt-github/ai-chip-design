@@ -126,3 +126,30 @@ The first pilot (2026-11-05; Claude Opus 5.5 via OpenRouter; blinker, uart_tx an
 run each) passed all 6 runs and cost $1.32: $0.28 per spec draft (71-103 s) and $0.16 per agent
 proposal (35-66 s, 4-7 turns). At that rate the whole set, 16 tasks with 2 repeats on both evals,
 costs about $14; larger tasks such as `uart_rx` and `fifo4` will likely cost more.
+
+## Baseline results
+
+First full run, 2026-11-05: Claude Opus 5.5 through OpenRouter, 16 tasks, 2 repeats, both evals.
+$12.72 in total, as the server recorded it (the four agent runs that a provider error stopped
+were rerun; see below).
+
+| Eval | Pass | Clear tasks | Vague tasks | Cost per run | Time per run |
+|---|---|---|---|---|---|
+| Assistant | 25 of 32 (78%) | 20 of 22 | 5 of 10 | $0.26 | 41-172 s |
+| Agent | 32 of 32 (100%) | 22 of 22 | 10 of 10 | $0.13 | 28-70 s, 4-7 turns |
+
+What the assistant got wrong:
+
+- **Counting cycles** (uart_tx, sipo; one repeat each): an example expected busy to drop one
+  cycle early, and one expected a bit to still be there after 8 shifts.
+- **An example that depended on its own open question** (stretch, one repeat): it asked how long
+  dout stays high after a pulse, then wrote an example that assumed an answer (a 2-cycle pulse
+  becomes 4 cycles; the reference decision gives 5).
+- **No examples at all** (toggle_led, both repeats): it asked all the right questions but wrote no
+  example, although "a long press and release toggles the LED once" holds whatever the answers.
+- **Didn't ask whether the input is synchronous** (edges, both repeats): it asked about latency,
+  pulse length and the state after reset, but not about a synchronizer.
+
+Provider errors: the OpenRouter account allows few requests per minute for a new account (429)
+and the key had a spending cap (402). Four agent runs stopped on those errors before finishing.
+The runner now counts such a run as a failed attempt to retry, not as a graded result.
