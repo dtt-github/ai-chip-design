@@ -1,0 +1,11 @@
+{
+  "id": "pwm",
+  "kind": "clear",
+  "tags": [
+    "counter",
+    "comparator"
+  ],
+  "top": "pwm",
+  "description": "A PWM generator. Module `pwm` with inputs clk, rst_n (active-low reset) and duty (8 bits), and output out. An 8-bit counter is 0 during reset and goes up by one at every rising clock edge, wrapping from 255 to 0. out is 1 while the counter is below duty, so duty 0 is always off and duty 255 is on for 255 of every 256 cycles. out follows a change of duty straight away (no extra register).",
+  "open_points": []
+}

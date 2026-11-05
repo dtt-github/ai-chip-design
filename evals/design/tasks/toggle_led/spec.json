@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "intent": "Press the button to toggle the LED. Module `toggle_led` with inputs clk, rst_n (active-low reset) and button, and output led (from a register). button is already clean and synchronous to clk. The LED toggles at the rising clock edge that first samples button = 1 after it was 0 (holding the button does nothing more). The LED is off after reset, and a button already held when reset ends counts as a press.",
+  "top": "toggle_led",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "button",
+      "dir": "in",
+      "width": 1,
+      "meaning": "1 while pressed"
+    },
+    {
+      "name": "led",
+      "dir": "out",
+      "width": 1,
+      "meaning": "The LED"
+    }
+  ],
+  "params": [],
+  "decisions": [
+    {
+      "question": "Does the button need debouncing?",
+      "answer": "No: it is already clean and synchronous to clk."
+    },
+    {
+      "question": "Toggle on press or on release?",
+      "answer": "On press: at the rising edge that first samples button = 1."
+    },
+    {
+      "question": "LED after reset?",
+      "answer": "Off."
+    }
+  ],
+  "questions": [],
+  "examples": [
+    {
+      "id": "press_toggles",
+      "title": "Each press toggles the LED once",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "expect",
+          "signal": "led",
+          "value": "0"
+        },
+        {
+          "op": "set",
+          "signal": "button",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "led",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "led",
+          "value": "1",
+          "cycles": 5,
+          "note": "held"
+        },
+        {
+          "op": "set",
+          "signal": "button",
+          "value": "0"
+        },
+        {
+          "op": "expect_for",
+          "signal": "led",
+          "value": "1",
+          "cycles": 3,
+          "note": "released"
+        },
+        {
+          "op": "set",
+          "signal": "button",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "led",
+          "value": "0"
+        }
+      ]
+    }
+  ]
+}

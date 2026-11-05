@@ -1,0 +1,23 @@
+{
+  "id": "traffic",
+  "kind": "vague",
+  "tags": [
+    "fsm",
+    "open point"
+  ],
+  "top": "traffic",
+  "description": "A traffic light controller for one road: it goes green, then yellow, then red, and repeats. Module `traffic` with parameters GREEN, YELLOW and RED (defaults 8, 2 and 6: how many clock cycles each light stays on), inputs clk and rst_n (active-low reset), and outputs red, yellow and green, exactly one of which is on.",
+  "open_points": [
+    {
+      "point": "Which light is on after reset",
+      "keywords": [
+        "after reset",
+        "reset",
+        "first light",
+        "start with",
+        "starts with",
+        "initial"
+      ]
+    }
+  ]
+}

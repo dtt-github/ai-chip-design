@@ -1,0 +1,10 @@
+{
+  "id": "updown",
+  "kind": "clear",
+  "tags": [
+    "counter"
+  ],
+  "top": "updown",
+  "description": "An up/down counter. Module `updown` with inputs clk, rst_n (active-low reset), up and down, and a 4-bit output count. At each rising clock edge: up alone adds one, down alone subtracts one (both wrap around, 15 to 0 and 0 to 15), and both or neither keep the count. Reset sets the count to 0.",
+  "open_points": []
+}

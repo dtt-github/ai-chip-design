@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+// Reference design for eval task "debounce".
+module debounce #(parameter N = 4) (
+    input wire clk,
+    input wire rst_n,
+    input wire din,
+    output reg dout
+);
+    reg [15:0] cnt;
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            cnt <= 16'd0;
+            dout <= 1'b0;
+        end else if (din == dout) begin
+            cnt <= 16'd0;
+        end else if (cnt == N - 1) begin
+            cnt <= 16'd0;
+            dout <= din;
+        end else begin
+            cnt <= cnt + 16'd1;
+        end
+    end
+endmodule

@@ -1,0 +1,11 @@
+{
+  "id": "uart_tx",
+  "kind": "clear",
+  "tags": [
+    "uart",
+    "fsm"
+  ],
+  "top": "uart_tx",
+  "description": "A UART transmitter. Module `uart_tx` with a parameter CLKS_PER_BIT (default 4), inputs clk, rst_n (active-low reset), start and data (8 bits), and outputs tx and busy. tx is 1 when idle. At a rising clock edge where start is 1 and busy is 0, it takes data and sends a frame: a start bit (0), the 8 data bits least significant first, and a stop bit (1), each for exactly CLKS_PER_BIT cycles. tx changes at that edge (the start bit begins) and busy is 1 for exactly 10 x CLKS_PER_BIT cycles from that edge. A start while busy is ignored, not queued. tx and busy come straight from registers. Reset makes it idle.",
+  "open_points": []
+}

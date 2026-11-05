@@ -1,0 +1,34 @@
+{
+  "id": "edges",
+  "kind": "vague",
+  "tags": [
+    "edge detect",
+    "open point"
+  ],
+  "top": "edges",
+  "description": "Tell me when din goes up or down: rise and fall outputs. Module `edges` with inputs clk, rst_n (active-low reset) and din, and outputs rise and fall.",
+  "open_points": [
+    {
+      "point": "Latency and length of the pulses",
+      "keywords": [
+        "latency",
+        "delay",
+        "same cycle",
+        "one cycle",
+        "how long",
+        "registered",
+        "combinational",
+        "pulse"
+      ]
+    },
+    {
+      "point": "Is din synchronous",
+      "keywords": [
+        "synchron",
+        "asynchron",
+        "metastab",
+        "clock domain"
+      ]
+    }
+  ]
+}

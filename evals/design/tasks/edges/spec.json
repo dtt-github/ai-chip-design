@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "intent": "Edge detector. Module `edges` with inputs clk, rst_n (active-low reset) and din, and outputs rise and fall (from registers). din is synchronous to clk. rise is 1 for exactly one clock cycle, starting at the rising edge that first samples din = 1 after a 0; fall likewise for din = 0 after a 1. Before the first edge after reset din is taken as 0, so din = 1 when reset ends is a rise.",
+  "top": "edges",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "din",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Input"
+    },
+    {
+      "name": "rise",
+      "dir": "out",
+      "width": 1,
+      "meaning": "1 for one cycle after din goes 0 to 1"
+    },
+    {
+      "name": "fall",
+      "dir": "out",
+      "width": 1,
+      "meaning": "1 for one cycle after din goes 1 to 0"
+    }
+  ],
+  "params": [],
+  "decisions": [
+    {
+      "question": "Is din synchronous to clk?",
+      "answer": "Yes, no synchronizer is needed."
+    },
+    {
+      "question": "When do rise and fall pulse?",
+      "answer": "For one cycle, from the rising edge that first samples the new value (registered)."
+    },
+    {
+      "question": "din already 1 when reset ends?",
+      "answer": "Counts as a rise (din is taken as 0 before)."
+    }
+  ],
+  "questions": [],
+  "examples": [
+    {
+      "id": "rise_then_fall",
+      "title": "One pulse on rise, then one on fall",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "expect_for",
+          "signal": "rise",
+          "value": "0",
+          "cycles": 3
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "rise",
+          "value": "1"
+        },
+        {
+          "op": "expect",
+          "signal": "fall",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "rise",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 3
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "fall",
+          "value": "1"
+        },
+        {
+          "op": "expect",
+          "signal": "rise",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "fall",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "id": "steady",
+      "title": "No pulses while din is steady",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 2
+        },
+        {
+          "op": "expect_for",
+          "signal": "rise",
+          "value": "0",
+          "cycles": 10
+        },
+        {
+          "op": "expect",
+          "signal": "fall",
+          "value": "0"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "intent": "An LED blinker. Module `blinker` with a parameter N (default 4), inputs clk, rst_n (active-low reset) and en, and output led. While en is 1 the LED toggles every N clock cycles: it turns on at the Nth rising clock edge at which en is 1, turns off N edges later, and so on. When en is 0 the LED is off and the count starts over. Reset turns the LED off.",
+  "top": "blinker",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "en",
+      "dir": "in",
+      "width": 1,
+      "meaning": "1 makes the LED blink"
+    },
+    {
+      "name": "led",
+      "dir": "out",
+      "width": 1,
+      "meaning": "The LED"
+    }
+  ],
+  "params": [
+    {
+      "name": "N",
+      "value": "4",
+      "meaning": "Clock cycles per LED step"
+    }
+  ],
+  "decisions": [],
+  "questions": [],
+  "examples": [
+    {
+      "id": "first_on",
+      "title": "LED comes on after N cycles and goes off N later",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "en",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "led",
+          "value": "0",
+          "cycles": 4,
+          "note": "counting"
+        },
+        {
+          "op": "expect",
+          "signal": "led",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "led",
+          "value": "1",
+          "cycles": 4
+        },
+        {
+          "op": "expect",
+          "signal": "led",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "id": "enable_off",
+      "title": "Turning en off switches the LED off",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "en",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 5
+        },
+        {
+          "op": "expect",
+          "signal": "led",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "en",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "led",
+          "value": "0"
+        },
+        {
+          "op": "expect_for",
+          "signal": "led",
+          "value": "0",
+          "cycles": 10
+        }
+      ]
+    }
+  ]
+}

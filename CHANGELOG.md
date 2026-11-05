@@ -18,6 +18,8 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Fixed
 
+- The simulator read a sized index with its top bit set as negative (`f[4'd8]`, or a 4-bit
+  `b + 4'd1` reaching 8, gave 0); indices are now unsigned unless the expression is signed.
 - Example checks look 1 ps after the falling clock edge, so combinational outputs have settled
   (an example of a design without a clock could see the value from before the last `set`). The
   "what actually happened" replay samples at the same moment.

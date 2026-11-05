@@ -1,0 +1,36 @@
+{
+  "id": "stretch",
+  "kind": "vague",
+  "tags": [
+    "counter",
+    "open point"
+  ],
+  "top": "stretch",
+  "description": "Make every pulse on din at least N clock cycles long on dout. Module `stretch` with a parameter N (default 4), inputs clk, rst_n (active-low reset) and din, and output dout.",
+  "open_points": [
+    {
+      "point": "A new pulse while stretching",
+      "keywords": [
+        "retrigger",
+        "re-trigger",
+        "during",
+        "while",
+        "again",
+        "restart",
+        "extend",
+        "overlap",
+        "second pulse"
+      ]
+    },
+    {
+      "point": "Pulses longer than N",
+      "keywords": [
+        "longer",
+        "long pulse",
+        "already",
+        "more than n",
+        "wider"
+      ]
+    }
+  ]
+}

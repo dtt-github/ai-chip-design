@@ -1,0 +1,264 @@
+{
+  "version": 1,
+  "intent": "A UART transmitter. Module `uart_tx` with a parameter CLKS_PER_BIT (default 4), inputs clk, rst_n (active-low reset), start and data (8 bits), and outputs tx and busy. tx is 1 when idle. At a rising clock edge where start is 1 and busy is 0, it takes data and sends a frame: a start bit (0), the 8 data bits least significant first, and a stop bit (1), each for exactly CLKS_PER_BIT cycles. tx changes at that edge (the start bit begins) and busy is 1 for exactly 10 x CLKS_PER_BIT cycles from that edge. A start while busy is ignored, not queued. tx and busy come straight from registers. Reset makes it idle.",
+  "top": "uart_tx",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "start",
+      "dir": "in",
+      "width": 1,
+      "meaning": "1 starts sending data"
+    },
+    {
+      "name": "data",
+      "dir": "in",
+      "width": 8,
+      "meaning": "Byte to send"
+    },
+    {
+      "name": "tx",
+      "dir": "out",
+      "width": 1,
+      "meaning": "Serial line, 1 when idle"
+    },
+    {
+      "name": "busy",
+      "dir": "out",
+      "width": 1,
+      "meaning": "1 while sending"
+    }
+  ],
+  "params": [
+    {
+      "name": "CLKS_PER_BIT",
+      "value": "4",
+      "meaning": "Clock cycles per bit"
+    }
+  ],
+  "decisions": [],
+  "questions": [],
+  "examples": [
+    {
+      "id": "idle",
+      "title": "The line idles high",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "expect_for",
+          "signal": "tx",
+          "value": "1",
+          "cycles": 10
+        },
+        {
+          "op": "expect",
+          "signal": "busy",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "id": "send_a5",
+      "title": "Sends 0xA5 as start, 8 bits LSB first, stop",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "data",
+          "value": "0xA5"
+        },
+        {
+          "op": "set",
+          "signal": "start",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "start",
+          "value": "0"
+        },
+        {
+          "op": "expect",
+          "signal": "busy",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "tx",
+          "value": "0",
+          "cycles": 4,
+          "note": "start bit"
+        },
+        {
+          "op": "expect_for",
+          "signal": "tx",
+          "value": "1",
+          "cycles": 4,
+          "note": "bit 0"
+        },
+        {
+          "op": "expect_for",
+          "signal": "tx",
+          "value": "0",
+          "cycles": 4,
+          "note": "bit 1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "tx",
+          "value": "1",
+          "cycles": 4,
+          "note": "bit 2"
+        },
+        {
+          "op": "expect_for",
+          "signal": "tx",
+          "value": "0",
+          "cycles": 4,
+          "note": "bit 3"
+        },
+        {
+          "op": "expect_for",
+          "signal": "tx",
+          "value": "0",
+          "cycles": 4,
+          "note": "bit 4"
+        },
+        {
+          "op": "expect_for",
+          "signal": "tx",
+          "value": "1",
+          "cycles": 4,
+          "note": "bit 5"
+        },
+        {
+          "op": "expect_for",
+          "signal": "tx",
+          "value": "0",
+          "cycles": 4,
+          "note": "bit 6"
+        },
+        {
+          "op": "expect_for",
+          "signal": "tx",
+          "value": "1",
+          "cycles": 4,
+          "note": "bit 7"
+        },
+        {
+          "op": "expect_for",
+          "signal": "tx",
+          "value": "1",
+          "cycles": 4,
+          "note": "stop bit"
+        },
+        {
+          "op": "expect",
+          "signal": "busy",
+          "value": "0"
+        },
+        {
+          "op": "expect",
+          "signal": "tx",
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "id": "ignore_while_busy",
+      "title": "A second start while busy is ignored",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "data",
+          "value": "0x00"
+        },
+        {
+          "op": "set",
+          "signal": "start",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "start",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 10
+        },
+        {
+          "op": "set",
+          "signal": "data",
+          "value": "0xFF"
+        },
+        {
+          "op": "set",
+          "signal": "start",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "start",
+          "value": "0"
+        },
+        {
+          "op": "wait_until",
+          "signal": "busy",
+          "value": "0",
+          "cycles": 40
+        },
+        {
+          "op": "expect",
+          "signal": "tx",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "busy",
+          "value": "0",
+          "cycles": 5,
+          "note": "nothing queued"
+        }
+      ]
+    }
+  ]
+}

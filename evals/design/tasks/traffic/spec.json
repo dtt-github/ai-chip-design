@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "intent": "A traffic light controller for one road: green, then yellow, then red, repeating. Module `traffic` with parameters GREEN, YELLOW and RED (defaults 8, 2, 6), inputs clk and rst_n (active-low reset), outputs red, yellow and green, exactly one on at a time. After reset the light is red. Each light stays on for its parameter's number of clock cycles: the light changes at the rising edge that ends its time (red after reset lasts RED cycles from the end of reset). The outputs follow the state register directly.",
+  "top": "traffic",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "red",
+      "dir": "out",
+      "width": 1,
+      "meaning": "Red light"
+    },
+    {
+      "name": "yellow",
+      "dir": "out",
+      "width": 1,
+      "meaning": "Yellow light"
+    },
+    {
+      "name": "green",
+      "dir": "out",
+      "width": 1,
+      "meaning": "Green light"
+    }
+  ],
+  "params": [
+    {
+      "name": "GREEN",
+      "value": "8",
+      "meaning": "Cycles of green"
+    },
+    {
+      "name": "YELLOW",
+      "value": "2",
+      "meaning": "Cycles of yellow"
+    },
+    {
+      "name": "RED",
+      "value": "6",
+      "meaning": "Cycles of red"
+    }
+  ],
+  "decisions": [
+    {
+      "question": "Which light is on right after reset?",
+      "answer": "Red, for the full RED time, then green."
+    }
+  ],
+  "questions": [],
+  "examples": [
+    {
+      "id": "cycle",
+      "title": "Red, green, yellow, red with their durations",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "expect",
+          "signal": "green",
+          "value": "0"
+        },
+        {
+          "op": "expect",
+          "signal": "yellow",
+          "value": "0"
+        },
+        {
+          "op": "expect_for",
+          "signal": "red",
+          "value": "1",
+          "cycles": 6,
+          "note": "red first after reset"
+        },
+        {
+          "op": "expect",
+          "signal": "red",
+          "value": "0"
+        },
+        {
+          "op": "expect",
+          "signal": "green",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "green",
+          "value": "1",
+          "cycles": 8
+        },
+        {
+          "op": "expect",
+          "signal": "yellow",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "yellow",
+          "value": "1",
+          "cycles": 2
+        },
+        {
+          "op": "expect",
+          "signal": "red",
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "id": "period",
+      "title": "The whole cycle takes 16 clock cycles",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "expect",
+          "signal": "red",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 16
+        },
+        {
+          "op": "expect",
+          "signal": "red",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 5
+        },
+        {
+          "op": "expect",
+          "signal": "red",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "green",
+          "value": "1"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "watchdog",
+  "kind": "vague",
+  "tags": [
+    "counter",
+    "open point"
+  ],
+  "top": "watchdog",
+  "description": "A watchdog: if kick doesn't come for TIMEOUT clock cycles, raise bark. Module `watchdog` with a parameter TIMEOUT (default 8), inputs clk, rst_n (active-low reset) and kick, and output bark.",
+  "open_points": [
+    {
+      "point": "Does bark stay on or pulse",
+      "keywords": [
+        "stay",
+        "latch",
+        "pulse",
+        "until",
+        "clear",
+        "how long",
+        "one cycle",
+        "sticky"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "intent": "A pattern detector. Module `seq1011` with inputs clk, rst_n (active-low reset) and din, and output found. din is sampled at each rising clock edge. found is 1 for the clock cycle right after the edge that samples the last bit of the pattern 1, 0, 1, 1, and 0 otherwise. Overlapping patterns count (1011011 finds two). found comes from a register; reset clears it and forgets earlier bits.",
+  "top": "seq1011",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "din",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Serial input"
+    },
+    {
+      "name": "found",
+      "dir": "out",
+      "width": 1,
+      "meaning": "1 after 1011 is seen"
+    }
+  ],
+  "params": [],
+  "decisions": [],
+  "questions": [],
+  "examples": [
+    {
+      "id": "one_match",
+      "title": "1011 is found",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "found",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "found",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "id": "overlap",
+      "title": "1011011 is found twice",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "found",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "found",
+          "value": "0"
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "found",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "found",
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "id": "ones",
+      "title": "All ones never match",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "found",
+          "value": "0",
+          "cycles": 10
+        }
+      ]
+    }
+  ]
+}

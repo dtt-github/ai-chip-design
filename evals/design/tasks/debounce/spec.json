@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "intent": "A debouncer. Module `debounce` with a parameter N (default 4), inputs clk, rst_n (active-low reset) and din, and output dout. din is already synchronous to clk. dout takes din's new value only once din has differed from dout at N consecutive rising clock edges; dout changes at the Nth of those edges. Shorter changes are ignored. After reset dout is 0.",
+  "top": "debounce",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "din",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Noisy input"
+    },
+    {
+      "name": "dout",
+      "dir": "out",
+      "width": 1,
+      "meaning": "Debounced output"
+    }
+  ],
+  "params": [
+    {
+      "name": "N",
+      "value": "4",
+      "meaning": "Cycles the input must be stable"
+    }
+  ],
+  "decisions": [],
+  "questions": [],
+  "examples": [
+    {
+      "id": "steady_press",
+      "title": "A change that lasts N cycles gets through",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "dout",
+          "value": "0",
+          "cycles": 4,
+          "note": "still filtering"
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "id": "glitch",
+      "title": "A change shorter than N cycles is ignored",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 3
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "expect_for",
+          "signal": "dout",
+          "value": "0",
+          "cycles": 10
+        }
+      ]
+    },
+    {
+      "id": "release",
+      "title": "Going back to 0 is filtered the same way",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "expect_for",
+          "signal": "dout",
+          "value": "1",
+          "cycles": 4
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0"
+        }
+      ]
+    }
+  ]
+}

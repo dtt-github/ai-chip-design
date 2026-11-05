@@ -1,0 +1,29 @@
+{
+  "id": "toggle_led",
+  "kind": "vague",
+  "tags": [
+    "edge detect",
+    "open point"
+  ],
+  "top": "toggle_led",
+  "description": "Press the button to toggle the LED. Module `toggle_led` with inputs clk, rst_n (active-low reset) and button, and output led.",
+  "open_points": [
+    {
+      "point": "Debounce the button?",
+      "keywords": [
+        "bounce",
+        "debounc",
+        "noisy",
+        "clean"
+      ]
+    },
+    {
+      "point": "Toggle on press or release",
+      "keywords": [
+        "press",
+        "release",
+        "edge"
+      ]
+    }
+  ]
+}
