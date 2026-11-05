@@ -264,3 +264,23 @@ fn hostile_nesting_is_refused_not_a_crash() {
     );
     assert_eq!(on_big_stack(|| log(&src)), vec!["901"]);
 }
+
+#[test]
+fn sized_indices_are_unsigned() {
+    // A 4-bit index of 8 is bit 8, not -8 (found by the design evals: a UART frame lost its
+    // last bits); signed indices still count from below.
+    let l = log(r#"
+module tb;
+    reg [9:0] f = 10'b1100000000;
+    reg [3:0] b = 4'd7;
+    reg [7:0] m [0:15];
+    integer i = -1;
+    initial begin
+        m[4'd9] = 8'h5A;
+        f[b + 4'd2] = 1'b0;
+        $display("%0d %0d %0d %0d %h", f[b + 4'd1], f[4'd8], f[b + 4'd2], f[i], m[b + 4'd2]);
+        $display("%b", f[b + 4'd1 -: 2]);
+    end
+endmodule"#);
+    assert_eq!(l, vec!["1 1 0 0 5a", "10"]);
+}

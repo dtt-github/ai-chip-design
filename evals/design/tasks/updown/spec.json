@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "intent": "An up/down counter. Module `updown` with inputs clk, rst_n (active-low reset), up and down, and a 4-bit output count. At each rising clock edge: up alone adds one, down alone subtracts one (both wrap around, 15 to 0 and 0 to 15), and both or neither keep the count. Reset sets the count to 0.",
+  "top": "updown",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "up",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Count up"
+    },
+    {
+      "name": "down",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Count down"
+    },
+    {
+      "name": "count",
+      "dir": "out",
+      "width": 4,
+      "meaning": "The count"
+    }
+  ],
+  "params": [],
+  "decisions": [],
+  "questions": [],
+  "examples": [
+    {
+      "id": "up_then_down",
+      "title": "Counts up, then down past zero",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "up",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 3
+        },
+        {
+          "op": "expect",
+          "signal": "count",
+          "value": "3"
+        },
+        {
+          "op": "set",
+          "signal": "up",
+          "value": "0"
+        },
+        {
+          "op": "set",
+          "signal": "down",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 5
+        },
+        {
+          "op": "expect",
+          "signal": "count",
+          "value": "14"
+        }
+      ]
+    },
+    {
+      "id": "both_hold",
+      "title": "Up and down together hold the count",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "up",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "down",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "count",
+          "value": "0",
+          "cycles": 5
+        }
+      ]
+    },
+    {
+      "id": "wrap",
+      "title": "Wraps from 15 to 0",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "up",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 15
+        },
+        {
+          "op": "expect",
+          "signal": "count",
+          "value": "15"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "count",
+          "value": "0"
+        }
+      ]
+    }
+  ]
+}

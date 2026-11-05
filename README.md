@@ -61,6 +61,7 @@ Then open http://localhost:5173.
 | [API reference](docs/api.md) | HTTP and WebSocket endpoints, roles, errors |
 | [Configuration](docs/configuration.md) | Every environment variable |
 | [Development](docs/development.md) | Workflow, conventions, CI, migrations, how to add a feature |
+| [Design evals](docs/evals.md) | Task set, checks, pass rate and cost per task for the assistant and agent |
 | [Pilot deployment](deploy/pilot/README.md) | One-host HTTPS deployment, backups and restore |
 | [Security review](docs/security-review.md) | What was reviewed, fixed and accepted before the pilot |
 | [Phase 0 gate](docs/phase0-gate.md) | The first end-to-end milestone |

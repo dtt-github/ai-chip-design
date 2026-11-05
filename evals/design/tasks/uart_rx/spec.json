@@ -1,0 +1,339 @@
+{
+  "version": 1,
+  "intent": "A UART receiver. Module `uart_rx` with a parameter CLKS_PER_BIT (default 4), inputs clk, rst_n (active-low reset) and rx, and outputs data (8 bits) and valid. rx idles at 1 and is already synchronous to clk. A frame is a start bit (0), 8 data bits least significant first and a stop bit (1), each CLKS_PER_BIT cycles long; sample each bit near its middle. After a frame whose stop bit is 1, valid is 1 for exactly one clock cycle, no later than one bit time after the stop bit ends, and data holds the byte during that cycle. A frame whose stop bit is 0 is discarded (no valid). Reset makes it idle with valid 0.",
+  "top": "uart_rx",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "rx",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Serial line, 1 when idle"
+    },
+    {
+      "name": "data",
+      "dir": "out",
+      "width": 8,
+      "meaning": "Received byte"
+    },
+    {
+      "name": "valid",
+      "dir": "out",
+      "width": 1,
+      "meaning": "1 for one cycle when a byte arrives"
+    }
+  ],
+  "params": [
+    {
+      "name": "CLKS_PER_BIT",
+      "value": "4",
+      "meaning": "Clock cycles per bit"
+    }
+  ],
+  "decisions": [],
+  "questions": [],
+  "examples": [
+    {
+      "id": "receive_3c",
+      "title": "Receives 0x3C",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 2
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "note": "start bit"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "note": "bit 0"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "note": "bit 1"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "note": "bit 2"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "note": "bit 3"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "note": "bit 4"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "note": "bit 5"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "note": "bit 6"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "note": "bit 7"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "note": "stop bit"
+        },
+        {
+          "op": "wait_until",
+          "signal": "valid",
+          "value": "1",
+          "cycles": 8
+        },
+        {
+          "op": "expect",
+          "signal": "data",
+          "value": "0x3C"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "valid",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "id": "bad_stop",
+      "title": "A frame with a 0 stop bit is dropped",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 2
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "note": "start bit"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "note": "bit 0"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "note": "bit 1"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "note": "bit 2"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "note": "bit 3"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "note": "bit 4"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "note": "bit 5"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "note": "bit 6"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "note": "bit 7"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "note": "stop bit"
+        },
+        {
+          "op": "wait",
+          "cycles": 4
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "valid",
+          "value": "0",
+          "cycles": 20
+        }
+      ]
+    },
+    {
+      "id": "idle",
+      "title": "Nothing arrives while the line is idle",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "valid",
+          "value": "0",
+          "cycles": 50
+        }
+      ]
+    }
+  ]
+}

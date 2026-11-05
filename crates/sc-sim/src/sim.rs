@@ -463,11 +463,18 @@ impl<'d> Sim<'d> {
         self.notify(w.sig);
     }
 
+    /// An index or part-select start: unsigned unless the expression is signed, so a sized
+    /// index such as `4'd8` (or a 4-bit `b + 4'd1` that reaches 8) isn't read as negative.
+    fn index(&self, e: &CExpr) -> i64 {
+        let v = self.eval(e);
+        if e.signed() { as_signed(v, e.width(self.d)) } else { i64::try_from(v).unwrap_or(i64::MAX / 2) }
+    }
+
     fn word_slot(&self, sig: usize, word: Option<&CExpr>) -> Option<usize> {
         let s = &self.d.signals[sig];
         match (s.array, word) {
             (Some((lo, hi)), Some(idx)) => {
-                let i = self.eval(idx) as i64;
+                let i = self.index(idx);
                 (i >= lo && i <= hi).then(|| s.slot + (i - lo) as usize)
             }
             _ => Some(s.slot),
@@ -494,7 +501,7 @@ impl<'d> Sim<'d> {
             }
             LVal::Bit { sig, word, idx } => {
                 let s = &self.d.signals[*sig];
-                let i = self.eval(idx) as i64;
+                let i = self.index(idx);
                 if let (Some(off), Some(slot)) = (s.offset(i), self.word_slot(*sig, word.as_ref())) {
                     out.push(Write { slot, sig: *sig, lo: off, w: 1, value: v });
                 }
@@ -523,7 +530,7 @@ impl<'d> Sim<'d> {
 
     fn ipart_lo(&self, sig: usize, start: &CExpr, w: u32, up: bool) -> Option<u32> {
         let s = &self.d.signals[sig];
-        let st = as_signed(self.eval(start), start.width(self.d)).max(i64::MIN / 2);
+        let st = self.index(start).clamp(i64::MIN / 2, i64::MAX / 2);
         let (a, b) = if up { (st, st + w as i64 - 1) } else { (st - w as i64 + 1, st) };
         let (oa, ob) = (s.offset(a)?, s.offset(b)?);
         Some(oa.min(ob))
@@ -557,7 +564,7 @@ impl<'d> Sim<'d> {
             CExpr::Word { sig, idx } => self.word_slot(*sig, Some(idx)).map(|s| self.vals[s]).unwrap_or(0),
             CExpr::Bit { sig, word, idx } => {
                 let s = &self.d.signals[*sig];
-                let i = as_signed(self.eval(idx), idx.width(self.d));
+                let i = self.index(idx);
                 match (s.offset(i), self.word_slot(*sig, word.as_deref())) {
                     (Some(off), Some(slot)) => (self.vals[slot] >> off) & 1,
                     _ => 0,

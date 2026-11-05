@@ -70,7 +70,7 @@ function parse(v: string): bigint | null {
   }
 }
 
-/** Value of `sig` just before time `t` (outputs: what the testbench sees) or at `t` (inputs, after a set). */
+/** Value of `sig` at time `t`: before it, or including a change at `t` when `inclusive`. */
 function valueAt(sig: SimSignal, t: number, inclusive: boolean): bigint | null {
   let lo = 0;
   let hi = sig.times.length - 1;
@@ -110,12 +110,14 @@ export function replay(spec: Spec, ex: SpecExample, sim: SimResult): Replay {
   const prologue = spec.reset ? 2 : 1;
   const timeOf = (c: number) => tickTimes[prologue + c - 1];
 
-  const portOf = new Map(spec.ports.map((p) => [p.name, p]));
+  // The testbench checks 1 ps after each falling edge (so outputs that follow inputs directly
+  // have settled after a set); read every connection at that moment.
+  const eps = Math.max(1, Math.round(1000 / sim.timescaleFs));
   const read = (port: string, c: number): bigint | null => {
     const s = sig(port);
     const t = timeOf(c);
     if (!s || t === undefined) return null;
-    return valueAt(s, t, portOf.get(port)?.dir === "in");
+    return valueAt(s, t + eps, true);
   };
 
   const checks: Check[] = [];

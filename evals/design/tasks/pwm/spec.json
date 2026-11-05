@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "intent": "A PWM generator. Module `pwm` with inputs clk, rst_n (active-low reset) and duty (8 bits), and output out. An 8-bit counter is 0 during reset and goes up by one at every rising clock edge, wrapping from 255 to 0. out is 1 while the counter is below duty, so duty 0 is always off and duty 255 is on for 255 of every 256 cycles. out follows a change of duty straight away (no extra register).",
+  "top": "pwm",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "duty",
+      "dir": "in",
+      "width": 8,
+      "meaning": "On time out of 256 cycles"
+    },
+    {
+      "name": "out",
+      "dir": "out",
+      "width": 1,
+      "meaning": "PWM output"
+    }
+  ],
+  "params": [],
+  "decisions": [],
+  "questions": [],
+  "examples": [
+    {
+      "id": "off",
+      "title": "Duty 0 is always off",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "duty",
+          "value": "0"
+        },
+        {
+          "op": "expect_for",
+          "signal": "out",
+          "value": "0",
+          "cycles": 300
+        }
+      ]
+    },
+    {
+      "id": "quarter",
+      "title": "Duty 64 is on for 64 cycles then off for 192",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "duty",
+          "value": "64"
+        },
+        {
+          "op": "expect_for",
+          "signal": "out",
+          "value": "1",
+          "cycles": 64
+        },
+        {
+          "op": "expect_for",
+          "signal": "out",
+          "value": "0",
+          "cycles": 192
+        },
+        {
+          "op": "expect",
+          "signal": "out",
+          "value": "1",
+          "note": "next period"
+        }
+      ]
+    },
+    {
+      "id": "full",
+      "title": "Duty 255 is off for one cycle in 256",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "duty",
+          "value": "255"
+        },
+        {
+          "op": "expect_for",
+          "signal": "out",
+          "value": "1",
+          "cycles": 255
+        },
+        {
+          "op": "expect",
+          "signal": "out",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "out",
+          "value": "1"
+        }
+      ]
+    }
+  ]
+}

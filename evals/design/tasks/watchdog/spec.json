@@ -1,0 +1,188 @@
+{
+  "version": 1,
+  "intent": "A watchdog. Module `watchdog` with a parameter TIMEOUT (default 8), inputs clk, rst_n (active-low reset) and kick, and output bark (from a register). bark goes to 1 at the TIMEOUT-th rising clock edge in a row at which kick is 0, and stays 1 until a rising edge at which kick is 1 (or reset). A kick restarts the count and clears bark.",
+  "top": "watchdog",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "kick",
+      "dir": "in",
+      "width": 1,
+      "meaning": "1 restarts the timeout"
+    },
+    {
+      "name": "bark",
+      "dir": "out",
+      "width": 1,
+      "meaning": "1 after a timeout"
+    }
+  ],
+  "params": [
+    {
+      "name": "TIMEOUT",
+      "value": "8",
+      "meaning": "Cycles without a kick before barking"
+    }
+  ],
+  "decisions": [
+    {
+      "question": "Does bark stay on or pulse?",
+      "answer": "It stays on until the next kick (or reset)."
+    },
+    {
+      "question": "When exactly does it bark?",
+      "answer": "At the TIMEOUT-th rising edge in a row without a kick."
+    }
+  ],
+  "questions": [],
+  "examples": [
+    {
+      "id": "timeout",
+      "title": "No kick for TIMEOUT cycles barks, and bark stays on",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "expect_for",
+          "signal": "bark",
+          "value": "0",
+          "cycles": 8
+        },
+        {
+          "op": "expect",
+          "signal": "bark",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "bark",
+          "value": "1",
+          "cycles": 20,
+          "note": "stays until a kick"
+        }
+      ]
+    },
+    {
+      "id": "kick_clears",
+      "title": "A kick clears bark",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "wait",
+          "cycles": 10
+        },
+        {
+          "op": "expect",
+          "signal": "bark",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "kick",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "bark",
+          "value": "0"
+        },
+        {
+          "op": "set",
+          "signal": "kick",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "id": "kicked_in_time",
+      "title": "Kicking every 7 cycles keeps it quiet",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "kick",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "kick",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 6
+        },
+        {
+          "op": "set",
+          "signal": "kick",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "kick",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 6
+        },
+        {
+          "op": "set",
+          "signal": "kick",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "kick",
+          "value": "0"
+        },
+        {
+          "op": "expect_for",
+          "signal": "bark",
+          "value": "0",
+          "cycles": 6
+        }
+      ]
+    }
+  ]
+}

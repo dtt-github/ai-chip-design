@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "intent": "Make every pulse on din at least N clock cycles long on dout. Module `stretch` with a parameter N (default 4), inputs clk, rst_n (active-low reset) and din, and output dout (from a register). dout goes to 1 at the rising edge that samples din = 1 and stays 1 while din is 1 and for N-1 more cycles after din returns to 0, so a one-cycle pulse becomes exactly N cycles and an L-cycle pulse L+N-1 cycles. A new pulse while dout is still stretched restarts the count. dout is 0 after reset.",
+  "top": "stretch",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "din",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Input pulses"
+    },
+    {
+      "name": "dout",
+      "dir": "out",
+      "width": 1,
+      "meaning": "Stretched pulses"
+    }
+  ],
+  "params": [
+    {
+      "name": "N",
+      "value": "4",
+      "meaning": "Minimum pulse length in cycles"
+    }
+  ],
+  "decisions": [
+    {
+      "question": "What happens with a new pulse while dout is still stretched?",
+      "answer": "It restarts the N-cycle count."
+    },
+    {
+      "question": "How long is dout after a longer pulse?",
+      "answer": "As long as din, plus N-1 cycles."
+    },
+    {
+      "question": "When does dout rise?",
+      "answer": "At the rising edge that samples din = 1 (one register)."
+    }
+  ],
+  "questions": [],
+  "examples": [
+    {
+      "id": "short_pulse",
+      "title": "A one-cycle pulse becomes N cycles",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "expect_for",
+          "signal": "dout",
+          "value": "1",
+          "cycles": 4
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "id": "retrigger",
+      "title": "A new pulse while stretching restarts the count",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 2
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "expect_for",
+          "signal": "dout",
+          "value": "1",
+          "cycles": 4
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "id": "long_pulse",
+      "title": "A long pulse stays high, then N-1 more cycles",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect_for",
+          "signal": "dout",
+          "value": "1",
+          "cycles": 6
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "expect_for",
+          "signal": "dout",
+          "value": "1",
+          "cycles": 4
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0"
+        }
+      ]
+    }
+  ]
+}

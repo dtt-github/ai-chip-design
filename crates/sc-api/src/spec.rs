@@ -8,7 +8,8 @@
 //! person or the agent) is only accepted when every example passes.
 //!
 //! Step semantics, all on the falling clock edge so inputs settle before the
-//! design samples them on the rising edge:
+//! design samples them on the rising edge (checks look 1 ps later, so outputs that follow inputs
+//! directly have settled after a `set` in the same step):
 //! - `set`: drive an input now (no time passes);
 //! - `wait`: let `cycles` clock cycles pass;
 //! - `wait_until`: wait until `signal` equals `value`, failing after `cycles`;
@@ -449,7 +450,7 @@ impl Spec {
                         s.signal, val, s.cycles
                     ));
                     o.push_str(&format!(
-                        "        k = 0;\n        while ({sig} !== {v} && k < {c}) begin {tick}; k = k + 1; end\n        if ({sig} !== {v}) begin {msg} errors = errors + 1; end\n",
+                        "        #1; k = 0;\n        while ({sig} !== {v} && k < {c}) begin {tick}; k = k + 1; end\n        if ({sig} !== {v}) begin {msg} errors = errors + 1; end\n",
                         sig = s.signal,
                         c = s.cycles,
                         msg = fail(&format!("{} never became {} within {} cycle(s)", s.signal, val, s.cycles)),
@@ -459,7 +460,7 @@ impl Spec {
                     let v = self.lit(&s.signal, &s.value);
                     o.push_str(&format!("        // {n}. expect {} = {}{note}\n", s.signal, val));
                     o.push_str(&format!(
-                        "        if ({sig} !== {v}) begin {msg} errors = errors + 1; end\n",
+                        "        #1; if ({sig} !== {v}) begin {msg} errors = errors + 1; end\n",
                         sig = s.signal,
                         msg = fail(&format!("expected {} = {}", s.signal, val)),
                     ));
@@ -471,7 +472,7 @@ impl Spec {
                         s.signal, val, s.cycles
                     ));
                     o.push_str(&format!(
-                        "        bad = 0;\n        for (k = 0; k < {c}; k = k + 1) begin\n            if ({sig} !== {v} && bad == 0) begin $display(\"FAIL: step {n}: expected {sig} = {val} for {c} cycle(s), but at cycle %0d got 0x%0h\", k, {sig}); bad = 1; errors = errors + 1; end\n            {tick};\n        end\n",
+                        "        #1; bad = 0;\n        for (k = 0; k < {c}; k = k + 1) begin\n            if ({sig} !== {v} && bad == 0) begin $display(\"FAIL: step {n}: expected {sig} = {val} for {c} cycle(s), but at cycle %0d got 0x%0h\", k, {sig}); bad = 1; errors = errors + 1; end\n            {tick};\n        end\n",
                         sig = s.signal,
                         c = s.cycles,
                         val = val,
@@ -632,6 +633,43 @@ endmodule
         let r = crate::gate::run(&files);
         assert!(r.passed, "{r:#?}");
         assert_eq!(r.runs.len(), 2, "the design's example and the chip's");
+    }
+
+    #[test]
+    fn combinational_outputs_settle_before_checks() {
+        // No clock: a set followed by an expect in the same step must see the new output.
+        let port =
+            |name: &str, dir: &str, width| Port { name: name.into(), dir: dir.into(), width, meaning: String::new() };
+        let s = Spec {
+            version: 1,
+            top: "par".into(),
+            ports: vec![port("d", "in", 8), port("p", "out", 1)],
+            examples: vec![Example {
+                id: "odd".into(),
+                title: "odd number of ones".into(),
+                given: String::new(),
+                expect: String::new(),
+                params: vec![],
+                steps: vec![
+                    step("set", "d", "0x01", 0),
+                    step("expect", "p", "1", 0),
+                    step("set", "d", "0xA5", 0),
+                    step("expect", "p", "0", 0),
+                    step("set", "d", "0xA7", 0),
+                    step("expect_for", "p", "1", 2),
+                ],
+                target: None,
+            }],
+            ..Default::default()
+        };
+        assert_eq!(s.check(None), Vec::<String>::new());
+        let mut files = s.testbenches_for(None);
+        files.insert(
+            "src/par.v".into(),
+            "module par(input wire [7:0] d, output wire p); assign p = ^d; endmodule\n".into(),
+        );
+        let r = crate::gate::run(&files);
+        assert!(r.passed, "{r:#?}");
     }
 
     #[test]

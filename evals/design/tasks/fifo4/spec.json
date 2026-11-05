@@ -1,0 +1,286 @@
+{
+  "version": 1,
+  "intent": "A small FIFO. Module `fifo4` with inputs clk, rst_n (active-low reset), wr, din (8 bits) and rd, and outputs dout (8 bits), empty and full. It holds up to 4 bytes. At a rising clock edge, wr stores din if the FIFO is not full, and rd removes the oldest byte if it is not empty (judged by the state before the edge; both can happen at the same edge). dout always shows the oldest byte while the FIFO is not empty (no read latency); empty and full describe the current contents. Reset empties it.",
+  "top": "fifo4",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "wr",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Write din"
+    },
+    {
+      "name": "din",
+      "dir": "in",
+      "width": 8,
+      "meaning": "Data in"
+    },
+    {
+      "name": "rd",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Remove the oldest byte"
+    },
+    {
+      "name": "dout",
+      "dir": "out",
+      "width": 8,
+      "meaning": "Oldest byte"
+    },
+    {
+      "name": "empty",
+      "dir": "out",
+      "width": 1,
+      "meaning": "No bytes"
+    },
+    {
+      "name": "full",
+      "dir": "out",
+      "width": 1,
+      "meaning": "4 bytes"
+    }
+  ],
+  "params": [],
+  "decisions": [],
+  "questions": [],
+  "examples": [
+    {
+      "id": "in_order",
+      "title": "Bytes come out in the order they went in",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "expect",
+          "signal": "empty",
+          "value": "1"
+        },
+        {
+          "op": "expect",
+          "signal": "full",
+          "value": "0"
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0x11"
+        },
+        {
+          "op": "set",
+          "signal": "wr",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0x22"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0x33"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "wr",
+          "value": "0"
+        },
+        {
+          "op": "expect",
+          "signal": "empty",
+          "value": "0"
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0x11"
+        },
+        {
+          "op": "set",
+          "signal": "rd",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0x22"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0x33"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "empty",
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "id": "full_drops",
+      "title": "A write when full is dropped",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "wr",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0x01"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0x02"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0x03"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0x04"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "full",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0x55"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "wr",
+          "value": "0"
+        },
+        {
+          "op": "expect",
+          "signal": "full",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "rd",
+          "value": "1"
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0x01"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0x02"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0x03"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0x04"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "expect",
+          "signal": "empty",
+          "value": "1"
+        }
+      ]
+    }
+  ]
+}

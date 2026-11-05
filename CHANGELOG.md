@@ -8,6 +8,11 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Added
 
+- **Design evals** for the assistant and the agent (`evals/design/`, [docs/evals.md](docs/evals.md)):
+  16 tasks (11 clear, 5 with open points), each with a reference spec, design and hidden testbench;
+  a runner that drafts specs or proposes designs through the API, grades them with simulation, and
+  reports pass rate and cost per task (`summary.mjs`); oracle and null modes check the grading for free. First baseline: assistant 78%, agent 100%,
+  $12.72 for 64 runs.
 - **Chip examples**: examples can test the whole chip built in the Blocks view through its pins
   (`"target": "<chip>"`), in simulation and on the chip's gate-level netlist. The assistant can
   draft them; saving the chip keeps them in step and refuses changes that would break one.
@@ -15,6 +20,14 @@ All notable changes to SiliconCommons are recorded here. The format follows
   development; `CONTRIBUTING.md`, `SECURITY.md`, `NOTICE`, issue and pull request templates.
 - Credit to DigitalTwin Technology GmbH as the initiator of the project (README, NOTICE, package
   metadata).
+
+### Fixed
+
+- The simulator read a sized index with its top bit set as negative (`f[4'd8]`, or a 4-bit
+  `b + 4'd1` reaching 8, gave 0); indices are now unsigned unless the expression is signed.
+- Example checks look 1 ps after the falling clock edge, so combinational outputs have settled
+  (an example of a design without a clock could see the value from before the last `set`). The
+  "what actually happened" replay samples at the same moment.
 
 ### Changed
 

@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "intent": "A parity checker. Module `parity8` with an 8-bit input d and an output odd, and no clock or reset. odd is 1 when d has an odd number of 1 bits, and 0 otherwise.",
+  "top": "parity8",
+  "ports": [
+    {
+      "name": "d",
+      "dir": "in",
+      "width": 8,
+      "meaning": "Data"
+    },
+    {
+      "name": "odd",
+      "dir": "out",
+      "width": 1,
+      "meaning": "1 when d has an odd number of 1s"
+    }
+  ],
+  "params": [],
+  "decisions": [],
+  "questions": [],
+  "examples": [
+    {
+      "id": "ones",
+      "title": "Single bits and all ones",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "d",
+          "value": "0x01"
+        },
+        {
+          "op": "expect",
+          "signal": "odd",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "d",
+          "value": "0x80"
+        },
+        {
+          "op": "expect",
+          "signal": "odd",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "d",
+          "value": "0xFF"
+        },
+        {
+          "op": "expect",
+          "signal": "odd",
+          "value": "0"
+        }
+      ]
+    },
+    {
+      "id": "mixed",
+      "title": "Mixed patterns",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "d",
+          "value": "0x00"
+        },
+        {
+          "op": "expect",
+          "signal": "odd",
+          "value": "0"
+        },
+        {
+          "op": "set",
+          "signal": "d",
+          "value": "0xA5"
+        },
+        {
+          "op": "expect",
+          "signal": "odd",
+          "value": "0"
+        },
+        {
+          "op": "set",
+          "signal": "d",
+          "value": "0x7F"
+        },
+        {
+          "op": "expect",
+          "signal": "odd",
+          "value": "1"
+        }
+      ]
+    }
+  ]
+}

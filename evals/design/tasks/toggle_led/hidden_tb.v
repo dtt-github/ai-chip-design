@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: Apache-2.0
+// Hidden testbench for eval task "toggle_led": 3000 cycles of pseudo-random stimulus (with a
+// reset in the middle), checked cycle by cycle against a behavioural model of the intended
+// behaviour. The AI never sees this file.
+`timescale 1ps/1ps
+module tb_hidden_toggle_led;
+    reg clk = 1'b0;
+    reg rst_n = 1'b0;
+    reg button = 1'b0;
+    wire led;
+    reg [15:0] r = 16'hACE1;
+    integer cyc;
+    integer errors = 0;
+
+    // Model state.
+    reg m_prev;
+    reg m_led;
+
+    toggle_led dut (.clk(clk), .rst_n(rst_n), .button(button), .led(led));
+
+    always #500 clk = ~clk;
+
+    // Behavioural model, reset synchronously; compared only while reset is off.
+    always @(posedge clk) begin
+        if (!rst_n) begin
+            m_prev <= 1'b0;
+            m_led <= 1'b0;
+        end else begin
+            m_prev <= button;
+            if (button && !m_prev) m_led <= ~m_led;
+        end
+    end
+
+    initial begin
+        repeat (2) @(negedge clk);
+        rst_n = 1'b1;
+        for (cyc = 0; cyc < 3000; cyc = cyc + 1) begin
+            r = {r[14:0], r[15] ^ r[13] ^ r[12] ^ r[10]};
+            if (cyc == 1000) rst_n = 1'b0;
+            if (cyc == 1002) rst_n = 1'b1;
+            if (r[1:0] == 2'd0) button = ~button;
+            @(negedge clk);
+            #1;
+            if (rst_n) begin
+                if (led !== m_led) begin
+                    if (errors < 5) $display("FAIL: cycle %0d: led = 0x%0h, expected 0x%0h", cyc, led, m_led);
+                    errors = errors + 1;
+                end
+            end
+        end
+        if (errors == 0) $display("PASS: hidden checks for toggle_led");
+        else $display("FAIL: hidden checks for toggle_led: %0d mismatch(es)", errors);
+        $finish;
+    end
+endmodule

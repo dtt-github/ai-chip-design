@@ -65,6 +65,8 @@ one). It runs when the API starts and in every `sqlx::test`.
   `tests/common`, and a mock Messages API for the AI features (no network, no cost).
 - **Simulator conformance**: `crates/sc-sim/tests/conformance/*.v` must print exactly what Icarus
   Verilog prints (`scripts/gen-sim-expected.sh` regenerates the references).
+- **Design evals**: `tests/evals.rs` checks the eval task references; the evals themselves run
+  against a live API and the model, by hand ([evals.md](evals.md)).
 
 ## Adding a feature: checklist
 

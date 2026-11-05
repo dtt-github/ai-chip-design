@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "intent": "A serial-in, parallel-out shift register. Module `sipo` with inputs clk, rst_n (active-low reset), din and shift, and an 8-bit output q. At each rising clock edge where shift is 1, q shifts left by one and din enters at bit 0 (so the first bit shifted in ends up as the most significant after 8 shifts). With shift 0, q holds. Reset clears q.",
+  "top": "sipo",
+  "clock": {
+    "port": "clk",
+    "mhz": 50
+  },
+  "reset": {
+    "port": "rst_n",
+    "active_low": true
+  },
+  "ports": [
+    {
+      "name": "clk",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Clock"
+    },
+    {
+      "name": "rst_n",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Reset, active low: 0 resets"
+    },
+    {
+      "name": "din",
+      "dir": "in",
+      "width": 1,
+      "meaning": "Serial data"
+    },
+    {
+      "name": "shift",
+      "dir": "in",
+      "width": 1,
+      "meaning": "1 shifts din in"
+    },
+    {
+      "name": "q",
+      "dir": "out",
+      "width": 8,
+      "meaning": "Parallel data"
+    }
+  ],
+  "params": [],
+  "decisions": [],
+  "questions": [],
+  "examples": [
+    {
+      "id": "byte",
+      "title": "Shifting in 1,0,1,1,0,0,1,0 gives 0xB2",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "shift",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0"
+        },
+        {
+          "op": "wait",
+          "cycles": 1
+        },
+        {
+          "op": "set",
+          "signal": "shift",
+          "value": "0"
+        },
+        {
+          "op": "expect",
+          "signal": "q",
+          "value": "0xB2"
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "expect_for",
+          "signal": "q",
+          "value": "0xB2",
+          "cycles": 5,
+          "note": "holds"
+        }
+      ]
+    },
+    {
+      "id": "partial",
+      "title": "Three ones shifted in",
+      "given": "",
+      "expect": "",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "1"
+        },
+        {
+          "op": "set",
+          "signal": "shift",
+          "value": "1"
+        },
+        {
+          "op": "wait",
+          "cycles": 3
+        },
+        {
+          "op": "expect",
+          "signal": "q",
+          "value": "0x07"
+        }
+      ]
+    }
+  ]
+}
