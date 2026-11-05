@@ -340,9 +340,19 @@ fn assumes_open(raw: &Value, spec: &Spec) -> Vec<String> {
     out
 }
 
+/// The tool's `spec` as a JSON object. Models sometimes send the object as a JSON string; anything
+/// else goes back to the model as a problem instead of failing the request.
+fn spec_value(v: &Value) -> Result<Value, String> {
+    let v = match v {
+        Value::String(s) => serde_json::from_str(s).map_err(|_| "spec must be a JSON object, not text".to_string())?,
+        other => other.clone(),
+    };
+    if v.is_object() { Ok(v) } else { Err("spec must be a JSON object".into()) }
+}
+
 /// The tool's input (clock and reset as possibly-empty objects) as a [`Spec`].
 fn from_tool(v: &Value) -> Result<Spec, String> {
-    let mut v = v.clone();
+    let mut v = spec_value(v)?;
     for key in ["clock", "reset"] {
         if v[key]["port"].as_str().unwrap_or_default().is_empty() {
             v[key] = Value::Null;
@@ -467,7 +477,7 @@ pub async fn draft(
             Err(e) => vec![e],
             Ok(spec) => {
                 let mut p = spec.check(chip.as_ref());
-                p.extend(assumes_open(&call["input"]["spec"], &spec));
+                p.extend(assumes_open(&spec_value(&call["input"]["spec"]).unwrap_or_default(), &spec));
                 let invented: Vec<&str> = spec
                     .decisions
                     .iter()
@@ -519,4 +529,21 @@ pub async fn draft(
         crate::spend::record(&state, user.id, id, "draft", &usage).await;
     }
     result.map(Json)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_spec_sent_as_text_is_read_or_refused_without_panicking() {
+        let spec = json!({
+            "intent": "", "top": "t", "clock": { "port": "", "mhz": 0 }, "reset": { "port": "", "active_low": false },
+            "ports": [], "params": [], "decisions": [], "questions": [], "examples": []
+        });
+        assert_eq!(from_tool(&Value::String(spec.to_string())).expect("parsed").top, "t");
+        assert!(from_tool(&json!("not json")).unwrap_err().contains("JSON object"));
+        assert!(from_tool(&json!(42)).unwrap_err().contains("JSON object"));
+        assert!(from_tool(&spec).is_ok());
+    }
 }
