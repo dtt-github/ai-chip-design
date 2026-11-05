@@ -3,6 +3,7 @@ name = "sc-gds-wasm"
 description = "WebAssembly bindings for sc-gds (built with scripts/build-wasm.sh)"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
 license.workspace = true
 publish.workspace = true
 

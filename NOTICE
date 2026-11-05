@@ -1,0 +1,16 @@
+SiliconCommons
+Copyright 2026 DigitalTwin Technology GmbH and the SiliconCommons contributors
+
+This product was initiated by DigitalTwin Technology GmbH (https://digitaltwin.technology),
+which started the project and leads its development.
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes or builds on third-party software and data, each under its own licence:
+
+- The IHP SG13G2 layer stack in apps/web/src/pdk/ihp-sg13g2.json is derived from the IHP
+  Open PDK's KLayout layer properties (sg13g2.lyp), Apache-2.0, IHP GmbH.
+- At run time (not distributed with this repository): LibreLane and its tools (Apache-2.0 and
+  others), the IHP SG13G2 open PDK (Apache-2.0), Verible (Apache-2.0), Rauthy (Apache-2.0),
+  Icarus Verilog (GPL-2.0, used as a separate program inside the flow container).
+- Rust crates and npm packages listed in Cargo.lock and pnpm-lock.yaml, under their licences.
