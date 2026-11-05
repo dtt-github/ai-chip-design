@@ -1,0 +1,412 @@
+//! HTTP side of intent-first design ([`crate::spec`]): read and save the spec
+//! (saving regenerates the example testbenches in the same commit), run the
+//! examples, and let the assistant draft or revise the spec from plain language.
+
+use std::collections::BTreeMap;
+use std::time::Instant;
+
+use axum::Json;
+use axum::extract::{Path, State};
+use sc_git::{Author, Change};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use uuid::Uuid;
+
+use crate::AppState;
+use crate::auth::AuthUser;
+use crate::error::{ApiError, ApiResult};
+use crate::gate::{self, TestbenchRun};
+use crate::projects::{Role, authorize};
+use crate::spec::{self, EXAMPLES_DIR, SPEC_FILE, Spec};
+
+const MAX_TEXT: usize = 4 << 20;
+/// HDL sent to the assistant as context, at most.
+const CONTEXT_BYTES: usize = 60_000;
+const DRAFT_TURNS: usize = 4;
+
+async fn files_at(state: &AppState, project: Uuid, rev: &str) -> ApiResult<BTreeMap<String, String>> {
+    Ok(crate::workspace::text_files(state.repos.clone(), project, rev.to_string(), MAX_TEXT)
+        .await?
+        .into_iter()
+        .collect())
+}
+
+async fn head(state: &AppState, project: Uuid) -> ApiResult<String> {
+    crate::workspace::head(state.repos.clone(), project)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("the project has no commits".into()))
+}
+
+fn parse_spec(text: &str) -> ApiResult<Spec> {
+    serde_json::from_str(text).map_err(|e| ApiError::Conflict(format!("{SPEC_FILE} can't be read: {e}")))
+}
+
+#[derive(Debug, Serialize)]
+pub struct SpecView {
+    pub head: String,
+    /// `None` when the project has no spec yet.
+    pub spec: Option<Spec>,
+    /// Problems that keep the examples from being compiled.
+    pub problems: Vec<String>,
+    /// Whether `tb/examples/` matches the spec (someone may have edited a generated file).
+    pub in_sync: bool,
+    /// The flow config's top and clock, as defaults for a new spec.
+    pub design_name: Option<String>,
+    pub clock_mhz: Option<f64>,
+}
+
+pub async fn get(State(state): State<AppState>, user: AuthUser, Path(id): Path<Uuid>) -> ApiResult<Json<SpecView>> {
+    authorize(&state, &user, id, Role::Viewer).await?;
+    let head = head(&state, id).await?;
+    let files = files_at(&state, id, &head).await?;
+    let config: Option<Value> = files.get("config.json").and_then(|c| serde_json::from_str(c).ok());
+    let design_name = config.as_ref().and_then(|c| c["DESIGN_NAME"].as_str().map(String::from));
+    let clock_mhz = config.as_ref().and_then(|c| c["CLOCK_PERIOD"].as_f64()).filter(|p| *p > 0.0).map(|p| 1000.0 / p);
+    let (spec, problems, in_sync) = match files.get(SPEC_FILE) {
+        None => (None, vec![], true),
+        Some(text) => {
+            let s = parse_spec(text)?;
+            let problems = s.validate();
+            let in_sync = problems.is_empty() && s.testbenches().iter().all(|(p, c)| files.get(p) == Some(c));
+            (Some(s), problems, in_sync)
+        }
+    };
+    Ok(Json(SpecView { head, spec, problems, in_sync, design_name, clock_mhz }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SaveReq {
+    pub spec: Spec,
+    /// The head the edit is based on; the save is refused if the branch moved.
+    pub parent: String,
+    pub message: Option<String>,
+}
+
+/// Commits `spec.json` and the regenerated example testbenches together.
+pub async fn save(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(req): Json<SaveReq>,
+) -> ApiResult<Json<Value>> {
+    authorize(&state, &user, id, Role::Editor).await?;
+    let problems = req.spec.validate();
+    if !problems.is_empty() {
+        return Err(ApiError::BadRequest(problems.join("\n")));
+    }
+    let files = files_at(&state, id, &req.parent).await?;
+    let tbs = req.spec.testbenches();
+    let mut changes = Vec::new();
+    for (path, content) in &tbs {
+        match files.get(path) {
+            Some(old) if old == content => {}
+            Some(old) if !spec::is_generated(old) => {
+                return Err(ApiError::Conflict(format!(
+                    "{path} exists and wasn't generated from the spec; rename or remove it"
+                )));
+            }
+            _ => changes.push(Change::Write { path: path.clone(), content: content.clone().into_bytes() }),
+        }
+    }
+    // Examples that were removed take their testbench with them.
+    for (path, content) in &files {
+        if path.starts_with(&format!("{EXAMPLES_DIR}/")) && !tbs.contains_key(path) && spec::is_generated(content) {
+            changes.push(Change::Delete { path: path.clone() });
+        }
+    }
+    let text = serde_json::to_string_pretty(&req.spec).map_err(anyhow::Error::from)? + "\n";
+    if files.get(SPEC_FILE) != Some(&text) {
+        changes.push(Change::Write { path: SPEC_FILE.into(), content: text.into_bytes() });
+    }
+    if changes.is_empty() {
+        return Ok(Json(json!({ "commit": req.parent, "changed": false })));
+    }
+    let message = req.message.map(|m| m.trim().to_string()).filter(|m| !m.is_empty()).unwrap_or_else(|| {
+        format!(
+            "Update the spec ({} example{})",
+            req.spec.examples.len(),
+            if req.spec.examples.len() == 1 { "" } else { "s" }
+        )
+    });
+    let message = format!("{message}\n\nRegenerated {EXAMPLES_DIR}/ from {SPEC_FILE}.\n");
+    let author = Author { name: user.display_name.clone(), email: user.email.clone() };
+    let (repos, parent) = (state.repos.clone(), req.parent.clone());
+    let info = tokio::task::spawn_blocking(move || {
+        repos.open(&id.to_string())?.commit(changes, &message, &author, Some(&parent))
+    })
+    .await??;
+    sqlx::query("UPDATE projects SET updated_at = now() WHERE id = $1").bind(id).execute(&state.db).await?;
+    state.collab.committed(&state, id, &info.id).await;
+    Ok(Json(json!({ "commit": info.id, "changed": true })))
+}
+
+#[derive(Debug, Serialize)]
+pub struct ExampleResult {
+    pub id: String,
+    pub title: String,
+    /// `pass`, `fail`, `no_verdict`, `error`, or `missing` (no testbench at this commit).
+    pub verdict: String,
+    pub reason: Option<String>,
+    pub log: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RunResult {
+    pub commit: String,
+    pub examples: Vec<ExampleResult>,
+    /// The project's other testbenches, run alongside.
+    pub others: Vec<TestbenchRun>,
+    pub engine: String,
+}
+
+/// Runs every testbench at the branch tip and reports the examples by name.
+pub async fn run(State(state): State<AppState>, user: AuthUser, Path(id): Path<Uuid>) -> ApiResult<Json<RunResult>> {
+    authorize(&state, &user, id, Role::Viewer).await?;
+    let commit = head(&state, id).await?;
+    let files = files_at(&state, id, &commit).await?;
+    let spec = match files.get(SPEC_FILE) {
+        Some(t) => parse_spec(t)?,
+        None => return Err(ApiError::NotFound("this project has no spec yet".into())),
+    };
+    let report = tokio::task::spawn_blocking(move || gate::run(&files)).await?;
+    let mut runs: BTreeMap<String, TestbenchRun> = report.runs.into_iter().map(|r| (r.top.clone(), r)).collect();
+    let examples = spec
+        .examples
+        .iter()
+        .map(|e| match runs.remove(&spec::tb_name(&e.id)) {
+            Some(r) => ExampleResult {
+                id: e.id.clone(),
+                title: e.title.clone(),
+                verdict: r.verdict,
+                reason: r.reason,
+                log: r.log,
+            },
+            None => ExampleResult {
+                id: e.id.clone(),
+                title: e.title.clone(),
+                verdict: if report.summary.contains("does not parse") { "error".into() } else { "missing".into() },
+                reason: Some(if report.summary.contains("does not parse") {
+                    report.summary.clone()
+                } else {
+                    "save the spec to generate its testbench".into()
+                }),
+                log: vec![],
+            },
+        })
+        .collect();
+    Ok(Json(RunResult { commit, examples, others: runs.into_values().collect(), engine: report.engine }))
+}
+
+// ---- drafting with the assistant -----------------------------------------------
+
+const DRAFT_SYSTEM: &str = "You are the design assistant in SiliconCommons, a platform where engineers \
+who are not Verilog or chip-design experts design digital chips (IHP SG13G2 130 nm open PDK). You keep the \
+project's spec: a plain-language description of what the design does, plus worked examples that become its \
+tests. Another agent writes the Verilog later; a change is only accepted when every example passes, so the \
+examples must be exactly right.
+
+Write for a non-expert: connection meanings and example titles in plain words, units where they matter \
+(\"50 MHz\", \"80 clock cycles\"). Keep Verilog jargon out of the prose.
+
+The spec:
+- top: the top module's name (a Verilog identifier). Keep the existing one unless asked.
+- clock: the clock input and its frequency (port \"\" if the design has no clock); reset: the reset input and \
+whether 0 resets (port \"\" if none).
+- ports: every connection of the top module: name, dir \"in\"/\"out\", width in bits (1-64), meaning. Include \
+clock and reset. When the project already has RTL for the top module, match its names unless the request \
+changes them.
+- params: settings (Verilog parameters) with their default value and meaning.
+- decisions: questions already answered; keep them. questions: anything the request leaves open that changes \
+behaviour, each with 2-3 short answer options. Ask instead of guessing; when the instruction answers a \
+question, move it to decisions and update the examples.
+- examples: 3-8 short, focused examples covering the main behaviour and the important edge cases. Keep the \
+ids of existing examples. id: lowercase letters, digits, _. params: overrides for that example (e.g. PARITY=1).
+
+Example steps run on the falling clock edge; the design samples inputs on the rising edge. Before step 1 all \
+inputs are 0 and reset is held for 2 cycles, then released. Ops (unused fields: \"\" or 0):
+- set: drive input `signal` to `value` now (no time passes).
+- wait: let `cycles` clock cycles pass.
+- wait_until: wait until `signal` = `value`, failing after `cycles` cycles.
+- expect: `signal` must equal `value` now.
+- expect_for: `signal` must equal `value` for the next `cycles` cycles; time moves past them.
+Values are numbers: 1, 0x55, 0b1010. A pulse is set 1, wait 1, set 0. Work out timing cycle by cycle: after \
+`set start 1; wait 1`, the design has seen start on one rising edge. Prefer wait_until on an output over \
+counting exact latency when the request doesn't fix the latency; use exact counts when it does (\"each bit lasts \
+8 clocks\"). Add a short note to steps where it helps (\"start bit\", \"bit 0\").
+
+Finish by calling submit_spec with the whole spec and a one-paragraph note to the user on what you changed and \
+why. If it comes back with problems, fix them and call it again.";
+
+fn draft_tool() -> Value {
+    let s = |d: &str| json!({ "type": "string", "description": d });
+    let obj = |props: Value, req: &[&str]| json!({ "type": "object", "properties": props, "required": req, "additionalProperties": false });
+    let step = obj(
+        json!({
+            "op": { "type": "string", "enum": ["set", "wait", "wait_until", "expect", "expect_for"] },
+            "signal": s("Connection name, or \"\" for wait"),
+            "value": s("Number such as 1, 0x55 or 0b1010, or \"\" for wait"),
+            "cycles": { "type": "integer", "description": "Clock cycles for wait, wait_until (timeout) and expect_for; 0 otherwise" },
+            "note": s("Optional plain-language note, or \"\"")
+        }),
+        &["op", "signal", "value", "cycles", "note"],
+    );
+    let example = obj(
+        json!({
+            "id": s("lowercase letters, digits and _"),
+            "title": s("Short plain-language title"),
+            "given": s("The situation, in plain words"),
+            "expect": s("What should happen, in plain words"),
+            "params": { "type": "array", "items": obj(json!({ "name": s("Setting name"), "value": s("Number") }), &["name", "value"]) },
+            "steps": { "type": "array", "items": step }
+        }),
+        &["id", "title", "given", "expect", "params", "steps"],
+    );
+    let spec = obj(
+        json!({
+            "intent": s("The request in the user's words (keep theirs; refine only if asked)"),
+            "top": s("Top module name"),
+            "clock": obj(json!({ "port": s("Clock input, or \"\""), "mhz": { "type": "number" } }), &["port", "mhz"]),
+            "reset": obj(json!({ "port": s("Reset input, or \"\""), "active_low": { "type": "boolean" } }), &["port", "active_low"]),
+            "ports": { "type": "array", "items": obj(json!({
+                "name": s("Connection name"), "dir": { "type": "string", "enum": ["in", "out"] },
+                "width": { "type": "integer" }, "meaning": s("Plain-language meaning")
+            }), &["name", "dir", "width", "meaning"]) },
+            "params": { "type": "array", "items": obj(json!({ "name": s("Parameter"), "value": s("Default"), "meaning": s("Plain-language meaning") }), &["name", "value", "meaning"]) },
+            "decisions": { "type": "array", "items": obj(json!({ "question": s("Question"), "answer": s("Answer") }), &["question", "answer"]) },
+            "questions": { "type": "array", "items": obj(json!({ "question": s("Open question"), "options": { "type": "array", "items": { "type": "string" } } }), &["question", "options"]) },
+            "examples": { "type": "array", "items": example }
+        }),
+        &["intent", "top", "clock", "reset", "ports", "params", "decisions", "questions", "examples"],
+    );
+    json!([{
+        "name": "submit_spec",
+        "description": "Submit the complete updated spec. The server checks it and compiles each example into a testbench; any problems come back as an error to fix.",
+        "strict": true,
+        "input_schema": obj(json!({ "spec": spec, "note": s("One paragraph to the user: what you changed and why, and what you need from them") }), &["spec", "note"])
+    }])
+}
+
+/// The tool's input (clock and reset as possibly-empty objects) as a [`Spec`].
+fn from_tool(v: &Value) -> Result<Spec, String> {
+    let mut v = v.clone();
+    for key in ["clock", "reset"] {
+        if v[key]["port"].as_str().unwrap_or_default().is_empty() {
+            v[key] = Value::Null;
+        }
+    }
+    v["version"] = json!(1);
+    serde_json::from_value(v).map_err(|e| format!("the spec doesn't have the right shape: {e}"))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DraftReq {
+    /// What to do: the first description, an answer to a question, a new example in words...
+    pub instruction: String,
+    /// The spec being edited (unsaved edits included); defaults to the saved one.
+    pub spec: Option<Spec>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DraftResult {
+    pub spec: Spec,
+    pub note: String,
+    pub model: String,
+    pub usage: BTreeMap<String, u64>,
+    pub elapsed_ms: u64,
+}
+
+/// Asks the assistant to write or revise the spec. Nothing is saved: the person reviews it first.
+pub async fn draft(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(req): Json<DraftReq>,
+) -> ApiResult<Json<DraftResult>> {
+    authorize(&state, &user, id, Role::Editor).await?;
+    let Some(claude) = state.agent.claude.clone() else {
+        return Err(ApiError::Unavailable("the assistant is not configured on this server (no API key)".into()));
+    };
+    let instruction = req.instruction.trim();
+    if instruction.is_empty() || instruction.len() > 20_000 {
+        return Err(ApiError::BadRequest("say what the design should do (up to 20,000 characters)".into()));
+    }
+    let head = head(&state, id).await?;
+    let files = files_at(&state, id, &head).await?;
+    let current = match req.spec {
+        Some(s) => Some(s),
+        None => files.get(SPEC_FILE).map(|t| parse_spec(t)).transpose()?,
+    };
+
+    // Context: the flow config and the design's own HDL (not testbenches), within a budget.
+    let mut context = String::new();
+    if let Some(c) = files.get("config.json") {
+        context.push_str(&format!("--- config.json ---\n{c}\n"));
+    }
+    for (p, c) in files.iter().filter(|(p, _)| {
+        p.ends_with(".v") && !p.starts_with("tb/") && !p.contains("/tb_") && !p.starts_with(&format!("{EXAMPLES_DIR}/"))
+    }) {
+        if context.len() + c.len() > CONTEXT_BYTES {
+            context.push_str(&format!("--- {p} (left out: too large for context) ---\n"));
+            continue;
+        }
+        context.push_str(&format!("--- {p} ---\n{c}\n"));
+    }
+    let current_text = match &current {
+        Some(s) => serde_json::to_string_pretty(s).map_err(anyhow::Error::from)?,
+        None => "(none yet: write the first spec)".into(),
+    };
+    let first = format!(
+        "Project files for context:\n{context}\nCurrent spec:\n{current_text}\n\nInstruction from the user:\n{instruction}"
+    );
+
+    let tools = draft_tool();
+    let mut messages = vec![json!({ "role": "user", "content": first })];
+    let mut usage: BTreeMap<String, u64> = BTreeMap::new();
+    let started = Instant::now();
+    for _ in 0..DRAFT_TURNS {
+        let resp =
+            claude.create(DRAFT_SYSTEM, &tools, &messages).await.map_err(|e| ApiError::Unavailable(e.to_string()))?;
+        let model = resp["model"].as_str().unwrap_or_default().to_string();
+        if let Some(u) = resp["usage"].as_object() {
+            for k in ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"] {
+                *usage.entry(k.to_string()).or_default() += u.get(k).and_then(Value::as_u64).unwrap_or(0);
+            }
+        }
+        let content = resp["content"].as_array().cloned().unwrap_or_default();
+        match resp["stop_reason"].as_str().unwrap_or_default() {
+            "refusal" => return Err(ApiError::Conflict("the assistant declined this request".into())),
+            "max_tokens" => {
+                return Err(ApiError::Conflict("the assistant's answer was cut off; try a smaller request".into()));
+            }
+            _ => {}
+        }
+        let call = content.iter().find(|b| b["type"] == "tool_use" && b["name"] == "submit_spec").cloned();
+        messages.push(json!({ "role": "assistant", "content": content }));
+        let Some(call) = call else {
+            messages.push(json!({ "role": "user", "content": "Please call submit_spec with the complete spec." }));
+            continue;
+        };
+        let problems = match from_tool(&call["input"]["spec"]) {
+            Err(e) => vec![e],
+            Ok(spec) => {
+                let p = spec.validate();
+                if p.is_empty() {
+                    tracing::info!(project = %id, examples = spec.examples.len(), ?usage, "spec drafted");
+                    return Ok(Json(DraftResult {
+                        spec,
+                        note: call["input"]["note"].as_str().unwrap_or_default().to_string(),
+                        model,
+                        usage,
+                        elapsed_ms: started.elapsed().as_millis() as u64,
+                    }));
+                }
+                p
+            }
+        };
+        messages.push(json!({ "role": "user", "content": [{
+            "type": "tool_result", "tool_use_id": call["id"], "is_error": true,
+            "content": format!("The spec has problems; fix them and call submit_spec again:\n- {}", problems.join("\n- "))
+        }] }));
+    }
+    Err(ApiError::Conflict("the assistant could not produce a valid spec; try rephrasing".into()))
+}

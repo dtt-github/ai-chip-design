@@ -61,6 +61,8 @@ prints a line containing PASS, and prints no line containing FAIL, ERROR or MISM
 Guidelines:
 - Keep the RTL synthesizable and the change focused on the request; preserve existing behaviour that \
 the request doesn't ask you to change, and keep SPDX headers.
+- `spec.json` (if present) is the user's plain-language spec, and `tb/examples/tb_ex_*.v` are testbenches \
+generated from its examples: read them, never write them. They define the required behaviour.
 - When you change behaviour, add or extend a self-checking testbench that exercises it. Never weaken, \
 delete or bypass an existing check to make a test pass; if a test fails, fix the design or explain why \
 the test is wrong.
@@ -462,6 +464,16 @@ impl Workspace {
                 };
                 let content = input["content"].as_str().unwrap_or_default();
                 let rec = json!({ "path": p, "bytes": content.len(), "sha256": gate::sha256_hex(content.as_bytes()) });
+                // The examples are the user's tests: the agent may not rewrite them or what they're generated from.
+                if p == crate::spec::SPEC_FILE || p.starts_with(&format!("{}/", crate::spec::EXAMPLES_DIR)) {
+                    return (
+                        format!(
+                            "{p} holds the user's spec and examples, which you may not change; make the design pass them, or explain in your summary why an example looks wrong"
+                        ),
+                        true,
+                        rec,
+                    );
+                }
                 if content.len() > MAX_FILE_BYTES {
                     return (format!("file too large ({} bytes, max {MAX_FILE_BYTES})", content.len()), true, rec);
                 }
@@ -707,6 +719,22 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
+    use serde_json::json;
+
+    #[test]
+    fn examples_and_spec_are_read_only_to_the_agent() {
+        let mut ws = super::Workspace { base: BTreeMap::new(), changed: BTreeMap::new() };
+        for path in ["spec.json", "tb/examples/tb_ex_a.v"] {
+            let (out, is_error, _) = ws.call("write_file", &json!({ "path": path, "content": "x" }));
+            assert!(is_error && out.contains("may not change"), "{path}: {out}");
+        }
+        let (_, is_error, _) = ws.call("write_file", &json!({ "path": "tb/tb_mine.v", "content": "x" }));
+        assert!(!is_error);
+        assert_eq!(ws.changed.len(), 1);
+    }
+
     #[test]
     fn commit_titles() {
         assert_eq!(super::commit_title("Add a parity bit\nmore detail"), "Add a parity bit");

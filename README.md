@@ -134,6 +134,10 @@ All `/api` routes need `Authorization: Bearer <access token>`.
 | GET    | `/api/projects/{id}/collab`        | WebSocket for real-time co-editing (y-protocols) |
 | POST   | `/api/projects/{id}/jobs`          | Queue an RTL→GDS run `{commit?, config?}`        |
 | GET    | `/api/projects/{id}/jobs`          | Recent runs                                      |
+| GET    | `/api/projects/{id}/spec`          | The spec, whether its testbenches are in sync    |
+| PUT    | `/api/projects/{id}/spec`          | Save the spec and regenerate example testbenches |
+| POST   | `/api/projects/{id}/spec/run`      | Run every testbench; results per example         |
+| POST   | `/api/projects/{id}/spec/draft`    | Assistant drafts or revises the spec (unsaved)   |
 | GET    | `/api/ip`                          | IP blocks you can see, with their versions       |
 | POST   | `/api/projects/{id}/ip`            | Publish this project as a block version (editor) |
 | GET    | `/api/projects/{id}/ip/check`      | Licence verdict and plan for an import           |
@@ -155,6 +159,29 @@ All `/api` routes need `Authorization: Bearer <access token>`.
 
 Commits are optimistic: pass the `parent` you edited against and you get `409` if `main` moved.
 Roles are `owner` > `editor` > `viewer`; public projects are readable by any signed-in user.
+
+### Design view: describe, examples, health
+
+Each project opens in **Design** view, for engineers who don't write Verilog; **Code** is the file
+tree and editor for those who do. Both work on the same files and Git history.
+
+- **Describe**: what the design should do in plain words. "Draft the spec with the assistant"
+  (`POST /api/projects/{id}/spec/draft {instruction, spec?}`) has the model fill in connections
+  (with plain-language meanings), clock and reset, settings, examples and open questions; answering
+  a question or asking for a change goes through the same call. The server checks the model's spec
+  and sends problems back until it is valid (strict tool schema, at most 4 turns). Nothing is saved
+  until the person clicks Save.
+- **Examples are the tests**: `spec.json` holds the spec; each example is a table of steps (set an
+  input, wait N cycles, wait until, expect, expect for N cycles) that `sc-api/src/spec.rs` compiles,
+  deterministically, into `tb/examples/tb_ex_<id>.v`. Saving (`PUT /api/projects/{id}/spec
+  {spec, parent}`) commits the spec and the regenerated testbenches together and removes those of
+  deleted examples (only files carrying the generated header). Because they are ordinary
+  testbenches, the simulation gate, the browser simulator and gate-level simulation all run them.
+  `POST .../spec/run` reports each example's result; "Ask the AI to make them pass" opens an agent
+  proposal with the failures. The agent may not write `spec.json` or `tb/examples/`.
+- **Health**: the latest default build in plain language (works, fast enough with the margin as
+  "about N× faster", can be manufactured, size and power), each with "What does this mean?" and
+  the expert numbers, plus what still needs an expert before a real chip run.
 
 ### IP registry
 

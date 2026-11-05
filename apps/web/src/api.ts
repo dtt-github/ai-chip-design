@@ -150,6 +150,78 @@ export function flowConfigs(paths: string[]): string[] {
   return configs.sort((a, b) => Number(b === "config.json") - Number(a === "config.json") || a.localeCompare(b));
 }
 
+export type StepOp = "set" | "wait" | "wait_until" | "expect" | "expect_for";
+
+export interface SpecStep {
+  op: StepOp;
+  signal: string;
+  value: string;
+  cycles: number;
+  note: string;
+}
+
+export interface SpecExample {
+  id: string;
+  title: string;
+  given: string;
+  expect: string;
+  params: { name: string; value: string }[];
+  steps: SpecStep[];
+}
+
+export interface SpecPort {
+  name: string;
+  dir: "in" | "out";
+  width: number;
+  meaning: string;
+}
+
+/** The project's spec.json: what the design should do, and the examples that test it. */
+export interface Spec {
+  version: number;
+  intent: string;
+  top: string;
+  clock: { port: string; mhz: number } | null;
+  reset: { port: string; active_low: boolean } | null;
+  ports: SpecPort[];
+  params: { name: string; value: string; meaning: string }[];
+  decisions: { question: string; answer: string }[];
+  questions: { question: string; options: string[] }[];
+  examples: SpecExample[];
+}
+
+export interface SpecView {
+  head: string;
+  spec: Spec | null;
+  problems: string[];
+  in_sync: boolean;
+  design_name: string | null;
+  clock_mhz: number | null;
+}
+
+export interface ExampleResult {
+  id: string;
+  title: string;
+  verdict: "pass" | "fail" | "no_verdict" | "error" | "missing";
+  reason: string | null;
+  log: string[];
+}
+
+export interface SpecRun {
+  commit: string;
+  examples: ExampleResult[];
+  others: GateReport["runs"];
+  engine: string;
+}
+
+export interface SpecDraft {
+  spec: Spec;
+  note: string;
+  model: string;
+  usage: Record<string, number>;
+  elapsed_ms: number;
+}
+
 /** Licences offered when creating a project (the server accepts any it knows). */
 export const PROJECT_LICENCES = [
   "Apache-2.0",
@@ -371,6 +443,12 @@ export const api = {
   listProjects: () => request<Project[]>("GET", "/projects"),
   createProject: (body: { name: string; description?: string; visibility?: string; licence?: string }) =>
     request<Project>("POST", "/projects", body),
+  getSpec: (id: string) => request<SpecView>("GET", `/projects/${enc(id)}/spec`),
+  saveSpec: (id: string, body: { spec: Spec; parent: string; message?: string }) =>
+    request<{ commit: string; changed: boolean }>("PUT", `/projects/${enc(id)}/spec`, body),
+  runSpec: (id: string) => request<SpecRun>("POST", `/projects/${enc(id)}/spec/run`),
+  draftSpec: (id: string, body: { instruction: string; spec?: Spec | null }) =>
+    request<SpecDraft>("POST", `/projects/${enc(id)}/spec/draft`, body),
   ipBlocks: () => request<IpBlock[]>("GET", "/ip"),
   ipImports: (id: string) => request<{ blocks: Record<string, IpLockEntry> }>("GET", `/projects/${enc(id)}/ip/imports`),
   ipCheck: (id: string, block: string, version: string) =>

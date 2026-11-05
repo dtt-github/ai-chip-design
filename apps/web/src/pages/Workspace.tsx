@@ -15,6 +15,7 @@ import { IpPanel } from "../components/Ip";
 import { SimPanel, type SimFile } from "../components/SimPanel";
 import { ShareBox } from "../components/ShareBox";
 import { AgentList, AgentView } from "../components/Agent";
+import { DesignFlow } from "../components/Design";
 
 const HDL = /\.(s?v|vh|svh)$/i;
 
@@ -36,6 +37,8 @@ export function WorkspacePage() {
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<{ kind: "error" | "info"; text: string } | null>(null);
   const [panelTab, setPanelTab] = useState<"changes" | "runs" | "agent" | "ip">("changes");
+  // Design: describe, examples, health. Code: the files and the editor (for Verilog experts).
+  const [mode, setMode] = useState<"design" | "code">("design");
   const [bottom, setBottom] = useState<Bottom>(null);
   const [maximized, setMaximized] = useState(false);
   const [committing, setCommitting] = useState(false);
@@ -334,7 +337,32 @@ export function WorkspacePage() {
       </aside>
 
       <section className={`editor-area ${bottom && maximized ? "run-max" : ""}`}>
-        <div className="tabs" role="tablist">
+        <div className="mode-switch" role="tablist" aria-label="View">
+          <button role="tab" aria-selected={mode === "design"} className={mode === "design" ? "active" : ""} onClick={() => setMode("design")}>
+            Design
+          </button>
+          <button role="tab" aria-selected={mode === "code"} className={mode === "code" ? "active" : ""} onClick={() => setMode("code")}>
+            Code
+          </button>
+          <span className="muted small">{mode === "design" ? "Describe it, give examples, check it. The AI writes the Verilog." : "The files themselves, for Verilog experts."}</span>
+        </div>
+        {mode === "design" && (
+          <DesignFlow
+            projectId={id}
+            head={head}
+            canEdit={!readOnly}
+            onOpenFile={(path) => {
+              setMode("code");
+              openFile(path);
+            }}
+            onShowRun={(j) => setBottom({ kind: "run", jobId: j.id })}
+            onShowProposal={(pid) => {
+              setPanelTab("agent");
+              setBottom({ kind: "agent", proposalId: pid });
+            }}
+          />
+        )}
+        <div className="tabs" role="tablist" hidden={mode === "design"}>
           {tabs.map((p) => (
             <div key={p} className={`tab ${p === active ? "active" : ""}`} role="tab" aria-selected={p === active}>
               <button className="tab-label" onClick={() => setActive(p)} title={p}>
@@ -347,7 +375,7 @@ export function WorkspacePage() {
             </div>
           ))}
         </div>
-        <div className="editor">
+        <div className="editor" hidden={mode === "design"}>
           {active && isText ? (
             <Editor
               path={VerilogLsp.uriFor(id, active)}
