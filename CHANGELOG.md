@@ -27,6 +27,13 @@ All notable changes to SiliconCommons are recorded here. The format follows
   outside inputs need a synchronizer or debouncing, treats an example of the situation a question is
   about as depending on it, and always writes at least one example that holds whatever the answers
   are (a draft without examples is sent back once). From the design eval's baseline failures.
+- AI costs are priced for the model that served each call (Claude Opus 5.5 and Gemini 4 Argon
+  built in, `SC_AI_PRICES` for anything else) instead of always at Opus 5.5 prices, and recorded
+  with the model. Drafts return their cost (`usd`), proposals keep it in the evidence log, and the
+  eval runner uses the server's figure.
+
+- Gate-level simulation and Health say how many testbenches test a block rather than the chip, and
+  don't call a chip working when nothing tests it as a whole.
 
 ### Fixed
 
@@ -39,11 +46,6 @@ All notable changes to SiliconCommons are recorded here. The format follows
 - Example checks look 1 ps after the falling clock edge, so combinational outputs have settled
   (an example of a design without a clock could see the value from before the last `set`). The
   "what actually happened" replay samples at the same moment.
-
-### Changed
-
-- Gate-level simulation and Health say how many testbenches test a block rather than the chip, and
-  don't call a chip working when nothing tests it as a whole.
 
 ## 0.1.0 development line (2026-11-05)
 

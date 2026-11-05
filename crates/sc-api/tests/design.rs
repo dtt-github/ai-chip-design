@@ -221,6 +221,8 @@ async fn spec_examples_and_drafting(db: PgPool) {
     assert_eq!(d["spec"]["examples"][0]["steps"][1]["signal"], "en");
     assert_eq!(d["spec"]["questions"][0]["options"][1], "Stop at 255");
     assert_eq!(d["usage"]["output_tokens"], 100);
+    // Two turns of 100 input and 50 output tokens, at the served model's prices (Opus 5.5: $4 / $20).
+    assert!((d["usd"].as_f64().unwrap() - 0.0028).abs() < 1e-9, "{d}");
     {
         let seen = seen.lock().unwrap();
         assert_eq!(seen.len(), 2);

@@ -164,9 +164,9 @@ const USERNAME = env('SC_EVAL_USER', 'dev@siliconcommons.dev');
 const PASSWORD = env('SC_EVAL_PASSWORD', 'SiliconCommons-dev-2026');
 const POLL_MS = 5000;
 
-// US dollars per million tokens, as the server prices them (crates/sc-api/src/spend.rs).
-const PRICE = { input_tokens: 4.0, output_tokens: 20.0, cache_read_input_tokens: 0.2, cache_creation_input_tokens: 5.0 };
-const usd = (u = {}) => Object.entries(PRICE).reduce((s, [k, p]) => s + (u[k] ?? 0) * p / 1e6, 0);
+// Costs come from the server, which prices each call for the model that served it
+// (crates/sc-api/src/spend.rs); a server without per-model prices reports none.
+const serverUsd = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 let token = null;
 async function bearer() {
@@ -285,7 +285,8 @@ async function propose(input, ctx) {
   }
   const ev = p.evidence ?? {};
   return { project, proposal: p.id, request, files: p.files ?? {}, status: p.status, error: p.error, title: p.title,
-           summary: p.summary, gate: p.gate, model: ev.models_served?.[0] ?? p.model, usage: ev.usage ?? {}, steps: ev.steps ?? [] };
+           summary: p.summary, gate: p.gate, model: ev.models_served?.at(-1) ?? p.model, usage: ev.usage ?? {},
+           usd: serverUsd(ev.usd), steps: ev.steps ?? [] };
 }
 
 /**
@@ -296,7 +297,7 @@ async function runCase(input, ctx) {
     const d = await draftSpec(input, ctx);
     return {
       output: JSON.stringify(d.spec, null, 2), spec: d.spec, model: d.model, usage: d.usage, stop_reason: 'end_turn',
-      cost_usd: usd(d.usage), elapsed_ms: d.elapsed_ms,
+      cost_usd: d.model === 'oracle' || d.model === 'null' ? 0 : serverUsd(d.usd), elapsed_ms: d.elapsed_ms,
       transcript: [
         { role: 'user', content: input.task.description },
         { role: 'assistant', content: `${d.note ?? ''}\n\n\`\`\`json\n${JSON.stringify(d.spec, null, 2)}\n\`\`\`` },
@@ -314,7 +315,7 @@ async function runCase(input, ctx) {
   transcript.push({ role: 'assistant', content: `Status: ${p.status}${p.error ? ` (${p.error})` : ''}\n\n${p.title ?? ''}\n\n${p.summary ?? ''}`,
                     attachments: Object.keys(p.files).map(f => ({ kind: 'code', ref: `data:text/plain,${encodeURIComponent(p.files[f])}`, alt: f })) });
   return { output: JSON.stringify(p.files), files: p.files, status_agent: p.status, gate_passed: p.gate?.passed ?? null,
-           model: p.model, usage: p.usage, stop_reason: 'end_turn', cost_usd: usd(p.usage), turns, transcript };
+           model: p.model, usage: p.usage, stop_reason: 'end_turn', cost_usd: ctx.mode === 'live' ? p.usd : 0, turns, transcript };
 }
 
 /** Saves `spec` next to `files` in a fresh grading project and runs every testbench. */
@@ -392,7 +393,7 @@ async function gradeCase(input, run, ref, ctx) {
 
 /** Side-channel perf fields beyond the built-ins (latency_s etc.). */
 function perfFrom(run) {
-  return { cost_usd: run.cost_usd ?? 0, ...(run.turns != null ? { turns: run.turns } : {}) };
+  return { ...(run.cost_usd != null ? { cost_usd: run.cost_usd } : {}), ...(run.turns != null ? { turns: run.turns } : {}) };
 }
 
 // --- harness (you usually won't need to touch below this line) --------------

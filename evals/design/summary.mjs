@@ -23,11 +23,13 @@ for (const dir of dirs) {
     '| Task | Kind | Reps | Pass | Cost per run | Time per run |', '|---|---|---|---|---|---|');
   for (const [id, rs] of [...byTask].sort()) {
     lines.push(`| ${id} | ${rs[0].meta?.kind ?? ''} | ${rs.length} | ${pct(mean(rs, r => r.grade.pass))} | ` +
-      `${usd(mean(rs, r => r.cost_usd ?? 0))} | ${Math.round(mean(rs, r => r.latency_s))} s |`);
+      `${rs.every(r => typeof r.cost_usd === 'number') ? usd(mean(rs, r => r.cost_usd)) : 'n/a'} | ${Math.round(mean(rs, r => r.latency_s))} s |`);
   }
-  const total = rows.reduce((s, r) => s + (r.cost_usd ?? 0), 0);
+  const priced = rows.filter(r => typeof r.cost_usd === 'number');
+  const total = priced.reduce((s, r) => s + r.cost_usd, 0);
   lines.push('', `**Pass rate ${pct(mean(rows, r => r.grade.pass))}** over ${rows.length} runs of ${byTask.size} tasks; ` +
-    `cost ${usd(total)} in total, ${usd(total / rows.length)} per run` +
+    `cost ${usd(total)} in total, ${usd(total / Math.max(1, priced.length))} per run` +
+    (priced.length < rows.length ? ` (the server reported no cost for ${rows.length - priced.length} run(s))` : '') +
     (failed ? `; ${failed} attempt(s) failed to run (see errors.jsonl)` : '') + '.', '');
 }
 process.stdout.write(lines.join('\n'));

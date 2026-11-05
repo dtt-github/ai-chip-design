@@ -245,14 +245,18 @@ pub async fn create(
             .await;
         }
         // Bill what the run used, finished or not (the evidence log keeps the running total).
-        let usage: Option<Value> = sqlx::query_scalar("SELECT evidence->'usage' FROM agent_proposals WHERE id = $1")
+        let ev: Option<Value> = sqlx::query_scalar("SELECT evidence FROM agent_proposals WHERE id = $1")
             .bind(id)
             .fetch_optional(&st.db)
             .await
             .ok()
             .flatten();
-        if let Some(u) = usage.and_then(|u| serde_json::from_value::<BTreeMap<String, u64>>(u).ok()) {
-            crate::spend::record(&st, user.id, project_id, "agent", &u).await;
+        let ev = ev.unwrap_or_default();
+        if let Ok(u) = serde_json::from_value::<BTreeMap<String, u64>>(ev["usage"].clone()) {
+            // Priced for the model that served the run (the last one, if a fallback switched).
+            let model = ev["models_served"].as_array().and_then(|m| m.last()).and_then(Value::as_str);
+            let model = model.or(ev["model_requested"].as_str()).unwrap_or_default();
+            crate::spend::record(&st, user.id, project_id, "agent", model, &u).await;
         }
     });
     tracing::info!(proposal = %p.id, project = %project_id, "agent proposal started");
@@ -631,6 +635,7 @@ async fn run(
             "engine": gate::engine(),
             "steps": steps,
             "usage": usage,
+            "usd": crate::spend::usd(models.last().unwrap_or(&claude.cfg.model), usage),
             "elapsed_ms": started.elapsed().as_millis() as u64,
         })
     };

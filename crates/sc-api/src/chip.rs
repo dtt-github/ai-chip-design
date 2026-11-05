@@ -373,6 +373,7 @@ pub async fn review(
 
     let tools = review_tool();
     let mut messages = vec![json!({ "role": "user", "content": ctx })];
+    let mut served = claude.cfg.model.clone();
     let mut usage: BTreeMap<String, u64> = BTreeMap::new();
     let result: ApiResult<Review> = async {
         for _ in 0..REVIEW_TURNS {
@@ -380,6 +381,9 @@ pub async fn review(
                 .create(REVIEW_SYSTEM, &tools, &messages)
                 .await
                 .map_err(|e| ApiError::Unavailable(e.to_string()))?;
+            if let Some(m) = resp["model"].as_str().filter(|m| !m.is_empty()) {
+                served = m.to_string();
+            }
             if let Some(u) = resp["usage"].as_object() {
                 for k in ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"] {
                     *usage.entry(k.to_string()).or_default() += u.get(k).and_then(Value::as_u64).unwrap_or(0);
@@ -419,7 +423,7 @@ pub async fn review(
     }
     .await;
     if !usage.is_empty() {
-        crate::spend::record(&state, user.id, id, "review", &usage).await;
+        crate::spend::record(&state, user.id, id, "review", &served, &usage).await;
     }
     result.map(Json)
 }
