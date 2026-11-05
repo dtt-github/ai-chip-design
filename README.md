@@ -195,6 +195,11 @@ tree and editor for those who do. Both work on the same files and Git history.
   testbenches, the simulation gate, the browser simulator and gate-level simulation all run them.
   `POST .../spec/run` reports each example's result; "Ask the AI to make them pass" opens an agent
   proposal with the failures. The agent may not write `spec.json` or `tb/examples/`.
+- **Chip examples**: once the Blocks step has built a chip, an example can target it
+  (`"target": "<chip top>"`); its steps then use the chip's pins, clock and reset, so it checks
+  everything between the pins and the design (a synchronizer's two cycles, for instance). Gate-level
+  simulation of a chip build runs the chip examples on the chip's netlist and lists the design's
+  own examples as testing a block. "Add chip examples with the assistant" drafts them.
 - **What actually happened**: selecting an example runs its testbench in the browser simulator
   (continuing 20 cycles past the end) and replays the steps against the result exactly as the
   testbench does (`apps/web/src/lib/replay.ts`): each connection per clock cycle, the checks laid
@@ -222,7 +227,9 @@ source; unconnected inputs are tied to 0 with a warning; ports named like the cl
 pins are connected to them automatically. Whether a connection makes sense is the assistant's
 part (`POST .../blocks/review`): a note per connection in plain words, and where it helps, one of
 the library adapters, which "Add adapter" puts into the connection. Examples test the module
-named in `spec.json`; the chip as a whole has no examples of its own yet, and Health says so.
+named in `spec.json` by default; an example with `"target": "<chip>"` tests the whole chip through
+its pins instead (see the Design view section). Saving the chip regenerates those examples'
+testbenches, and refuses a change that would break one (a renamed pin, say).
 
 ### IP registry
 

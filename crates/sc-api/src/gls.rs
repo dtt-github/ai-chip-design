@@ -277,7 +277,20 @@ pub async fn run(
     if runs.is_empty() {
         summary = "no testbench found (a top-level module named tb*, *_tb or *test*)".into();
     } else if skipped > 0 && !ran.is_empty() {
-        summary.push_str(&format!("; {skipped} skipped (different parameters)"));
+        let blocks = runs
+            .iter()
+            .filter(|r| {
+                r.verdict == "skipped" && r.reason.as_deref().is_some_and(|w| w.starts_with("does not instantiate"))
+            })
+            .count();
+        let mut parts = Vec::new();
+        if blocks > 0 {
+            parts.push(format!("{blocks} test a block, not {design}"));
+        }
+        if skipped > blocks {
+            parts.push(format!("{} use different parameters", skipped - blocks));
+        }
+        summary.push_str(&format!("; {skipped} skipped ({})", parts.join(", ")));
     }
     GlsReport { status: status.into(), summary, design, params: plan.params, simulator: SIMULATOR.into(), runs }
 }
