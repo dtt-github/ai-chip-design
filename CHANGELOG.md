@@ -8,6 +8,10 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Added
 
+- **Design evals** for the assistant and the agent (`evals/design/`, [docs/evals.md](docs/evals.md)):
+  16 tasks (11 clear, 5 with open points), each with a reference spec, design and hidden testbench;
+  a runner that drafts specs or proposes designs through the API, grades them with simulation, and
+  reports pass rate and cost per task; oracle and null modes check the grading for free.
 - **Chip examples**: examples can test the whole chip built in the Blocks view through its pins
   (`"target": "<chip>"`), in simulation and on the chip's gate-level netlist. The assistant can
   draft them; saving the chip keeps them in step and refuses changes that would break one.

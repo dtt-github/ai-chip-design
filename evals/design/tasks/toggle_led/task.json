@@ -25,5 +25,62 @@
         "edge"
       ]
     }
-  ]
+  ],
+  "ideal_draft": {
+    "questions": [
+      {
+        "question": "Does the button need debouncing, or is it already clean?",
+        "options": [
+          "Already clean",
+          "Debounce it"
+        ]
+      },
+      {
+        "question": "Should the LED toggle when the button is pressed or when it is released?",
+        "options": [
+          "On press",
+          "On release"
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "id": "press_release",
+        "title": "A long press and release toggles the LED once",
+        "given": "",
+        "expect": "",
+        "params": [],
+        "steps": [
+          {
+            "op": "expect",
+            "signal": "led",
+            "value": "0"
+          },
+          {
+            "op": "set",
+            "signal": "button",
+            "value": "1"
+          },
+          {
+            "op": "wait",
+            "cycles": 20
+          },
+          {
+            "op": "set",
+            "signal": "button",
+            "value": "0"
+          },
+          {
+            "op": "wait",
+            "cycles": 20
+          },
+          {
+            "op": "expect",
+            "signal": "led",
+            "value": "1"
+          }
+        ]
+      }
+    ]
+  }
 }

@@ -32,5 +32,59 @@
         "wider"
       ]
     }
-  ]
+  ],
+  "ideal_draft": {
+    "questions": [
+      {
+        "question": "What happens when a new pulse arrives while dout is still stretched: restart the count, or ignore it?",
+        "options": [
+          "Restart the count",
+          "Ignore it"
+        ]
+      },
+      {
+        "question": "How long should dout be after a pulse longer than N cycles?",
+        "options": [
+          "As long as din plus N-1",
+          "Exactly N"
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "id": "short_pulse",
+        "title": "A one-cycle pulse becomes N cycles",
+        "given": "",
+        "expect": "",
+        "params": [],
+        "steps": [
+          {
+            "op": "set",
+            "signal": "din",
+            "value": "1"
+          },
+          {
+            "op": "wait",
+            "cycles": 1
+          },
+          {
+            "op": "set",
+            "signal": "din",
+            "value": "0"
+          },
+          {
+            "op": "expect_for",
+            "signal": "dout",
+            "value": "1",
+            "cycles": 4
+          },
+          {
+            "op": "expect",
+            "signal": "dout",
+            "value": "0"
+          }
+        ]
+      }
+    ]
+  }
 }

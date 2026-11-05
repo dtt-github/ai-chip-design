@@ -1,6 +1,8 @@
 //! The design eval tasks in `evals/design/tasks/` are graded with their reference files, so the
 //! references must be right: each task's reference design passes its own examples and its hidden
-//! testbench, and a design that drives every output to 0 fails both.
+//! testbench, and a design that drives every output to 0 fails both. For vague tasks, the ideal
+//! draft (questions about every open point, examples that hold whatever the answers) passes the
+//! same grading the assistant eval applies.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -92,6 +94,33 @@ fn every_task_is_graded_by_correct_references() {
         }
         if run(&null, &spec, hidden_tb).passed {
             problems.push(format!("{id}: the hidden testbench passes a design that does nothing"));
+        }
+        if let Some(ideal) = task.get("ideal_draft") {
+            let mut draft = spec.clone();
+            draft.decisions.clear();
+            draft.questions = serde_json::from_value(ideal["questions"].clone()).expect("ideal questions");
+            draft.examples = serde_json::from_value(ideal["examples"].clone()).expect("ideal examples");
+            let asked: Vec<String> = draft
+                .questions
+                .iter()
+                .map(|q| format!("{} {}", q.question, q.options.join(" ")).to_lowercase())
+                .collect();
+            for point in task["open_points"].as_array().unwrap() {
+                let hit = point["keywords"].as_array().unwrap().iter().any(|k| {
+                    let k = k.as_str().unwrap().to_lowercase();
+                    asked.iter().any(|q| q.contains(&k))
+                });
+                assert!(hit, "{id}: the ideal draft doesn't ask about {}", point["point"]);
+            }
+            assert_eq!(draft.check(None), Vec::<String>::new(), "{id}: ideal draft");
+            let tbs = draft.testbenches_for(None);
+            let r = run(&reference, &spec, tbs.clone());
+            if !r.passed {
+                problems.push(format!("{id}: the ideal draft's examples fail on the reference\n{}", failures(&r)));
+            }
+            if run(&null, &spec, tbs).passed {
+                problems.push(format!("{id}: the ideal draft's examples pass a design that does nothing"));
+            }
         }
     }
     assert!(problems.is_empty(), "{}", problems.join("\n\n"));

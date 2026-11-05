@@ -19,5 +19,66 @@
         "initial"
       ]
     }
-  ]
+  ],
+  "ideal_draft": {
+    "questions": [
+      {
+        "question": "Which light should be on right after reset?",
+        "options": [
+          "Red, then green",
+          "Green"
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "id": "green_then_yellow",
+        "title": "Green lasts GREEN cycles, then yellow, then red",
+        "given": "",
+        "expect": "",
+        "params": [],
+        "steps": [
+          {
+            "op": "wait_until",
+            "signal": "green",
+            "value": "1",
+            "cycles": 20
+          },
+          {
+            "op": "expect_for",
+            "signal": "green",
+            "value": "1",
+            "cycles": 8
+          },
+          {
+            "op": "expect",
+            "signal": "yellow",
+            "value": "1"
+          },
+          {
+            "op": "expect_for",
+            "signal": "yellow",
+            "value": "1",
+            "cycles": 2
+          },
+          {
+            "op": "expect",
+            "signal": "red",
+            "value": "1"
+          },
+          {
+            "op": "expect_for",
+            "signal": "red",
+            "value": "1",
+            "cycles": 6
+          },
+          {
+            "op": "expect",
+            "signal": "green",
+            "value": "1"
+          }
+        ]
+      }
+    ]
+  }
 }

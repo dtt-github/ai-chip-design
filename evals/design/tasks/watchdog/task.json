@@ -21,5 +21,103 @@
         "sticky"
       ]
     }
-  ]
+  ],
+  "ideal_draft": {
+    "questions": [
+      {
+        "question": "Should bark stay on until the next kick, or pulse for one cycle?",
+        "options": [
+          "Stay on until a kick",
+          "One-cycle pulse"
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "id": "timeout",
+        "title": "No kick for TIMEOUT cycles barks",
+        "given": "",
+        "expect": "",
+        "params": [],
+        "steps": [
+          {
+            "op": "expect_for",
+            "signal": "bark",
+            "value": "0",
+            "cycles": 8
+          },
+          {
+            "op": "expect",
+            "signal": "bark",
+            "value": "1"
+          }
+        ]
+      },
+      {
+        "id": "kicked_in_time",
+        "title": "Kicking every 7 cycles keeps it quiet",
+        "given": "",
+        "expect": "",
+        "params": [],
+        "steps": [
+          {
+            "op": "set",
+            "signal": "kick",
+            "value": "1"
+          },
+          {
+            "op": "wait",
+            "cycles": 1
+          },
+          {
+            "op": "set",
+            "signal": "kick",
+            "value": "0"
+          },
+          {
+            "op": "wait",
+            "cycles": 6
+          },
+          {
+            "op": "set",
+            "signal": "kick",
+            "value": "1"
+          },
+          {
+            "op": "wait",
+            "cycles": 1
+          },
+          {
+            "op": "set",
+            "signal": "kick",
+            "value": "0"
+          },
+          {
+            "op": "wait",
+            "cycles": 6
+          },
+          {
+            "op": "set",
+            "signal": "kick",
+            "value": "1"
+          },
+          {
+            "op": "wait",
+            "cycles": 1
+          },
+          {
+            "op": "set",
+            "signal": "kick",
+            "value": "0"
+          },
+          {
+            "op": "expect_for",
+            "signal": "bark",
+            "value": "0",
+            "cycles": 6
+          }
+        ]
+      }
+    ]
+  }
 }

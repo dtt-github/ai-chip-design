@@ -30,5 +30,56 @@
         "clock domain"
       ]
     }
-  ]
+  ],
+  "ideal_draft": {
+    "questions": [
+      {
+        "question": "How many cycles after din changes should rise or fall pulse, and for how long?",
+        "options": [
+          "One cycle, registered",
+          "Same cycle, combinational"
+        ]
+      },
+      {
+        "question": "Is din synchronous to clk, or does it need a synchronizer?",
+        "options": [
+          "Synchronous",
+          "Add a synchronizer"
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "id": "both_edges",
+        "title": "A rise and a fall are both reported",
+        "given": "",
+        "expect": "",
+        "params": [],
+        "steps": [
+          {
+            "op": "set",
+            "signal": "din",
+            "value": "1"
+          },
+          {
+            "op": "wait_until",
+            "signal": "rise",
+            "value": "1",
+            "cycles": 5
+          },
+          {
+            "op": "set",
+            "signal": "din",
+            "value": "0"
+          },
+          {
+            "op": "wait_until",
+            "signal": "fall",
+            "value": "1",
+            "cycles": 5
+          }
+        ]
+      }
+    ]
+  }
 }
