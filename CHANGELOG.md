@@ -21,16 +21,12 @@ All notable changes to SiliconCommons are recorded here. The format follows
 - Credit to DigitalTwin Technology GmbH as the initiator of the project (README, NOTICE, package
   metadata).
 
-### Fixed
-
-- The simulator read a sized index with its top bit set as negative (`f[4'd8]`, or a 4-bit
-  `b + 4'd1` reaching 8, gave 0); indices are now unsigned unless the expression is signed.
-- Example checks look 1 ps after the falling clock edge, so combinational outputs have settled
-  (an example of a design without a clock could see the value from before the last `set`). The
-  "what actually happened" replay samples at the same moment.
-
 ### Changed
 
+- The assistant counts example timing explicitly (cycle by cycle, with the reasoning), asks whether
+  outside inputs need a synchronizer or debouncing, treats an example of the situation a question is
+  about as depending on it, and always writes at least one example that holds whatever the answers
+  are (a draft without examples is sent back once). From the design eval's baseline failures.
 - AI costs are priced for the model that served each call (Claude Opus 5.5 and Gemini 4 Argon
   built in, `SC_AI_PRICES` for anything else) instead of always at Opus 5.5 prices, and recorded
   with the model. Drafts return their cost (`usd`), proposals keep it in the evidence log, and the
@@ -38,6 +34,18 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 - Gate-level simulation and Health say how many testbenches test a block rather than the chip, and
   don't call a chip working when nothing tests it as a whole.
+
+### Fixed
+
+- The spec check refuses an example that runs longer than the simulator's 50 µs limit (it could
+  never pass), saying how many cycles fit; the assistant is told to use small settings instead.
+- Drafting no longer crashes the request when the model sends the spec as JSON text instead of an
+  object: the text is read, or the problem goes back to the model.
+- The simulator read a sized index with its top bit set as negative (`f[4'd8]`, or a 4-bit
+  `b + 4'd1` reaching 8, gave 0); indices are now unsigned unless the expression is signed.
+- Example checks look 1 ps after the falling clock edge, so combinational outputs have settled
+  (an example of a design without a clock could see the value from before the last `set`). The
+  "what actually happened" replay samples at the same moment.
 
 ## 0.1.0 development line (2026-11-05)
 

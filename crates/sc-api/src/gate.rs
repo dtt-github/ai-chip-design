@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// Bounds for one testbench: generous for unit tests, but a hung testbench can't stall the gate.
-const MAX_TIME: u64 = 50_000_000;
+pub(crate) const MAX_TIME: u64 = 50_000_000;
 const MAX_STEPS: u64 = 50_000_000;
 const MAX_LOG_LINES: usize = 400;
 
