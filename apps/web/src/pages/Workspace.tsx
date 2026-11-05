@@ -13,10 +13,11 @@ import { VerilogLsp, type LspStatus } from "../lsp";
 import { RunsList, RunView } from "../components/Runs";
 import { SimPanel, type SimFile } from "../components/SimPanel";
 import { ShareBox } from "../components/ShareBox";
+import { AgentList, AgentView } from "../components/Agent";
 
 const HDL = /\.(s?v|vh|svh)$/i;
 
-type Bottom = { kind: "run"; jobId: string } | { kind: "sim" } | null;
+type Bottom = { kind: "run"; jobId: string } | { kind: "sim" } | { kind: "agent"; proposalId: string } | null;
 type ChangeKind = "A" | "M" | "D";
 
 export function WorkspacePage() {
@@ -33,7 +34,7 @@ export function WorkspacePage() {
   const [history, setHistory] = useState<CommitInfo[]>([]);
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<{ kind: "error" | "info"; text: string } | null>(null);
-  const [panelTab, setPanelTab] = useState<"changes" | "runs">("changes");
+  const [panelTab, setPanelTab] = useState<"changes" | "runs" | "agent">("changes");
   const [bottom, setBottom] = useState<Bottom>(null);
   const [maximized, setMaximized] = useState(false);
   const [committing, setCommitting] = useState(false);
@@ -397,6 +398,19 @@ export function WorkspacePage() {
             }}
           />
         )}
+        {bottom?.kind === "agent" && (
+          <AgentView
+            proposalId={bottom.proposalId}
+            head={head}
+            canMerge={!readOnly}
+            maximized={maximized}
+            onMaximize={setMaximized}
+            onClose={() => {
+              setBottom(null);
+              setMaximized(false);
+            }}
+          />
+        )}
         {bottom?.kind === "sim" && (
           <SimPanel
             gatherFiles={gatherFiles}
@@ -422,8 +436,18 @@ export function WorkspacePage() {
           <button role="tab" aria-selected={panelTab === "runs"} className={panelTab === "runs" ? "active" : ""} onClick={() => setPanelTab("runs")}>
             Runs
           </button>
+          <button role="tab" aria-selected={panelTab === "agent"} className={panelTab === "agent" ? "active" : ""} onClick={() => setPanelTab("agent")}>
+            Agent
+          </button>
         </div>
-        {panelTab === "runs" ? (
+        {panelTab === "agent" ? (
+          <AgentList
+            projectId={id}
+            canPropose={!readOnly}
+            selected={bottom?.kind === "agent" ? bottom.proposalId : null}
+            onSelect={(pid) => setBottom({ kind: "agent", proposalId: pid })}
+          />
+        ) : panelTab === "runs" ? (
           <RunsList
             projectId={id}
             head={head}

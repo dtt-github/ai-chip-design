@@ -48,6 +48,77 @@ export interface Member {
   role: Role;
 }
 
+export type ProposalStatus = "running" | "ready" | "gate_failed" | "failed" | "merged" | "discarded";
+
+export interface GateRun {
+  top: string;
+  verdict: "pass" | "fail" | "no_verdict" | "error";
+  finished: boolean;
+  time: number;
+  steps: number;
+  log: string[];
+  reason: string | null;
+}
+
+export interface GateReport {
+  passed: boolean;
+  summary: string;
+  engine: string;
+  runs: GateRun[];
+  inputs: Record<string, string>;
+}
+
+export interface EvidenceStep {
+  turn: number;
+  kind: "reasoning" | "message" | "tool" | "fallback";
+  text?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  output?: string;
+  is_error?: boolean;
+  ms?: number;
+  from?: { model: string };
+  to?: { model: string };
+}
+
+export interface Proposal {
+  id: string;
+  project_id: string;
+  request: string;
+  base_commit: string;
+  status: ProposalStatus;
+  model: string;
+  summary: string | null;
+  error: string | null;
+  files: Record<string, string>;
+  base_files: Record<string, string | null>;
+  gate: GateReport | null;
+  evidence: {
+    steps?: EvidenceStep[];
+    models_served?: string[];
+    usage?: Record<string, number>;
+    system_prompt_sha256?: string;
+    engine?: string;
+    effort?: string;
+    elapsed_ms?: number;
+  };
+  evidence_hash: string | null;
+  merged_commit: string | null;
+  created_at: string;
+  finished_at: string | null;
+  merged_at: string | null;
+}
+
+export interface ProposalListItem {
+  id: string;
+  request: string;
+  status: ProposalStatus;
+  summary: string | null;
+  base_commit: string;
+  created_at: string;
+  merged_commit: string | null;
+}
+
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "canceled";
 
 export interface JobSummary {
@@ -203,6 +274,12 @@ export const api = {
   members: (id: string) => request<Member[]>("GET", `/projects/${enc(id)}/members`),
   addMember: (id: string, body: { email: string; role: "editor" | "viewer" }) =>
     request<Member>("POST", `/projects/${enc(id)}/members`, body),
+  proposals: (id: string) => request<ProposalListItem[]>("GET", `/projects/${enc(id)}/agent`),
+  propose: (id: string, text: string) => request<Proposal>("POST", `/projects/${enc(id)}/agent`, { request: text }),
+  proposal: (pid: string) => request<Proposal>("GET", `/agent/${enc(pid)}`),
+  mergeProposal: (pid: string) => request<Proposal>("POST", `/agent/${enc(pid)}/merge`),
+  discardProposal: (pid: string) => request<Proposal>("POST", `/agent/${enc(pid)}/discard`),
+  regate: (pid: string) => request<{ report: GateReport; reproduced: boolean }>("POST", `/agent/${enc(pid)}/regate`),
   createJob: (id: string, body: { commit?: string; config?: string } = {}) =>
     request<Job>("POST", `/projects/${enc(id)}/jobs`, body),
   listJobs: (id: string) => request<Job[]>("GET", `/projects/${enc(id)}/jobs`),

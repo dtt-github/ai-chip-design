@@ -1,9 +1,67 @@
 //! Files a new project starts with: a small clocked design and a LibreLane
 //! config targeting the IHP SG13G2 open PDK.
 
+/// Keywords a project slug could plausibly collide with.
+const RESERVED: &[&str] = &[
+    "always",
+    "and",
+    "assign",
+    "begin",
+    "bit",
+    "buf",
+    "byte",
+    "case",
+    "class",
+    "default",
+    "edge",
+    "else",
+    "end",
+    "enum",
+    "event",
+    "for",
+    "function",
+    "generate",
+    "if",
+    "initial",
+    "inout",
+    "input",
+    "int",
+    "integer",
+    "interface",
+    "logic",
+    "longint",
+    "module",
+    "nand",
+    "nor",
+    "not",
+    "or",
+    "output",
+    "package",
+    "parameter",
+    "real",
+    "reg",
+    "shortint",
+    "signed",
+    "string",
+    "struct",
+    "task",
+    "time",
+    "type",
+    "unsigned",
+    "var",
+    "void",
+    "wire",
+    "xor",
+];
+
 pub fn starter_files(name: &str, slug: &str) -> Vec<(String, Vec<u8>)> {
     let top = slug.replace('-', "_");
-    let top = if top.starts_with(|c: char| c.is_ascii_digit()) { format!("top_{top}") } else { top };
+    // Module names must be identifiers, and not Verilog/SystemVerilog keywords.
+    let top = if top.starts_with(|c: char| c.is_ascii_digit()) || RESERVED.contains(&top.as_str()) {
+        format!("top_{top}")
+    } else {
+        top
+    };
 
     let readme = format!(
         "# {name}\n\n\
@@ -86,6 +144,7 @@ mod tests {
     fn module_name_is_a_valid_identifier() {
         let files = super::starter_files("My Chip", "2-bit-alu");
         assert_eq!(files[1].0, "src/top_2_bit_alu.v");
+        assert_eq!(super::starter_files("Logic", "logic")[1].0, "src/top_logic.v");
         let rtl = String::from_utf8(files[1].1.clone()).unwrap();
         assert!(rtl.contains("module top_2_bit_alu #("));
         assert!(rtl.contains("count <= {WIDTH{1'b0}};"));

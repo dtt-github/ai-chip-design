@@ -37,6 +37,7 @@ pub fn state_with_backend(
         lsp: Arc::new(lsp),
         jobs: Arc::new(JobService::new(backend, dir.path().join("jobs"))),
         collab: Arc::new(sc_api::collab::Collab::new(dir.path().join("collab"))),
+        agent: Arc::new(sc_api::agent::AgentService::new(None, 2)),
     };
     (state, dir)
 }

@@ -1097,3 +1097,149 @@ select.small {
   font-size: 12px;
   padding: 3px 6px;
 }
+
+/* Agent */
+.agent-form {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.agent-form textarea {
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: inherit;
+  border-radius: 6px;
+  padding: 6px 8px;
+  resize: vertical;
+}
+
+.agent-form p {
+  margin: 0;
+}
+
+.agent-request {
+  font-size: 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.agent-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-head {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.agent-head p {
+  margin: 0 0 4px;
+}
+
+.agent-request-full {
+  font-weight: 600;
+}
+
+.agent-summary {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 13px;
+  margin: 6px 0 0;
+  max-height: 8em;
+  overflow: auto;
+}
+
+.agent-diff,
+.gate,
+.evidence {
+  padding: 8px 12px;
+}
+
+.file-diff {
+  margin-bottom: 10px;
+}
+
+.diff {
+  margin: 4px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 0;
+  overflow: auto;
+}
+
+.diff span {
+  display: block;
+  padding: 0 8px;
+  white-space: pre;
+}
+
+.diff-add {
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+}
+
+.diff-del {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+.diff-gap {
+  color: var(--muted);
+}
+
+.gate-run summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.gate-run .run-log {
+  height: auto;
+  max-height: 200px;
+}
+
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  gap: 6px;
+}
+
+.step {
+  border-left: 3px solid var(--border);
+  padding: 2px 8px;
+}
+
+.step-tool {
+  border-left-color: var(--accent);
+}
+
+.step-reasoning {
+  border-left-color: var(--muted);
+}
+
+.step-reasoning .step-text {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.step-error {
+  border-left-color: var(--danger);
+}
+
+.step-text {
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+
+.step .run-log {
+  height: auto;
+  max-height: 180px;
+}

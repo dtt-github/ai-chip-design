@@ -3,7 +3,8 @@
 Open, browser-based, physics-aware chip design platform. Edit Verilog together in real time with a
 real language server, simulate it in the browser, keep every project in Git, run it from RTL to GDS
 with LibreLane on the IHP SG13G2 130 nm open PDK, and inspect the result in a WebGPU layout viewer
-with DRC markers and timing/area reports.
+with DRC markers and timing/area reports. An AI agent proposes RTL changes that can only be merged
+when the simulation gate passes, with an evidence log for every proposal.
 
 **Phase 0 gate passed:** a UART goes from an empty project to a sign-off-clean GDS in 4 min 30 s
 while two people co-edit ([docs/phase0-gate.md](docs/phase0-gate.md)).
@@ -133,6 +134,12 @@ All `/api` routes need `Authorization: Bearer <access token>`.
 | GET    | `/api/projects/{id}/collab`        | WebSocket for real-time co-editing (y-protocols) |
 | POST   | `/api/projects/{id}/jobs`          | Queue an RTL→GDS run `{commit?, config?}`        |
 | GET    | `/api/projects/{id}/jobs`          | Recent runs                                      |
+| POST   | `/api/projects/{id}/agent`         | Ask the agent for a change `{request}` (editor)  |
+| GET    | `/api/projects/{id}/agent`         | Recent proposals                                 |
+| GET    | `/api/agent/{id}`                  | Proposal: files, base content, gate, evidence    |
+| POST   | `/api/agent/{id}/merge`            | Merge (editor; gate must pass, base must be head) |
+| POST   | `/api/agent/{id}/regate`           | Re-run the gate on the recorded inputs           |
+| POST   | `/api/agent/{id}/discard`          | Discard a finished proposal                      |
 | GET    | `/api/jobs/{id}`                   | Run status, error excerpt, sign-off summary      |
 | GET    | `/api/jobs/{id}/log?offset=`       | Log from `offset`; poll until `done`             |
 | POST   | `/api/jobs/{id}/cancel`            | Cancel a queued or running run (editor)          |
@@ -143,6 +150,31 @@ All `/api` routes need `Authorization: Bearer <access token>`.
 
 Commits are optimistic: pass the `parent` you edited against and you get `409` if `main` moved.
 Roles are `owner` > `editor` > `viewer`; public projects are readable by any signed-in user.
+
+### AI agent with a simulation gate
+
+The Agent tab sends a change request to an agent running in the API (`sc-api/src/agent.rs`). It
+calls the Claude Messages API over HTTP (`claude-opus-5-5`, adaptive thinking with summarised
+reasoning, effort `high`, prompt caching, server-side refusal fallback `fallbacks: "default"`) and
+works on a private copy of the project at the current commit through four tools: `list_files`,
+`read_file`, `write_file` and `run_simulation` (the same `sc-sim` engine as the browser). It cannot
+commit.
+
+When it finishes, the server runs the **simulation gate** (`sc-api/src/gate.rs`) on the tree the
+proposal would produce: every testbench (top-level `tb*`, `*_tb`, `*test*` modules) must reach
+`$finish`, print `PASS` and print no `FAIL`/`ERROR`/`MISMATCH`. A person with the editor role can
+merge only a proposal whose gate passed and whose base is still the branch tip; the gate runs again
+at merge time on the exact files committed. The commit is authored by the person who merged, and
+records the proposal, model, gate result and evidence hash.
+
+Every proposal keeps an **evidence log**: the request and requester, base commit, model requested
+and served, effort, a hash of the agent's instructions, its reasoning summaries and messages, every
+tool call with its input (file hashes, not contents) and result, token usage, the changed files'
+hashes, and the gate report with the hash of every simulated file. A sha256 over the whole log goes
+into the merge commit, and "Re-run gate" checks that the recorded result reproduces.
+
+Set `ANTHROPIC_API_KEY` to enable it (`SC_AGENT_MODEL`, `SC_AGENT_EFFORT` and
+`SC_ANTHROPIC_BASE_URL` are optional); without a key the endpoint answers 503.
 
 ### Co-editing
 

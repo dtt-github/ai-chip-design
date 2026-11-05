@@ -65,6 +65,23 @@ async fn main() -> anyhow::Result<()> {
             None
         }
     };
+    let claude = match env("ANTHROPIC_API_KEY").ok().filter(|k| !k.is_empty()) {
+        Some(api_key) => {
+            let cfg = sc_api::claude::ClaudeConfig {
+                api_key,
+                base_url: env("SC_ANTHROPIC_BASE_URL").unwrap_or_else(|_| "https://api.anthropic.com".into()),
+                model: env("SC_AGENT_MODEL").unwrap_or_else(|_| sc_api::claude::DEFAULT_MODEL.into()),
+                effort: env("SC_AGENT_EFFORT").unwrap_or_else(|_| "high".into()),
+                max_tokens: 16_000,
+            };
+            tracing::info!(model = %cfg.model, effort = %cfg.effort, "agent enabled");
+            Some(sc_api::claude::Claude::new(cfg))
+        }
+        None => {
+            tracing::warn!("agent disabled: set ANTHROPIC_API_KEY to enable it");
+            None
+        }
+    };
     let workers: usize = env("SC_JOB_WORKERS").ok().and_then(|v| v.parse().ok()).unwrap_or(2);
 
     let state = AppState {
@@ -74,7 +91,9 @@ async fn main() -> anyhow::Result<()> {
         lsp: Arc::new(LspConfig::new(verible_ls, max_lsp)),
         jobs: Arc::new(JobService::new(backend, data_dir.join("jobs"))),
         collab: Arc::new(sc_api::collab::Collab::new(data_dir.join("collab"))),
+        agent: Arc::new(sc_api::agent::AgentService::new(claude, 2)),
     };
+    sc_api::agent::recover(&state).await?;
     sc_api::jobs::start_workers(state.clone(), workers).await?;
 
     let listener = tokio::net::TcpListener::bind(bind).await?;

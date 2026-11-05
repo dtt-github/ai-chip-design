@@ -1,8 +1,11 @@
 //! SiliconCommons HTTP API.
 
+pub mod agent;
 pub mod auth;
+pub mod claude;
 pub mod collab;
 pub mod error;
+pub mod gate;
 pub mod jobs;
 pub mod lsp;
 pub mod projects;
@@ -31,6 +34,7 @@ pub struct AppState {
     pub lsp: Arc<lsp::LspConfig>,
     pub jobs: Arc<jobs::JobService>,
     pub collab: Arc<collab::Collab>,
+    pub agent: Arc<agent::AgentService>,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -47,6 +51,11 @@ pub fn router(state: AppState) -> Router {
         .route("/projects/{id}/lsp", get(lsp::handler))
         .route("/projects/{id}/collab", get(collab::handler))
         .route("/projects/{id}/jobs", get(jobs::list).post(jobs::create))
+        .route("/projects/{id}/agent", get(agent::list).post(agent::create))
+        .route("/agent/{id}", get(agent::get))
+        .route("/agent/{id}/merge", post(agent::merge))
+        .route("/agent/{id}/discard", post(agent::discard))
+        .route("/agent/{id}/regate", post(agent::regate))
         .route("/jobs/{id}", get(jobs::get))
         .route("/jobs/{id}/log", get(jobs::log))
         .route("/jobs/{id}/cancel", post(jobs::cancel))
