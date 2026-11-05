@@ -272,6 +272,10 @@ async fn spec_examples_and_drafting(db: PgPool) {
         feedback["content"].as_str().unwrap().contains("depends on the open question \"Should count wrap at 255?\""),
         "{feedback}"
     );
+    // A spec without examples is pushed back once, asking for examples that hold whatever the answers.
+    let feedback = &seen[6]["messages"].as_array().unwrap().last().unwrap()["content"][0];
+    assert!(feedback["content"].as_str().unwrap().contains("There are no examples"), "{feedback}");
+    assert_eq!(seen.len(), 7);
 }
 
 #[sqlx::test(migrator = "sc_api::MIGRATOR")]

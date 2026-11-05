@@ -21,6 +21,13 @@ All notable changes to SiliconCommons are recorded here. The format follows
 - Credit to DigitalTwin Technology GmbH as the initiator of the project (README, NOTICE, package
   metadata).
 
+### Changed
+
+- The assistant counts example timing explicitly (cycle by cycle, with the reasoning), asks whether
+  outside inputs need a synchronizer or debouncing, treats an example of the situation a question is
+  about as depending on it, and always writes at least one example that holds whatever the answers
+  are (a draft without examples is sent back once). From the design eval's baseline failures.
+
 ### Fixed
 
 - The simulator read a sized index with its top bit set as negative (`f[4'd8]`, or a 4-bit
