@@ -32,6 +32,24 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Stack for [`on_big_stack`]: parsing, elaboration and simulation recurse over the syntax tree,
+/// whose depth the parser bounds; this is comfortably more than that bound needs.
+pub const STACK_BYTES: usize = 256 << 20;
+
+/// Runs `f` on a thread with a [`STACK_BYTES`] stack (address space, committed only as used).
+/// Servers should run untrusted designs through this rather than on a default-sized thread.
+pub fn on_big_stack<R: Send>(f: impl FnOnce() -> R + Send) -> R {
+    std::thread::scope(|s| {
+        std::thread::Builder::new()
+            .name("sc-sim".into())
+            .stack_size(STACK_BYTES)
+            .spawn_scoped(s, f)
+            .expect("spawn simulator thread")
+            .join()
+            .unwrap_or_else(|p| std::panic::resume_unwind(p))
+    })
+}
+
 /// Parses all files and returns the modules plus the timescale (fs per unit) in effect.
 pub fn parse(files: &[(&str, &str)]) -> Result<(Vec<ast::Module>, u64)> {
     let mut defines = HashMap::new();

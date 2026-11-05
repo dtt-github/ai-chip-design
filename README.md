@@ -98,6 +98,15 @@ The `siliconcommons-dev-cli` client allows the password grant (dev only), which 
 curl -s -X POST localhost:8180/auth/v1/oidc/token -d grant_type=password -d client_id=siliconcommons-dev-cli -d client_secret=scdevcliscdevcliscdevcliscdevcliscdevcliscdevcliscdevcliscdevcli -d username=dev@siliconcommons.dev -d password=SiliconCommons-dev-2026
 ```
 
+## Deploying a pilot
+
+`deploy/pilot/` runs everything on one host behind HTTPS (Caddy, the API, Postgres, Rauthy with a
+production config, nightly backups with a tested `restore.sh`). Start with
+`deploy/pilot/README.md`; `docs/security-review.md` lists what was reviewed, fixed and accepted.
+Per-person limits: an AI budget per day (`SC_AI_DAILY_USD`), 3 active flow runs, 2 running agent
+proposals, 3 language-server sessions; flow runs stop after `SC_JOB_TIMEOUT_MIN` and their
+directories are deleted after `SC_JOB_RETENTION_DAYS`.
+
 ## Tests
 
 ```bash

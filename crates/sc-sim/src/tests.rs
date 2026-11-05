@@ -240,3 +240,27 @@ endmodule
     assert_eq!(top.instances[0].params["P"], 1);
     assert!(elab::elaborate_with(&modules, "dut", &[("L".to_string(), 1)].into()).is_err());
 }
+
+#[test]
+fn hostile_nesting_is_refused_not_a_crash() {
+    // The way servers run untrusted designs.
+    let r = on_big_stack(|| {
+        let cases = [
+            format!("module tb; wire x; wire y = {}x; endmodule", "~".repeat(1_000_000)),
+            format!("module tb; wire x; wire y = {}x{}; endmodule", "(".repeat(100_000), ")".repeat(100_000)),
+            format!("module tb; initial {}$finish; endmodule", "begin ".repeat(100_000)),
+            format!("module tb; wire x; wire y = x{}; endmodule", " + x".repeat(500_000)),
+        ];
+        cases.iter().map(|src| simulate(&[("t.v", src)], Some("tb"), Limits::default()).is_err()).collect::<Vec<_>>()
+    });
+    assert_eq!(r, vec![true; 4]);
+
+    // Ordinary depth still works: 100 nested parentheses and a 900-term sum.
+    let src = format!(
+        "module tb; reg [15:0] y; initial begin y = {}1{} + {}; $display(\"%0d\", y); $finish; end endmodule",
+        "(".repeat(100),
+        ")".repeat(100),
+        vec!["1"; 900].join(" + ")
+    );
+    assert_eq!(on_big_stack(|| log(&src)), vec!["901"]);
+}

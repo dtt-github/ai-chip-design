@@ -14,6 +14,7 @@ pub mod licence;
 pub mod lsp;
 pub mod projects;
 pub mod spec;
+pub mod spend;
 mod template;
 pub mod workspace;
 
@@ -46,6 +47,7 @@ pub fn router(state: AppState) -> Router {
     use projects as p;
     let api = Router::new()
         .route("/me", get(me))
+        .route("/me/ai-usage", get(spend::mine))
         .route("/projects", get(p::list).post(p::create))
         .route("/projects/{id}", get(p::get))
         .route("/projects/{id}/tree", get(p::tree))
@@ -53,6 +55,7 @@ pub fn router(state: AppState) -> Router {
         .route("/projects/{id}/files/{*path}", get(p::read_file))
         .route("/projects/{id}/commits", get(p::log).post(p::commit))
         .route("/projects/{id}/members", get(p::members).post(p::add_member))
+        .route("/projects/{id}/members/{user}", axum::routing::delete(p::remove_member))
         .route("/projects/{id}/lsp", get(lsp::handler))
         .route("/projects/{id}/collab", get(collab::handler))
         .route("/projects/{id}/jobs", get(jobs::list).post(jobs::create))

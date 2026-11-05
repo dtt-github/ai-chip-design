@@ -18,6 +18,8 @@ type Step = "describe" | "examples" | "health";
 
 interface Props {
   projectId: string;
+  /** Description to start a project without a spec with (from the starter ideas). */
+  startIntent?: string | null;
   head: string | null;
   canEdit: boolean;
   /** Opens a file in the code view. */
@@ -63,7 +65,7 @@ function blankSpec(top: string, mhz: number | null): Spec {
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Intent-first design: describe the design, give examples (they become the tests), check its health. */
-export function DesignFlow({ projectId, head, canEdit, onOpenFile, onShowRun, onShowProposal }: Props) {
+export function DesignFlow({ projectId, startIntent, head, canEdit, onOpenFile, onShowRun, onShowProposal }: Props) {
   const [step, setStep] = useState<Step>("describe");
   const [view, setView] = useState<SpecView | null>(null);
   const [draft, setDraft] = useState<Spec | null>(null);
@@ -71,16 +73,26 @@ export function DesignFlow({ projectId, head, canEdit, onOpenFile, onShowRun, on
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [run, setRun] = useState<SpecRun | null>(null);
+  const [budget, setBudget] = useState<{ today_usd: number; limit_usd: number | null } | null>(null);
+  const refreshBudget = useCallback(() => {
+    api.aiUsage().then(setBudget, () => setBudget(null));
+  }, []);
+  useEffect(refreshBudget, [refreshBudget]);
 
   // The last spec loaded from the server: a draft that differs from it has unsaved edits to keep.
   const saved = useRef<Spec | null>(null);
   const load = useCallback(async () => {
     const v = await api.getSpec(projectId);
     setView(v);
-    setDraft((d) => (d && saved.current && !same(d, saved.current) ? d : (v.spec ?? blankSpec(v.design_name ?? "top", v.clock_mhz))));
-    saved.current = v.spec ?? blankSpec(v.design_name ?? "top", v.clock_mhz);
+    // A starting description from the projects page counts as the starting point, not an edit.
+    const blank = blankSpec(v.design_name ?? "top", v.clock_mhz);
+    const start = startIntent ? { ...blank, intent: startIntent } : blank;
+    setDraft((d) => (d && saved.current && !same(d, saved.current) ? d : (v.spec ?? start)));
+    saved.current = v.spec ?? start;
     if (v.spec && v.spec.examples.length) api.runSpec(projectId).then(setRun, () => setRun(null));
     else setRun(null);
+    // The starting description only applies when the project is first opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   useEffect(() => {
@@ -101,6 +113,7 @@ export function DesignFlow({ projectId, head, canEdit, onOpenFile, onShowRun, on
       setError((e as Error).message);
     } finally {
       setBusy(null);
+      refreshBudget();
     }
   }
 
@@ -215,7 +228,8 @@ export function DesignFlow({ projectId, head, canEdit, onOpenFile, onShowRun, on
       )}
 
       <div className="design-body">
-        {step === "describe" && <Describe spec={draft} update={update} canEdit={canEdit} busy={!!busy} hasSaved={!!view.spec} ask={ask} />}
+        {step === "describe" && !view.spec && <FirstRun />}
+        {step === "describe" && <Describe spec={draft} update={update} canEdit={canEdit} busy={!!busy} hasSaved={!!view.spec} ask={ask} budget={budget} />}
         {step === "examples" && (
           <Examples
             spec={draft}
@@ -254,6 +268,58 @@ export function DesignFlow({ projectId, head, canEdit, onOpenFile, onShowRun, on
   );
 }
 
+// ---- First run --------------------------------------------------------------------
+
+const GUIDE_KEY = "sc.guide.dismissed";
+
+/** How the three steps work, until dismissed (remembered in this browser). */
+function FirstRun() {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem(GUIDE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  if (hidden) return null;
+  const steps = [
+    ["Describe", "Say what the chip should do, in your own words. The assistant turns it into a spec and asks about anything unclear. Answer its questions; nothing is saved until you click Save."],
+    ["Examples", "Each example is a test: set an input, wait, expect an output. The AI writes the design until every example passes, and you can see what the design actually did, cycle by cycle."],
+    ["Health", "Build it into a chip layout and check, in plain words, that it works, is fast enough, can be manufactured, and how big it is."],
+  ];
+  return (
+    <section className="design-card first-run">
+      <div className="design-row" style={{ justifyContent: "space-between" }}>
+        <h3>How this works</h3>
+        <button
+          className="ghost small"
+          onClick={() => {
+            setHidden(true);
+            try {
+              localStorage.setItem(GUIDE_KEY, "1");
+            } catch {
+              /* private mode: just hide it for now */
+            }
+          }}
+        >
+          Got it
+        </button>
+      </div>
+      <ol className="first-run-steps">
+        {steps.map(([t, d]) => (
+          <li key={t}>
+            <strong>{t}</strong>
+            <span className="small">{d}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="muted small" style={{ margin: 0 }}>
+        You never have to read Verilog. If you can, the Code tab shows the files, and everything the AI changes waits for a person to merge it.
+      </p>
+    </section>
+  );
+}
+
 // ---- Describe ---------------------------------------------------------------------
 
 function Describe({
@@ -263,6 +329,7 @@ function Describe({
   busy,
   hasSaved,
   ask,
+  budget,
 }: {
   spec: Spec;
   update: (p: Partial<Spec>) => void;
@@ -270,6 +337,7 @@ function Describe({
   busy: boolean;
   hasSaved: boolean;
   ask: (instruction: string) => void;
+  budget: { today_usd: number; limit_usd: number | null } | null;
 }) {
   const [request, setRequest] = useState("");
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -298,7 +366,16 @@ function Describe({
             <button className="primary" disabled={busy || !spec.intent.trim()} onClick={() => ask(hasSaved ? "Update the spec to match the description above." : "Write the first spec from the description above.")}>
               {hasSaved || spec.examples.length ? "Update spec with the assistant" : "Draft the spec with the assistant"}
             </button>
-            <span className="muted small">The assistant fills in the connections, settings and examples, and asks about anything unclear. Nothing is saved until you save.</span>
+            <span className="muted small">
+              The assistant fills in the connections, settings and examples, and asks about anything unclear. It takes about a minute; nothing is
+              saved until you save.
+              {budget?.limit_usd != null && (
+                <>
+                  {" "}
+                  Your AI use today: ${budget.today_usd.toFixed(2)} of ${budget.limit_usd.toFixed(2)}.
+                </>
+              )}
+            </span>
           </div>
         )}
       </section>
@@ -306,13 +383,23 @@ function Describe({
       {spec.questions.length > 0 && (
         <section className="design-card design-questions">
           <h3>Questions from the assistant</h3>
+          <p className="muted small" style={{ margin: 0 }}>
+            The description leaves these open. Examples that depend on them are added once you answer.
+          </p>
           {spec.questions.map((q, i) => (
             <div key={q.question} className="design-question">
               <p>{q.question}</p>
               <div className="design-row">
-                {q.options.map((o) => (
-                  <button key={o} disabled={busy || ro} onClick={() => ask(`Answer to the open question "${q.question}": ${o}`)}>
+                {q.options.map((o, k) => (
+                  <button
+                    key={o}
+                    className={k === 0 ? "primary" : ""}
+                    disabled={busy || ro}
+                    onClick={() => ask(`Answer to the open question "${q.question}": ${o}`)}
+                    title={k === 0 ? "The assistant's suggestion" : undefined}
+                  >
                     {o}
+                    {k === 0 ? " (suggested)" : ""}
                   </button>
                 ))}
               </div>

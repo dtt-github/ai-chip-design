@@ -20,6 +20,8 @@ pub struct DockerConfig {
     pub memory: String,
     /// `uid:gid` to run as, so results are owned by the API's user.
     pub user: Option<String>,
+    /// Wall-clock limit per container; the container is killed after it.
+    pub timeout: Option<std::time::Duration>,
 }
 
 /// Runs LibreLane in a throwaway container with no network access.
@@ -56,7 +58,7 @@ impl DockerBackend {
     async fn run_inner(&self, spec: &JobSpec, cancel: CancellationToken) -> Result<Outcome, JobError> {
         let argv: Vec<String> = ["librelane", "--manual-pdk", "--pdk-root", "/pdk", "--pdk", &spec.pdk]
             .into_iter()
-            .chain(["--run-tag", RUN_TAG, "--overwrite", &spec.config])
+            .chain(["--run-tag", RUN_TAG, "--overwrite", &format!("./{}", spec.config)])
             .map(String::from)
             .collect();
         self.container(spec, &Self::container_name(spec), &argv, &spec.log_path, cancel).await
@@ -76,7 +78,7 @@ impl DockerBackend {
         let mut cmd = Command::new(&c.docker);
         cmd.args(["run", "--rm", "--name", name, "--network", "none"])
             .args(["--cpus", &c.cpus.to_string(), "--memory", &c.memory, "--pids-limit", "4096"])
-            .args(["--security-opt", "no-new-privileges"])
+            .args(["--security-opt", "no-new-privileges", "--cap-drop", "ALL"])
             .args(["-e", "HOME=/tmp", "-e", "PDK_ROOT=/pdk"])
             .args(["-v", &format!("{}:/pdk:ro", c.pdk_volume)])
             .args(["-v", &format!("{}:/work", workdir.display())])
@@ -97,13 +99,27 @@ impl DockerBackend {
         let stdout = pump(child.stdout.take().expect("piped"), log.clone());
         let stderr = pump(child.stderr.take().expect("piped"), log.clone());
 
+        let limit = async {
+            match c.timeout {
+                Some(t) => tokio::time::sleep(t).await,
+                None => std::future::pending().await,
+            }
+        };
+        // Killing the CLI client does not stop the container; kill it by name.
+        let kill = || async {
+            let _ = Command::new(&c.docker).args(["kill", name]).output().await;
+        };
         let outcome = tokio::select! {
             status = child.wait() => Outcome::Exited(status?.code().unwrap_or(-1)),
             _ = cancel.cancelled() => {
-                // Killing the CLI client does not stop the container; kill it by name.
-                let _ = Command::new(&c.docker).args(["kill", name]).output().await;
+                kill().await;
                 let _ = child.wait().await;
                 Outcome::Canceled
+            }
+            _ = limit => {
+                kill().await;
+                let _ = child.wait().await;
+                Outcome::TimedOut
             }
         };
         let _ = tokio::join!(stdout, stderr);

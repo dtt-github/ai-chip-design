@@ -32,6 +32,10 @@ use crate::gate::{self, GateReport};
 use crate::projects::{Role, authorize};
 
 const MAX_TURNS: usize = 30;
+const MAX_RUNNING_PER_USER: i64 = 2;
+/// The agent changes design and test sources and docs; flow configs and tool scripts (which run
+/// in the flow) stay with people.
+const AGENT_WRITABLE: &[&str] = &["v", "sv", "vh", "svh", "md", "txt"];
 const MAX_FILE_BYTES: usize = 256 * 1024;
 const TOOL_OUTPUT_LINES: usize = 200;
 const MAX_FILES_TEXT: usize = 1024 * 1024;
@@ -40,11 +44,22 @@ pub struct AgentService {
     /// `None` when no API key is configured: proposing answers 503.
     pub claude: Option<Arc<Claude>>,
     runs: Arc<Semaphore>,
+    /// Per-person daily AI budget in US dollars; `None` = no limit.
+    pub daily_usd: Option<f64>,
 }
 
 impl AgentService {
     pub fn new(claude: Option<Claude>, max_concurrent: usize) -> Self {
-        AgentService { claude: claude.map(Arc::new), runs: Arc::new(Semaphore::new(max_concurrent.max(1))) }
+        AgentService {
+            claude: claude.map(Arc::new),
+            runs: Arc::new(Semaphore::new(max_concurrent.max(1))),
+            daily_usd: None,
+        }
+    }
+
+    pub fn with_daily_limit(mut self, usd: Option<f64>) -> Self {
+        self.daily_usd = usd;
+        self
     }
 }
 
@@ -186,6 +201,17 @@ pub async fn create(
     let Some(claude) = state.agent.claude.clone() else {
         return Err(ApiError::Unavailable("the agent is not configured on this server (no ANTHROPIC_API_KEY)".into()));
     };
+    crate::spend::check(&state, &user).await?;
+    let running: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM agent_proposals WHERE created_by = $1 AND status = 'running'")
+            .bind(user.id)
+            .fetch_one(&state.db)
+            .await?;
+    if running >= MAX_RUNNING_PER_USER {
+        return Err(ApiError::TooManyRequests(format!(
+            "you already have {running} agent proposals running; wait for one to finish"
+        )));
+    }
     let request = req.request.trim().to_string();
     if request.is_empty() || request.len() > 20_000 {
         return Err(ApiError::BadRequest("describe the change you want (up to 20 000 characters)".into()));
@@ -217,6 +243,16 @@ pub async fn create(
             .bind(format!("{e:#}"))
             .execute(&st.db)
             .await;
+        }
+        // Bill what the run used, finished or not (the evidence log keeps the running total).
+        let usage: Option<Value> = sqlx::query_scalar("SELECT evidence->'usage' FROM agent_proposals WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&st.db)
+            .await
+            .ok()
+            .flatten();
+        if let Some(u) = usage.and_then(|u| serde_json::from_value::<BTreeMap<String, u64>>(u).ok()) {
+            crate::spend::record(&st, user.id, project_id, "agent", &u).await;
         }
     });
     tracing::info!(proposal = %p.id, project = %project_id, "agent proposal started");
@@ -295,7 +331,7 @@ async fn run_gate(tree: BTreeMap<String, String>) -> ApiResult<GateReport> {
 
 /// Re-runs the gate on the proposal's exact inputs and says whether it reproduces.
 pub async fn regate(State(state): State<AppState>, user: AuthUser, Path(id): Path<Uuid>) -> ApiResult<Json<Value>> {
-    let p = load(&state, &user, id, Role::Viewer).await?;
+    let p = load(&state, &user, id, Role::Editor).await?;
     let report = run_gate(proposed_tree(&state, &p).await?).await?;
     let recorded: Option<GateReport> = p.gate.as_ref().and_then(|g| serde_json::from_value(g.clone()).ok());
     let reproduced = recorded.as_ref().is_some_and(|r| {
@@ -465,6 +501,17 @@ impl Workspace {
                 let content = input["content"].as_str().unwrap_or_default();
                 let rec = json!({ "path": p, "bytes": content.len(), "sha256": gate::sha256_hex(content.as_bytes()) });
                 // The examples are the user's tests: the agent may not rewrite them or what they're generated from.
+                let ext = p.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).unwrap_or_default();
+                if !AGENT_WRITABLE.contains(&ext.as_str()) {
+                    return (
+                        format!(
+                            "you may only write Verilog sources and docs ({}); ask the person to change {p} if it's needed, and say so in your summary",
+                            AGENT_WRITABLE.join(", ")
+                        ),
+                        true,
+                        rec,
+                    );
+                }
                 if p == crate::spec::SPEC_FILE || p.starts_with(&format!("{}/", crate::spec::EXAMPLES_DIR)) {
                     return (
                         format!(
@@ -495,7 +542,10 @@ impl Workspace {
                     .collect();
                 let limits = sc_sim::Limits { max_time: 50_000_000, max_steps: 50_000_000, ..Default::default() };
                 let rec = json!({ "top": top });
-                match sc_sim::simulate(&hdl, (!top.is_empty()).then_some(top.as_str()), limits) {
+                let sim = gate::with_slot(|| {
+                    sc_sim::on_big_stack(|| sc_sim::simulate(&hdl, (!top.is_empty()).then_some(top.as_str()), limits))
+                });
+                match sim {
                     Err(e) => (format!("simulation error: {e}"), true, rec),
                     Ok(r) => {
                         let mut out = vec![format!("finished: {} at time {} ({} steps)", r.finished, r.time, r.steps)];
@@ -728,10 +778,17 @@ mod tests {
         let mut ws = super::Workspace { base: BTreeMap::new(), changed: BTreeMap::new() };
         for path in ["spec.json", "tb/examples/tb_ex_a.v"] {
             let (out, is_error, _) = ws.call("write_file", &json!({ "path": path, "content": "x" }));
-            assert!(is_error && out.contains("may not change"), "{path}: {out}");
+            assert!(
+                is_error && (out.contains("may not change") || out.contains("only write Verilog")),
+                "{path}: {out}"
+            );
         }
         let (_, is_error, _) = ws.call("write_file", &json!({ "path": "tb/tb_mine.v", "content": "x" }));
         assert!(!is_error);
+        for path in ["config.json", "constraints/top.sdc", "scripts/hook.tcl", "Makefile"] {
+            let (out, is_error, _) = ws.call("write_file", &json!({ "path": path, "content": "x" }));
+            assert!(is_error && out.contains("only write Verilog"), "{path}: {out}");
+        }
         assert_eq!(ws.changed.len(), 1);
     }
 

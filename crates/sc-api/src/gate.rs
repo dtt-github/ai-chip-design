@@ -66,8 +66,42 @@ pub(crate) fn verdict(log: &[String]) -> (&'static str, Option<String>) {
     if has("PASS").is_some() { ("pass", None) } else { ("no_verdict", Some("printed no PASS line".into())) }
 }
 
-/// Runs every testbench in `files` (path → content). Pure and deterministic.
+/// Simulations run in the API process; at most this many at once, server-wide.
+const MAX_CONCURRENT: usize = 3;
+
+struct Slots {
+    used: std::sync::Mutex<usize>,
+    freed: std::sync::Condvar,
+}
+
+static SLOTS: Slots = Slots { used: std::sync::Mutex::new(0), freed: std::sync::Condvar::new() };
+
+/// Waits for one of the [`MAX_CONCURRENT`] simulation slots (call from a blocking thread).
+pub(crate) fn with_slot<R>(f: impl FnOnce() -> R) -> R {
+    let mut used = SLOTS.used.lock().unwrap_or_else(|e| e.into_inner());
+    while *used >= MAX_CONCURRENT {
+        used = SLOTS.freed.wait(used).unwrap_or_else(|e| e.into_inner());
+    }
+    *used += 1;
+    drop(used);
+    struct Release;
+    impl Drop for Release {
+        fn drop(&mut self) {
+            *SLOTS.used.lock().unwrap_or_else(|e| e.into_inner()) -= 1;
+            SLOTS.freed.notify_one();
+        }
+    }
+    let _release = Release;
+    f()
+}
+
+/// Runs every testbench in `files` (path → content). Deterministic; blocks, so call it from a
+/// blocking thread. It runs on a large stack and waits for a free simulation slot.
 pub fn run(files: &BTreeMap<String, String>) -> GateReport {
+    with_slot(|| sc_sim::on_big_stack(|| run_inner(files)))
+}
+
+fn run_inner(files: &BTreeMap<String, String>) -> GateReport {
     let hdl: Vec<(&str, &str)> =
         files.iter().filter(|(p, _)| is_hdl(p)).map(|(p, c)| (p.as_str(), c.as_str())).collect();
     let inputs = hdl.iter().map(|(p, c)| (p.to_string(), sha256_hex(c.as_bytes()))).collect();

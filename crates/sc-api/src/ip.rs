@@ -263,7 +263,7 @@ pub async fn publish(
     }
 
     let top2 = top.clone();
-    let a = tokio::task::spawn_blocking(move || analyse(&all, &top2)).await??;
+    let a = tokio::task::spawn_blocking(move || sc_sim::on_big_stack(|| analyse(&all, &top2))).await??;
     let mut tx = state.db.begin().await?;
     sqlx::query(
         "INSERT INTO ip_blocks (name, project_id, description, created_by) VALUES ($1, $2, $3, $4)
@@ -442,22 +442,31 @@ async fn plan(state: &AppState, user: &AuthUser, project_id: Uuid, q: &ImportQue
         problems.push(format!("{}@{} is already imported", v.block, v.version));
     }
     // Module names must stay unique across the project.
-    let mut defined: HashMap<String, String> = HashMap::new();
-    for (path, text) in here.iter().filter(|(p, _)| is_hdl(p) && !old_files.contains(*p)) {
-        if let Ok((mods, _)) = sc_sim::parse(&[(path.as_str(), text.as_str())]) {
-            for m in mods {
-                defined.insert(m.name, path.clone());
-            }
-        }
-    }
-    let mut collisions = Vec::new();
-    for (path, text) in block_files.iter().filter(|(p, _)| is_hdl(p)) {
-        if let Ok((mods, _)) = sc_sim::parse(&[(path.as_str(), text.as_str())]) {
-            for m in mods {
-                if let Some(at) = defined.get(&m.name) {
-                    collisions.push(format!("module {} (already in {at})", m.name));
+    let names = |files: Vec<(String, String)>| {
+        tokio::task::spawn_blocking(move || {
+            sc_sim::on_big_stack(|| {
+                let mut out = Vec::new();
+                for (path, text) in &files {
+                    if let Ok((mods, _)) = sc_sim::parse(&[(path.as_str(), text.as_str())]) {
+                        out.extend(mods.into_iter().map(|m| (m.name, path.clone())));
+                    }
                 }
-            }
+                out
+            })
+        })
+    };
+    let ours: Vec<(String, String)> = here
+        .iter()
+        .filter(|(p, _)| is_hdl(p) && !old_files.contains(*p))
+        .map(|(p, c)| (p.clone(), c.clone()))
+        .collect();
+    let theirs: Vec<(String, String)> =
+        block_files.iter().filter(|(p, _)| is_hdl(p)).map(|(p, c)| (p.clone(), c.clone())).collect();
+    let defined: HashMap<String, String> = names(ours).await?.into_iter().collect();
+    let mut collisions = Vec::new();
+    for (name, _) in names(theirs).await? {
+        if let Some(at) = defined.get(&name) {
+            collisions.push(format!("module {name} (already in {at})"));
         }
     }
 

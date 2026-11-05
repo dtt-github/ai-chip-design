@@ -29,19 +29,28 @@ use crate::error::{ApiError, ApiResult};
 use crate::projects::{Role, authorize};
 
 const LOG_CHUNK_BYTES: u64 = 256 * 1024;
+const MAX_ACTIVE_PER_USER: i64 = 3;
+const PRUNE_EVERY: Duration = Duration::from_secs(6 * 3600);
 const IDLE_POLL: Duration = Duration::from_secs(5);
 
 pub struct JobService {
     /// `None` when no backend could be set up: job creation answers 503.
     pub backend: Option<Arc<dyn Backend>>,
     pub root: PathBuf,
+    /// Run directories of jobs finished longer ago than this are deleted (the job record stays).
+    pub retention_days: Option<u32>,
     wake: Notify,
     running: Mutex<HashMap<Uuid, CancellationToken>>,
 }
 
 impl JobService {
     pub fn new(backend: Option<Arc<dyn Backend>>, root: PathBuf) -> Self {
-        Self { backend, root, wake: Notify::new(), running: Mutex::new(HashMap::new()) }
+        Self { backend, root, retention_days: None, wake: Notify::new(), running: Mutex::new(HashMap::new()) }
+    }
+
+    pub fn with_retention(mut self, days: Option<u32>) -> Self {
+        self.retention_days = days;
+        self
     }
 
     fn dir(&self, id: Uuid) -> PathBuf {
@@ -117,6 +126,16 @@ pub async fn create(
         return Err(ApiError::Unavailable("flow runs are not available on this server".into()));
     };
     let config = sc_git::normalize_path(req.config.as_deref().unwrap_or("config.json"))?;
+    let mine: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM jobs WHERE created_by = $1 AND status IN ('queued', 'running')")
+            .bind(user.id)
+            .fetch_one(&state.db)
+            .await?;
+    if mine >= MAX_ACTIVE_PER_USER {
+        return Err(ApiError::TooManyRequests(format!(
+            "you already have {mine} runs queued or running; wait for one to finish"
+        )));
+    }
 
     // Pin the commit and check the config before queuing, so mistakes fail fast.
     let repos = state.repos.clone();
@@ -337,7 +356,9 @@ pub async fn report(
     load(&state, &user, id, Role::Viewer).await?;
     let workdir = state.jobs.workdir(id);
     let report = tokio::task::spawn_blocking(move || {
-        let bytes = std::fs::read(sc_jobs::final_dir(&workdir).join("metrics.json")).ok()?;
+        let bytes = tokio::runtime::Handle::current()
+            .block_on(sc_jobs::read_inside(&workdir, &sc_jobs::final_dir(&workdir).join("metrics.json")))
+            .ok()?;
         let metrics = sc_jobs::parse_metrics(&bytes).ok()?;
         Some(sc_jobs::reports::run_report(&sc_jobs::run_dir(&workdir), &metrics))
     })
@@ -375,6 +396,15 @@ pub async fn start_workers(state: AppState, count: usize) -> anyhow::Result<()> 
         return Ok(());
     };
     backend.cleanup_orphans().await;
+    if let Some(days) = state.jobs.retention_days {
+        let st = state.clone();
+        tokio::spawn(async move {
+            loop {
+                prune(&st, days).await;
+                tokio::time::sleep(PRUNE_EVERY).await;
+            }
+        });
+    }
     for i in 0..count {
         let state = state.clone();
         tokio::spawn(async move {
@@ -394,6 +424,33 @@ pub async fn start_workers(state: AppState, count: usize) -> anyhow::Result<()> 
         });
     }
     Ok(())
+}
+
+/// Deletes the run directories of jobs that finished more than `days` ago.
+async fn prune(state: &AppState, days: u32) {
+    let old: Vec<Uuid> = match sqlx::query_scalar(
+        "SELECT id FROM jobs WHERE finished_at < now() - make_interval(days => $1) ORDER BY finished_at",
+    )
+    .bind(days as i32)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(ids) => ids,
+        Err(e) => {
+            tracing::error!(error = ?e, "listing old jobs failed");
+            return;
+        }
+    };
+    let mut removed = 0;
+    for id in old {
+        let dir = state.jobs.dir(id);
+        if tokio::fs::try_exists(&dir).await.unwrap_or(false) && tokio::fs::remove_dir_all(&dir).await.is_ok() {
+            removed += 1;
+        }
+    }
+    if removed > 0 {
+        tracing::info!(removed, days, "deleted old run directories");
+    }
 }
 
 async fn claim(state: &AppState) -> sqlx::Result<Option<Job>> {
@@ -460,8 +517,14 @@ async fn run(state: &AppState, job: &Job, cancel: CancellationToken) -> anyhow::
         log_path: dir.join("flow.log"),
     };
     let outcome = backend.run(&spec, cancel.clone()).await?;
+    // The flow ran user-controlled tools: drop links it may have planted before reading its outputs.
+    let w = workdir.clone();
+    let removed = tokio::task::spawn_blocking(move || sc_jobs::remove_escaping_links(&w)).await?;
+    if removed > 0 {
+        tracing::warn!(job = %job.id, removed, "removed symlinks pointing out of the job directory");
+    }
 
-    let summary = match tokio::fs::read(sc_jobs::final_dir(&workdir).join("metrics.json")).await {
+    let summary = match sc_jobs::read_inside(&workdir, &sc_jobs::final_dir(&workdir).join("metrics.json")).await {
         Ok(bytes) => match sc_jobs::parse_metrics(&bytes) {
             Ok(m) => Some(sc_jobs::summarize(&m)),
             Err(e) => {
@@ -488,6 +551,13 @@ async fn run(state: &AppState, job: &Job, cancel: CancellationToken) -> anyhow::
             gls: None,
         },
         Outcome::Canceled => Finish { status: "canceled", exit_code: None, error: None, summary, gls: None },
+        Outcome::TimedOut => Finish {
+            status: "failed",
+            exit_code: None,
+            error: Some("stopped: the run took longer than this server's time limit".into()),
+            summary,
+            gls: None,
+        },
     })
 }
 

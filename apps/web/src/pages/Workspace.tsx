@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useLocation, useParams } from "react-router";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/editor/editor.api";
 import * as Y from "yjs";
@@ -24,6 +24,8 @@ type ChangeKind = "A" | "M" | "D";
 
 export function WorkspacePage() {
   const { id = "" } = useParams();
+  // A description chosen on the projects page, to start Describe with.
+  const startIntent = (useLocation().state as { intent?: string } | null)?.intent ?? null;
   const [project, setProject] = useState<Project | null>(null);
   const [session, setSession] = useState<CollabSession | null>(null);
   const [, setVersion] = useState(0);
@@ -269,11 +271,13 @@ export function WorkspacePage() {
   const peers: Peer[] = session?.peers() ?? [];
   const peerFiles = new Map<string, Peer[]>();
   for (const p of peers) if (p.file) peerFiles.set(p.file, [...(peerFiles.get(p.file) ?? []), p]);
+  // Colours come from other people's clients: only plain hex colours reach the stylesheet.
+  const safeColor = (c: unknown) => (typeof c === "string" && /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : "#8b96a5");
   const cursorCss = peers
     .map(
-      (p) => `.yRemoteSelection-${p.clientId}{background-color:${p.color}33}
-.yRemoteSelectionHead-${p.clientId}{position:absolute;border-left:2px solid ${p.color};height:100%;box-sizing:border-box}
-.yRemoteSelectionHead-${p.clientId}::after{content:${JSON.stringify(p.name)};position:absolute;top:-1.3em;left:-2px;background:${p.color};color:#fff;font:11px system-ui;padding:0 4px;border-radius:3px 3px 3px 0;white-space:nowrap;pointer-events:none}`,
+      (p) => `.yRemoteSelection-${Number(p.clientId)}{background-color:${safeColor(p.color)}33}
+.yRemoteSelectionHead-${Number(p.clientId)}{position:absolute;border-left:2px solid ${safeColor(p.color)};height:100%;box-sizing:border-box}
+.yRemoteSelectionHead-${Number(p.clientId)}::after{content:${JSON.stringify(p.name)};position:absolute;top:-1.3em;left:-2px;background:${safeColor(p.color)};color:#fff;font:11px system-ui;padding:0 4px;border-radius:3px 3px 3px 0;white-space:nowrap;pointer-events:none}`,
     )
     .join("\n");
 
@@ -298,7 +302,7 @@ export function WorkspacePage() {
           {peers.length > 0 && (
             <div className="peers" aria-label="People in this project">
               {peers.map((p) => (
-                <span key={p.clientId} className="peer" style={{ background: p.color }} title={`${p.name}${p.file ? ` · ${p.file}` : ""}`}>
+                <span key={p.clientId} className="peer" style={{ background: safeColor(p.color) }} title={`${p.name}${p.file ? ` · ${p.file}` : ""}`}>
                   {p.name.slice(0, 1).toUpperCase()}
                 </span>
               ))}
@@ -349,6 +353,7 @@ export function WorkspacePage() {
         {mode === "design" && (
           <DesignFlow
             projectId={id}
+            startIntent={startIntent}
             head={head}
             canEdit={!readOnly}
             onOpenFile={(path) => {

@@ -1,0 +1,112 @@
+# SiliconCommons pilot: everything on one host behind HTTPS.
+#   ./setup.sh            (once: secrets, sign-in config, PDK, data directories)
+#   docker compose up -d --build
+# See README.md in this directory.
+name: siliconcommons-pilot
+
+services:
+  caddy:
+    build:
+      context: ../..
+      dockerfile: deploy/pilot/Dockerfile.web
+      args:
+        SC_DOMAIN: ${SC_DOMAIN:?set SC_DOMAIN in .env}
+    environment:
+      SC_DOMAIN: ${SC_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [api, rauthy]
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/pilot/Dockerfile.api
+    environment:
+      DATABASE_URL: postgres://sc:${POSTGRES_PASSWORD}@postgres:5432/siliconcommons
+      # Job containers are started on the host's Docker and mount job directories by host path,
+      # so the data directory has the same absolute path inside this container as on the host.
+      SC_DATA_DIR: ${SC_DATA_DIR}
+      SC_OIDC_ISSUER: https://${SC_DOMAIN}/auth/v1/
+      SC_OIDC_INTERNAL_URL: http://rauthy:8080/auth/v1/
+      SC_OIDC_AUDIENCES: siliconcommons-web
+      SC_LIBRELANE_IMAGE: ${SC_LIBRELANE_IMAGE}
+      SC_PDK_VOLUME: siliconcommons_pdk
+      SC_JOB_WORKERS: ${SC_JOB_WORKERS:-2}
+      SC_JOB_CPUS: ${SC_JOB_CPUS:-4}
+      SC_JOB_MEMORY: ${SC_JOB_MEMORY:-8g}
+      SC_JOB_TIMEOUT_MIN: ${SC_JOB_TIMEOUT_MIN:-120}
+      SC_JOB_RETENTION_DAYS: ${SC_JOB_RETENTION_DAYS:-30}
+      SC_AI_DAILY_USD: ${SC_AI_DAILY_USD:-3}
+      SC_LSP_MAX_SESSIONS: ${SC_LSP_MAX_SESSIONS:-16}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      RUST_LOG: info,tower_http=info
+    volumes:
+      # Starting flow runs needs the host's Docker: see the security notes in README.md.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${SC_DATA_DIR}:${SC_DATA_DIR}
+    group_add:
+      - "${DOCKER_GID:?run setup.sh}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: sc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run setup.sh}
+      POSTGRES_DB: siliconcommons
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sc -d siliconcommons"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  rauthy:
+    image: ghcr.io/sebadob/rauthy:0.37.2
+    volumes:
+      - ./rauthy/config.toml:/app/config.toml:ro
+      - ./rauthy/bootstrap:/app/bootstrap:ro
+      - rauthy-data:/app/data
+    environment:
+      BOOTSTRAP_ADMIN_EMAIL: ${ADMIN_EMAIL:?set ADMIN_EMAIL in .env}
+      BOOTSTRAP_ADMIN_PASSWORD_PLAIN: ${RAUTHY_ADMIN_PASSWORD:?run setup.sh}
+    restart: unless-stopped
+
+  backup:
+    image: postgres:17-alpine
+    environment:
+      PGHOST: postgres
+      PGUSER: sc
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: siliconcommons
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-2}
+    volumes:
+      - ./backup.sh:/backup.sh:ro
+      - ${SC_DATA_DIR}:/data:ro
+      - rauthy-data:/rauthy:ro
+      - ${SC_BACKUP_DIR}:/backups
+    entrypoint: ["/bin/sh", "/backup.sh", "--daily"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:
+  pg-data:
+  rauthy-data:

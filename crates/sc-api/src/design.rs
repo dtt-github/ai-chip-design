@@ -159,9 +159,9 @@ pub struct RunResult {
     pub engine: String,
 }
 
-/// Runs every testbench at the branch tip and reports the examples by name.
+/// Runs every testbench at the branch tip and reports the examples by name (editors: it costs server time).
 pub async fn run(State(state): State<AppState>, user: AuthUser, Path(id): Path<Uuid>) -> ApiResult<Json<RunResult>> {
-    authorize(&state, &user, id, Role::Viewer).await?;
+    authorize(&state, &user, id, Role::Editor).await?;
     let commit = head(&state, id).await?;
     let files = files_at(&state, id, &commit).await?;
     let spec = match files.get(SPEC_FILE) {
@@ -216,11 +216,17 @@ whether 0 resets (port \"\" if none).
 clock and reset. When the project already has RTL for the top module, match its names unless the request \
 changes them.
 - params: settings (Verilog parameters) with their default value and meaning.
-- decisions: questions already answered; keep them. questions: anything the request leaves open that changes \
-behaviour, each with 2-3 short answer options. Ask instead of guessing; when the instruction answers a \
-question, move it to decisions and update the examples.
-- examples: 3-8 short, focused examples covering the main behaviour and the important edge cases. Keep the \
-ids of existing examples. id: lowercase letters, digits, _. params: overrides for that example (e.g. PARITY=1).
+- decisions: only what the user has decided: things their own words settle, and their answers to questions. \
+Keep existing ones. Never record a choice of your own as a decision, however reasonable.
+- questions: every behaviour the user hasn't settled that an example would depend on: how many cycles until \
+something happens, what an output does right after reset, what happens on edge cases or conflicting inputs. \
+Each with 2-3 short answer options, the one you recommend FIRST. Don't ask about things that don't change \
+behaviour (names, coding style). The user is not an expert: phrase questions in plain words. When the \
+instruction answers a question, move it to decisions with that answer and add or update the examples.
+- examples: 3-8 short, focused examples covering the main behaviour and the important edge cases, but only \
+behaviour that is decided: an example must not assume an answer to an open question (it comes once the \
+question is answered). Keep the ids of existing examples. id: lowercase letters, digits, _. params: overrides \
+for that example (e.g. PARITY=1).
 
 Example steps run on the falling clock edge; the design samples inputs on the rising edge. Before step 1 all \
 inputs are 0 and reset is held for 2 cycles, then released. Ops (unused fields: \"\" or 0):
@@ -235,7 +241,7 @@ counting exact latency when the request doesn't fix the latency; use exact count
 8 clocks\"). Add a short note to steps where it helps (\"start bit\", \"bit 0\").
 
 Finish by calling submit_spec with the whole spec and a one-paragraph note to the user on what you changed and \
-why. If it comes back with problems, fix them and call it again.";
+why, and which questions you need answered. If it comes back with problems, fix them and call it again.";
 
 fn draft_tool() -> Value {
     let s = |d: &str| json!({ "type": "string", "description": d });
@@ -326,12 +332,14 @@ pub async fn draft(
     let Some(claude) = state.agent.claude.clone() else {
         return Err(ApiError::Unavailable("the assistant is not configured on this server (no API key)".into()));
     };
+    crate::spend::check(&state, &user).await?;
     let instruction = req.instruction.trim();
     if instruction.is_empty() || instruction.len() > 20_000 {
         return Err(ApiError::BadRequest("say what the design should do (up to 20,000 characters)".into()));
     }
     let head = head(&state, id).await?;
     let files = files_at(&state, id, &head).await?;
+    let answering = instruction.starts_with("Answer to the open question");
     let current = match req.spec {
         Some(s) => Some(s),
         None => files.get(SPEC_FILE).map(|t| parse_spec(t)).transpose()?,
@@ -363,6 +371,15 @@ pub async fn draft(
     let mut messages = vec![json!({ "role": "user", "content": first })];
     let mut usage: BTreeMap<String, u64> = BTreeMap::new();
     let started = Instant::now();
+    // Decisions the user already had, and questions they were asked: anything else new is the model deciding.
+    let known: Vec<String> = current
+        .iter()
+        .flat_map(|s| {
+            s.decisions.iter().map(|d| d.question.clone()).chain(s.questions.iter().map(|q| q.question.clone()))
+        })
+        .collect();
+    let mut pushed_back = false;
+    let result: ApiResult<DraftResult> = async {
     for _ in 0..DRAFT_TURNS {
         let resp =
             claude.create(DRAFT_SYSTEM, &tools, &messages).await.map_err(|e| ApiError::Unavailable(e.to_string()))?;
@@ -389,16 +406,31 @@ pub async fn draft(
         let problems = match from_tool(&call["input"]["spec"]) {
             Err(e) => vec![e],
             Ok(spec) => {
-                let p = spec.validate();
+                let mut p = spec.validate();
+                let invented: Vec<&str> = spec
+                    .decisions
+                    .iter()
+                    .filter(|d| !known.iter().any(|k| k == &d.question))
+                    .map(|d| d.question.as_str())
+                    .collect();
+                // One push back: decisions must come from the user, unless this instruction answers a question.
+                if p.is_empty() && !invented.is_empty() && !answering && !pushed_back {
+                    pushed_back = true;
+                    p.push(format!(
+                        "These decisions are new: {}. Keep one only if the user's own words settle it; otherwise make it a \
+                         question (your recommended answer first) and leave out examples that depend on it",
+                        invented.iter().map(|q| format!("\"{q}\"")).collect::<Vec<_>>().join("; ")
+                    ));
+                }
                 if p.is_empty() {
                     tracing::info!(project = %id, examples = spec.examples.len(), ?usage, "spec drafted");
-                    return Ok(Json(DraftResult {
+                    return Ok(DraftResult {
                         spec,
                         note: call["input"]["note"].as_str().unwrap_or_default().to_string(),
                         model,
-                        usage,
+                        usage: usage.clone(),
                         elapsed_ms: started.elapsed().as_millis() as u64,
-                    }));
+                    });
                 }
                 p
             }
@@ -409,4 +441,11 @@ pub async fn draft(
         }] }));
     }
     Err(ApiError::Conflict("the assistant could not produce a valid spec; try rephrasing".into()))
+    }
+    .await;
+    // Every call costs, whether or not it produced a spec.
+    if !usage.is_empty() {
+        crate::spend::record(&state, user.id, id, "draft", &usage).await;
+    }
+    result.map(Json)
 }

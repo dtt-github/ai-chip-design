@@ -326,6 +326,10 @@ pub struct InstanceInfo {
     pub params: BTreeMap<String, i64>,
 }
 
+/// Bounds on what one simulation may allocate (64-bit words of signal and memory storage).
+pub const MAX_SLOTS: usize = 8 << 20;
+pub const MAX_INSTANCES: usize = 100_000;
+
 pub fn elaborate(modules: &[Module], top: &str) -> Result<Design> {
     elaborate_with(modules, top, &HashMap::new())
 }
@@ -350,6 +354,15 @@ pub fn elaborate_with(modules: &[Module], top: &str, overrides: &HashMap<String,
         });
     }
     e.instance(m, top, overrides, 0)?;
+    if e.d.slots > MAX_SLOTS || e.d.instances.len() > MAX_INSTANCES {
+        return Err(Error::Elab {
+            file: m.file.clone(),
+            line: m.line,
+            msg: format!(
+                "the design is too large to simulate here (over {MAX_SLOTS} storage words or {MAX_INSTANCES} instances)"
+            ),
+        });
+    }
     Ok(e.d)
 }
 

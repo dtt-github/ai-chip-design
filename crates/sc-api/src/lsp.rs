@@ -38,11 +38,33 @@ pub struct LspConfig {
     /// Path to `verible-verilog-ls`; `None` disables the endpoint.
     pub verible_ls: Option<PathBuf>,
     pub sessions: Arc<Semaphore>,
+    /// Open sessions per person, so one person can't hold every slot.
+    per_user: Arc<std::sync::Mutex<std::collections::HashMap<Uuid, usize>>>,
+}
+
+const MAX_SESSIONS_PER_USER: usize = 3;
+
+/// Counts one session against a person until dropped.
+struct UserSession {
+    map: Arc<std::sync::Mutex<std::collections::HashMap<Uuid, usize>>>,
+    user: Uuid,
+}
+
+impl Drop for UserSession {
+    fn drop(&mut self) {
+        let mut m = self.map.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(n) = m.get_mut(&self.user) {
+            *n -= 1;
+            if *n == 0 {
+                m.remove(&self.user);
+            }
+        }
+    }
 }
 
 impl LspConfig {
     pub fn new(verible_ls: Option<PathBuf>, max_sessions: usize) -> Self {
-        Self { verible_ls, sessions: Arc::new(Semaphore::new(max_sessions)) }
+        Self { verible_ls, sessions: Arc::new(Semaphore::new(max_sessions)), per_user: Default::default() }
     }
 
     pub fn disabled() -> Self {
@@ -88,6 +110,17 @@ async fn session(state: AppState, id: Uuid, mut socket: WebSocket) -> anyhow::Re
     }
     let Some(bin) = state.lsp.verible_ls.clone() else {
         return refuse(socket, "unavailable", "the Verilog language server is not installed on this server").await;
+    };
+    let mine = {
+        let mut m = state.lsp.per_user.lock().unwrap_or_else(|e| e.into_inner());
+        let n = m.entry(user.id).or_default();
+        (*n < MAX_SESSIONS_PER_USER).then(|| {
+            *n += 1;
+            UserSession { map: state.lsp.per_user.clone(), user: user.id }
+        })
+    };
+    let Some(_mine) = mine else {
+        return refuse(socket, "busy", "you have too many editor tabs with the language server open; close one").await;
     };
     let Ok(_permit) = state.lsp.sessions.clone().try_acquire_owned() else {
         return refuse(socket, "busy", "too many language server sessions; try again later").await;
@@ -175,6 +208,25 @@ struct UriRewriter {
     server_prefix: String,
 }
 
+/// `%XX`-decodes a URI segment; `None` if it is malformed or decodes to a separator.
+fn percent_decode(seg: &str) -> Option<String> {
+    let b = seg.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' {
+            let hex = std::str::from_utf8(b.get(i + 1..i + 3)?).ok()?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(b[i]);
+            i += 1;
+        }
+    }
+    let s = String::from_utf8(out).ok()?;
+    (!s.contains(['/', '\\', '\0'])).then_some(s)
+}
+
 impl UriRewriter {
     fn new(project: Uuid, workspace: &Path) -> Self {
         Self { client_prefix: format!("file:///{project}/"), server_prefix: format!("file://{}/", workspace.display()) }
@@ -186,11 +238,12 @@ impl UriRewriter {
         let mut ok = true;
         walk_strings(msg, &mut |s| {
             if let Some(rest) = s.strip_prefix(&self.client_prefix) {
-                if rest.split('/').any(|seg| seg == ".." || seg == "%2E%2E" || seg == "%2e%2e") {
+                // Judge each segment as the server will read it, after percent-decoding.
+                if rest.split('/').any(|seg| matches!(percent_decode(seg).as_deref(), None | Some("..") | Some("."))) {
                     ok = false;
                 }
                 *s = format!("{}{rest}", self.server_prefix);
-            } else if s.starts_with("file:/") {
+            } else if s.len() >= 5 && s[..5].eq_ignore_ascii_case("file:") {
                 ok = false;
             }
         });

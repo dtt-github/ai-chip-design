@@ -443,6 +443,7 @@ export const api = {
   listProjects: () => request<Project[]>("GET", "/projects"),
   createProject: (body: { name: string; description?: string; visibility?: string; licence?: string }) =>
     request<Project>("POST", "/projects", body),
+  aiUsage: () => request<{ today_usd: number; limit_usd: number | null }>("GET", "/me/ai-usage"),
   getSpec: (id: string) => request<SpecView>("GET", `/projects/${enc(id)}/spec`),
   saveSpec: (id: string, body: { spec: Spec; parent: string; message?: string }) =>
     request<{ commit: string; changed: boolean }>("PUT", `/projects/${enc(id)}/spec`, body),

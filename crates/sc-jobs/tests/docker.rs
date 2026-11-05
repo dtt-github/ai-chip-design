@@ -22,6 +22,7 @@ fn config() -> DockerConfig {
         cpus: 4.0,
         memory: "8g".into(),
         user: Some(format!("{}:{}", uid(), gid())),
+        timeout: None,
     }
 }
 

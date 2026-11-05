@@ -54,6 +54,9 @@ async fn main() -> anyhow::Result<()> {
         cpus: env("SC_JOB_CPUS").ok().and_then(|v| v.parse().ok()).unwrap_or(4.0),
         memory: env("SC_JOB_MEMORY").unwrap_or_else(|_| "8g".into()),
         user: current_user().await,
+        timeout: Some(std::time::Duration::from_secs(
+            60 * env("SC_JOB_TIMEOUT_MIN").ok().and_then(|v| v.parse().ok()).unwrap_or(120u64),
+        )),
     };
     let backend: Option<Arc<dyn Backend>> = match DockerBackend::new(docker).await {
         Ok(b) => {
@@ -93,15 +96,27 @@ async fn main() -> anyhow::Result<()> {
     };
     let workers: usize = env("SC_JOB_WORKERS").ok().and_then(|v| v.parse().ok()).unwrap_or(2);
 
-    let state = AppState {
-        db,
-        repos: Arc::new(RepoStore::new(data_dir.join("repos"))?),
-        verifier: Arc::new(Verifier::Jwks(JwksVerifier::new(issuer, audiences))),
-        lsp: Arc::new(LspConfig::new(verible_ls, max_lsp)),
-        jobs: Arc::new(JobService::new(backend, data_dir.join("jobs"))),
-        collab: Arc::new(sc_api::collab::Collab::new(data_dir.join("collab"))),
-        agent: Arc::new(sc_api::agent::AgentService::new(claude, 2)),
+    // Per-person daily AI budget in US dollars; 0 turns the limit off.
+    let daily_usd = match std::env::var("SC_AI_DAILY_USD") {
+        Ok(v) => v.trim().parse::<f64>().map_err(|_| anyhow::anyhow!("SC_AI_DAILY_USD must be a number"))?,
+        Err(_) => 3.0,
     };
+    let daily_usd = (daily_usd > 0.0).then_some(daily_usd);
+    tracing::info!(?daily_usd, "AI budget per person per day");
+    let state =
+        AppState {
+            db,
+            repos: Arc::new(RepoStore::new(data_dir.join("repos"))?),
+            verifier: Arc::new(Verifier::Jwks(
+                JwksVerifier::new(issuer, audiences).with_internal_url(env("SC_OIDC_INTERNAL_URL").ok()),
+            )),
+            lsp: Arc::new(LspConfig::new(verible_ls, max_lsp)),
+            jobs: Arc::new(JobService::new(backend, data_dir.join("jobs")).with_retention(
+                env("SC_JOB_RETENTION_DAYS").ok().and_then(|v| v.parse().ok()).filter(|d: &u32| *d > 0),
+            )),
+            collab: Arc::new(sc_api::collab::Collab::new(data_dir.join("collab"))),
+            agent: Arc::new(sc_api::agent::AgentService::new(claude, 2).with_daily_limit(daily_usd)),
+        };
     sc_api::agent::recover(&state).await?;
     sc_api::jobs::start_workers(state.clone(), workers).await?;
 

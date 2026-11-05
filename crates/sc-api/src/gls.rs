@@ -22,8 +22,19 @@ use crate::gate;
 /// Per testbench; a hung testbench is stopped after this.
 const RUN_TIMEOUT_SECS: u32 = 300;
 const MAX_LOG_LINES: usize = 400;
-/// Work-directory folder for the patched netlist, compiled testbenches and logs.
+/// Next to the job's `work/`: the simulation's own work directory, created fresh by the server
+/// after the flow container has exited (so nothing in it was planted by the flow), and its logs,
+/// which no container mounts.
 const DIR: &str = "gls";
+const LOGS: &str = "gls-logs";
+
+/// A plain Verilog identifier: safe in file names and command lines (escaped identifiers are not).
+pub fn plain_ident(s: &str) -> bool {
+    let mut c = s.chars();
+    c.next().is_some_and(|f| f.is_ascii_alphabetic() || f == '_')
+        && s.len() <= 128
+        && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GlsReport {
@@ -75,6 +86,9 @@ pub struct Plan {
 /// Decides which testbenches apply to the netlist built from `config`.
 pub fn plan(files: &BTreeMap<String, String>, config: &Value) -> Result<Plan, String> {
     let design = config["DESIGN_NAME"].as_str().ok_or("the flow config has no DESIGN_NAME")?.to_string();
+    if !plain_ident(&design) {
+        return Err(format!("DESIGN_NAME {design:?} is not a plain Verilog name"));
+    }
     let mut overrides = HashMap::new();
     if let Some(list) = config.get("SYNTH_PARAMETERS").filter(|v| !v.is_null()) {
         let list = list.as_array().ok_or("SYNTH_PARAMETERS must be a list of \"NAME=VALUE\" strings")?;
@@ -125,6 +139,10 @@ pub fn plan(files: &BTreeMap<String, String>, config: &Value) -> Result<Plan, St
 
     let mut benches = Vec::new();
     for top in sc_sim::top_candidates(&modules).into_iter().filter(|t| gate::looks_like_tb(t)) {
+        if !plain_ident(&top) {
+            benches.push((top, Err("its name isn't a plain Verilog name, so it can't be run here".into())));
+            continue;
+        }
         let verdict = match sc_sim::elab::elaborate(&modules, &top) {
             Err(e) => Err(format!("could not check its parameters: {e}")),
             Ok(d) => {
@@ -201,17 +219,21 @@ pub async fn run(
     cancel: CancellationToken,
 ) -> GlsReport {
     let design = config["DESIGN_NAME"].as_str().unwrap_or("").to_string();
-    let plan = match plan(files, config) {
+    let (f, c) = (files.clone(), config.clone());
+    let planned = tokio::task::spawn_blocking(move || sc_sim::on_big_stack(|| plan(&f, &c))).await;
+    let plan = match planned.unwrap_or_else(|e| Err(format!("planning failed: {e}"))) {
         Ok(p) => p,
         Err(e) => return GlsReport::unavailable(&design, e),
     };
-    let work = &spec.workdir;
-    let run_dir = sc_jobs::run_dir(work);
-    let netlist_rel = format!("{DIR}/{design}.nl.v");
-    let models = match prepare(work, &run_dir, &plan, &netlist_rel).await {
+    let job_dir = spec.workdir.parent().unwrap_or(&spec.workdir).to_path_buf();
+    let sim_dir = job_dir.join(DIR);
+    let logs = job_dir.join(LOGS);
+    let netlist_rel = format!("./{design}.nl.v");
+    let models = match prepare(&spec.workdir, &sim_dir, &logs, &plan, files).await {
         Ok(m) => m,
         Err(e) => return GlsReport::unavailable(&design, e),
     };
+    let sim_spec = JobSpec { workdir: sim_dir, ..spec.clone() };
 
     let mut runs = Vec::new();
     for (top, bench) in &plan.benches {
@@ -231,7 +253,8 @@ pub async fn run(
         if cancel.is_cancelled() {
             break;
         }
-        runs.push(simulate(backend, spec, top, needed, &models, &netlist_rel, cancel.clone()).await);
+        let log_base = logs.join(runs.len().to_string());
+        runs.push(simulate(backend, &sim_spec, &log_base, top, needed, &models, &netlist_rel, cancel.clone()).await);
     }
 
     let ran: Vec<&GlsRun> = runs.iter().filter(|r| r.verdict != "skipped").collect();
@@ -253,21 +276,47 @@ pub async fn run(
     GlsReport { status: status.into(), summary, design, params: plan.params, simulator: SIMULATOR.into(), runs }
 }
 
-/// Writes the parameterised netlist and returns the cell model paths (as the container sees them).
-async fn prepare(work: &Path, run_dir: &Path, plan: &Plan, netlist_rel: &str) -> Result<Vec<String>, String> {
-    let nl_path = sc_jobs::final_dir(work).join("nl").join(format!("{}.nl.v", plan.design));
-    let netlist = tokio::fs::read_to_string(&nl_path).await.map_err(|_| "the run produced no netlist".to_string())?;
+/// Sets up the simulation directory: the parameterised netlist and the project files the testbenches
+/// need (from Git, not from the flow's directory). Returns the cell model paths (inside the container).
+async fn prepare(
+    work: &Path,
+    sim_dir: &Path,
+    logs: &Path,
+    plan: &Plan,
+    files: &BTreeMap<String, String>,
+) -> Result<Vec<String>, String> {
+    // The flow's outputs are read through a check that refuses symlinks and anything outside `work`.
+    let run_dir = sc_jobs::run_dir(work);
+    let nl_rel = sc_jobs::final_dir(work).join("nl").join(format!("{}.nl.v", plan.design));
+    let netlist = sc_jobs::read_inside(work, &nl_rel).await.map_err(|_| "the run produced no netlist".to_string())?;
+    let netlist = String::from_utf8(netlist).map_err(|_| "the netlist is not text".to_string())?;
     let patched = add_params(&netlist, &plan.design, &plan.params)
         .ok_or_else(|| format!("module {} not found in the netlist", plan.design))?;
-    tokio::fs::create_dir_all(work.join(DIR)).await.map_err(|e| e.to_string())?;
-    tokio::fs::write(work.join(netlist_rel), patched).await.map_err(|e| e.to_string())?;
 
-    let resolved = tokio::fs::read(run_dir.join("resolved.json")).await.map_err(|_| "the run has no resolved.json")?;
+    for dir in [sim_dir, logs] {
+        let _ = tokio::fs::remove_dir_all(dir).await;
+        tokio::fs::create_dir_all(dir).await.map_err(|e| e.to_string())?;
+    }
+    tokio::fs::write(sim_dir.join(format!("{}.nl.v", plan.design)), patched).await.map_err(|e| e.to_string())?;
+    let needed: BTreeSet<&String> = plan.benches.iter().filter_map(|(_, b)| b.as_ref().ok()).flatten().collect();
+    for rel in needed {
+        let (Some(content), Ok(rel)) = (files.get(rel), sc_git::normalize_path(rel)) else { continue };
+        let path = sim_dir.join(&rel);
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent).await.map_err(|e| e.to_string())?;
+        }
+        tokio::fs::write(&path, content).await.map_err(|e| e.to_string())?;
+    }
+
+    let resolved =
+        sc_jobs::read_inside(work, &run_dir.join("resolved.json")).await.map_err(|_| "the run has no resolved.json")?;
     let resolved: Value = serde_json::from_slice(&resolved).map_err(|e| format!("bad resolved.json: {e}"))?;
+    // Written by the flow, so only PDK paths are taken.
     let models: Vec<String> = ["CELL_VERILOG_MODELS", "EXTRA_VERILOG_MODELS"]
         .iter()
         .flat_map(|k| resolved[*k].as_array().cloned().unwrap_or_default())
         .filter_map(|v| v.as_str().map(String::from))
+        .filter(|p| p.starts_with("/pdk/") && !p.contains("..") && !p.contains(char::is_whitespace))
         .collect();
     if models.is_empty() {
         return Err("the PDK lists no standard-cell Verilog models (CELL_VERILOG_MODELS)".into());
@@ -275,23 +324,26 @@ async fn prepare(work: &Path, run_dir: &Path, plan: &Plan, netlist_rel: &str) ->
     Ok(models)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn simulate(
     backend: &dyn Backend,
     spec: &JobSpec,
+    log_base: &Path,
     top: &str,
     needed: &[String],
     models: &[String],
     netlist_rel: &str,
     cancel: CancellationToken,
 ) -> GlsRun {
-    let rel = |name: &str| format!("{DIR}/{top}.{name}");
-    let compile_log = spec.workdir.join(rel("compile.log"));
-    let run_log = spec.workdir.join(rel("log"));
+    let compiled = format!("./{top}.vvp");
+    let compile_log = log_base.with_extension("compile.log");
+    let run_log = log_base.with_extension("log");
     let mut argv: Vec<String> =
-        ["iverilog", "-g2012", "-o", &rel("vvp"), "-s", top].into_iter().map(String::from).collect();
+        ["iverilog", "-g2012", "-o", &compiled, "-s", top].into_iter().map(String::from).collect();
     argv.extend(models.iter().cloned());
     argv.push(netlist_rel.to_string());
-    argv.extend(needed.iter().cloned());
+    // `./` so a file name can never be read as an option.
+    argv.extend(needed.iter().map(|p| format!("./{p}")));
     let result = |verdict: &str, finished, reason: Option<String>, log| GlsRun {
         top: top.into(),
         verdict: verdict.into(),
@@ -303,6 +355,7 @@ async fn simulate(
     match backend.exec(spec, &argv, &compile_log, cancel.clone()).await {
         Ok(Outcome::Exited(0)) => {}
         Ok(Outcome::Canceled) => return result("error", false, Some("canceled".into()), vec![]),
+        Ok(Outcome::TimedOut) => return result("error", false, Some("compiling took too long".into()), vec![]),
         Ok(Outcome::Exited(_)) => {
             let log = read_lines(&compile_log).await.into_iter().filter(|l| !l.contains("sorry:")).collect();
             return result("error", false, Some("the testbench does not compile against the netlist".into()), log);
@@ -311,13 +364,14 @@ async fn simulate(
     }
 
     let argv: Vec<String> =
-        ["timeout", &RUN_TIMEOUT_SECS.to_string(), "vvp", "-n", &rel("vvp")].into_iter().map(String::from).collect();
+        ["timeout", &RUN_TIMEOUT_SECS.to_string(), "vvp", "-n", &compiled].into_iter().map(String::from).collect();
     let outcome = backend.exec(spec, &argv, &run_log, cancel).await;
     let raw = read_lines(&run_log).await;
     let finished = raw.iter().any(|l| l.contains("$finish called at"));
     let log: Vec<String> = raw.into_iter().filter(|l| !l.contains("$finish called at")).take(MAX_LOG_LINES).collect();
     match outcome {
         Ok(Outcome::Canceled) => result("error", false, Some("canceled".into()), log),
+        Ok(Outcome::TimedOut) => result("fail", false, Some("stopped: took too long".into()), log),
         Err(e) => result("error", false, Some(e.to_string()), log),
         Ok(Outcome::Exited(124)) => {
             result("fail", false, Some(format!("did not reach $finish within {RUN_TIMEOUT_SECS} s")), log)

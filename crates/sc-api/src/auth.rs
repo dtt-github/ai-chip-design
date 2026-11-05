@@ -101,6 +101,9 @@ impl Verifier {
 
 pub struct JwksVerifier {
     issuer: String,
+    /// Where the server itself reaches the provider, when that differs from the public issuer
+    /// (e.g. `http://rauthy:8080/auth/v1` inside Compose); discovered URLs are rewritten to it.
+    internal: Option<String>,
     audiences: Vec<String>,
     http: reqwest::Client,
     keys: RwLock<KeyCache>,
@@ -125,9 +128,23 @@ impl JwksVerifier {
     pub fn new(issuer: String, audiences: Vec<String>) -> Self {
         Self {
             issuer,
+            internal: None,
             audiences,
             http: reqwest::Client::builder().timeout(Duration::from_secs(10)).build().expect("http client"),
             keys: RwLock::new(KeyCache { keys: HashMap::new(), userinfo_endpoint: None, fetched_at: None }),
+        }
+    }
+
+    pub fn with_internal_url(mut self, url: Option<String>) -> Self {
+        self.internal = url.map(|u| u.trim_end_matches('/').to_string());
+        self
+    }
+
+    /// `url` under the public issuer, as the server reaches it.
+    fn local(&self, url: &str) -> String {
+        match (&self.internal, url.strip_prefix(self.issuer.trim_end_matches('/'))) {
+            (Some(base), Some(rest)) => format!("{base}{rest}"),
+            _ => url.to_string(),
         }
     }
 
@@ -160,17 +177,18 @@ impl JwksVerifier {
     }
 
     async fn userinfo(&self, token: &str) -> Option<Claims> {
-        let url = self.keys.read().await.userinfo_endpoint.clone()?;
+        let url = self.local(&self.keys.read().await.userinfo_endpoint.clone()?);
         let res = self.http.get(url).bearer_auth(token).send().await.ok()?.error_for_status().ok()?;
         res.json().await.inspect_err(|e| tracing::warn!(error = %e, "bad userinfo response")).ok()
     }
 
     #[allow(clippy::type_complexity)]
     async fn fetch_keys(&self) -> Result<(HashMap<String, (Algorithm, DecodingKey)>, Option<String>), ApiError> {
-        let discovery_url = format!("{}/.well-known/openid-configuration", self.issuer.trim_end_matches('/'));
+        let discovery_url =
+            self.local(&format!("{}/.well-known/openid-configuration", self.issuer.trim_end_matches('/')));
         let fetch = async {
             let d: Discovery = self.http.get(&discovery_url).send().await?.error_for_status()?.json().await?;
-            let set: JwkSet = self.http.get(&d.jwks_uri).send().await?.error_for_status()?.json().await?;
+            let set: JwkSet = self.http.get(self.local(&d.jwks_uri)).send().await?.error_for_status()?.json().await?;
             anyhow::Ok((set, d.userinfo_endpoint))
         };
         let (set, userinfo_endpoint) =

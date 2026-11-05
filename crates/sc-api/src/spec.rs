@@ -300,7 +300,7 @@ impl Spec {
     /// The testbench for one example. Call only on a spec that [`validate`](Self::validate)s.
     pub fn testbench(&self, e: &Example) -> String {
         let mut o = String::new();
-        let clean = |s: &str| s.replace(['\n', '\r'], " ");
+        let clean = |s: &str| s.trim().replace(['\n', '\r'], " ");
         o.push_str(&format!("{GENERATED}, example \"{}\": {}\n", e.id, clean(&e.title)));
         o.push_str("// Do not edit: change the example instead and this file is regenerated.\n");
         if !e.given.is_empty() {
@@ -357,11 +357,14 @@ impl Spec {
         }
         for (i, s) in e.steps.iter().enumerate() {
             let n = i + 1;
+            // As written, for messages and comments: only characters a number can contain.
+            let val: String =
+                s.value.trim().chars().filter(|c| c.is_ascii_alphanumeric() || *c == '\'' || *c == '_').collect();
             let note = if s.note.is_empty() { String::new() } else { format!(" ({})", clean(&s.note)) };
             let fail = |what: &str| format!("$display(\"FAIL: step {n}: {what}, got 0x%0h\", {});", s.signal);
             match s.op.as_str() {
                 "set" => {
-                    o.push_str(&format!("        // {n}. set {} = {}{note}\n", s.signal, s.value));
+                    o.push_str(&format!("        // {n}. set {} = {}{note}\n", s.signal, val));
                     o.push_str(&format!("        {} = {};\n", s.signal, self.lit(&s.signal, &s.value)));
                 }
                 "wait" => {
@@ -372,35 +375,35 @@ impl Spec {
                     let v = self.lit(&s.signal, &s.value);
                     o.push_str(&format!(
                         "        // {n}. wait until {} = {}, at most {} cycle(s){note}\n",
-                        s.signal, s.value, s.cycles
+                        s.signal, val, s.cycles
                     ));
                     o.push_str(&format!(
                         "        k = 0;\n        while ({sig} !== {v} && k < {c}) begin {tick}; k = k + 1; end\n        if ({sig} !== {v}) begin {msg} errors = errors + 1; end\n",
                         sig = s.signal,
                         c = s.cycles,
-                        msg = fail(&format!("{} never became {} within {} cycle(s)", s.signal, s.value, s.cycles)),
+                        msg = fail(&format!("{} never became {} within {} cycle(s)", s.signal, val, s.cycles)),
                     ));
                 }
                 "expect" => {
                     let v = self.lit(&s.signal, &s.value);
-                    o.push_str(&format!("        // {n}. expect {} = {}{note}\n", s.signal, s.value));
+                    o.push_str(&format!("        // {n}. expect {} = {}{note}\n", s.signal, val));
                     o.push_str(&format!(
                         "        if ({sig} !== {v}) begin {msg} errors = errors + 1; end\n",
                         sig = s.signal,
-                        msg = fail(&format!("expected {} = {}", s.signal, s.value)),
+                        msg = fail(&format!("expected {} = {}", s.signal, val)),
                     ));
                 }
                 "expect_for" => {
                     let v = self.lit(&s.signal, &s.value);
                     o.push_str(&format!(
                         "        // {n}. expect {} = {} for {} cycle(s){note}\n",
-                        s.signal, s.value, s.cycles
+                        s.signal, val, s.cycles
                     ));
                     o.push_str(&format!(
                         "        bad = 0;\n        for (k = 0; k < {c}; k = k + 1) begin\n            if ({sig} !== {v} && bad == 0) begin $display(\"FAIL: step {n}: expected {sig} = {val} for {c} cycle(s), but at cycle %0d got 0x%0h\", k, {sig}); bad = 1; errors = errors + 1; end\n            {tick};\n        end\n",
                         sig = s.signal,
                         c = s.cycles,
-                        val = s.value.replace('"', ""),
+                        val = val,
                     ));
                 }
                 _ => unreachable!("validated"),

@@ -1,0 +1,38 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$SC_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# The API, including its WebSockets (co-editing, language server).
+	handle /api/* {
+		reverse_proxy api:8090
+	}
+	handle /healthz {
+		reverse_proxy api:8090
+	}
+
+	# Sign-in (Rauthy serves its pages and the OIDC endpoints under /auth/v1).
+	handle /auth/v1/* {
+		reverse_proxy rauthy:8080
+	}
+
+	# The single-page app; unknown paths (like /p/<id> or /auth/callback) load index.html.
+	handle {
+		# Only for the app: the sign-in pages under /auth/v1 send their own policy.
+		header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -55,6 +55,8 @@ pub struct Room {
     state: Mutex<RoomState>,
     /// (sender connection, encoded message) to every connection in the room.
     tx: broadcast::Sender<(u64, Arc<Vec<u8>>)>,
+    /// People whose access was removed: their connections close.
+    kick: broadcast::Sender<Uuid>,
 }
 
 struct RoomState {
@@ -71,6 +73,13 @@ impl Collab {
 
     fn file(&self, project: Uuid) -> PathBuf {
         self.dir.join(format!("{project}.ydoc"))
+    }
+
+    /// Closes `user`'s connections to the project's room (after they lose access).
+    pub async fn disconnect(&self, project: Uuid, user: Uuid) {
+        if let Some(room) = self.live(project).await {
+            let _ = room.kick.send(user);
+        }
     }
 
     /// The live room for a project, if anyone has it open.
@@ -94,6 +103,7 @@ impl Collab {
                         dirty: false,
                     }),
                     tx,
+                    kick: broadcast::channel(16).0,
                 });
                 rooms.insert(project, room.clone());
                 tokio::spawn(saver(Arc::downgrade(self), Arc::downgrade(&room)));
@@ -270,7 +280,7 @@ async fn saver(collab: Weak<Collab>, room: Weak<Room>) {
 }
 
 pub async fn handler(ws: WebSocketUpgrade, State(state): State<AppState>, UrlPath(id): UrlPath<Uuid>) -> Response {
-    ws.max_message_size(32 * 1024 * 1024).on_upgrade(move |socket| async move {
+    ws.max_message_size(8 * 1024 * 1024).on_upgrade(move |socket| async move {
         if let Err(e) = session(state, id, socket).await {
             tracing::warn!(project = %id, error = ?e, "collab session ended with error");
         }
@@ -305,6 +315,7 @@ async fn session(state: AppState, project: Uuid, mut socket: WebSocket) -> anyho
     let can_edit = role.is_some_and(|r| r >= Role::Editor);
     let (room, conn) = state.collab.join(&state, project).await?;
     let mut rx = room.tx.subscribe();
+    let mut kicked = room.kick.subscribe();
     let role_name = if can_edit { "editor" } else { "viewer" };
     socket.send(WsMessage::Text(json!({ "type": "ready", "role": role_name }).to_string().into())).await?;
     tracing::info!(%project, user = %user.id, role = role_name, "collab session started");
@@ -335,6 +346,12 @@ async fn session(state: AppState, project: Uuid, mut socket: WebSocket) -> anyho
                     Some(Ok(WsMessage::Close(_))) | None | Some(Err(_)) => return Ok(()),
                     Some(Ok(_)) => {}
                 },
+                k = kicked.recv() => {
+                    if k.is_ok_and(|u| u == user.id) {
+                        let _ = socket.send(WsMessage::Close(None)).await;
+                        return Ok(());
+                    }
+                }
                 out = rx.recv() => match out {
                     Ok((from, msg)) if from != conn => socket.send(WsMessage::Binary(msg.as_ref().clone().into())).await?,
                     Ok(_) => {}

@@ -1,0 +1,11 @@
+target
+**/node_modules
+apps/web/dist
+apps/web/src/wasm
+data
+.tools
+.git
+.env
+deploy/pilot/.env
+deploy/pilot/rauthy
+**/*.tsbuildinfo

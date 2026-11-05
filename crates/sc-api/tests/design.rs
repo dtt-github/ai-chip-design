@@ -59,7 +59,14 @@ async fn messages(State(seen): State<Seen>, Json(body): Json<Value>) -> Json<Val
             s.as_object_mut().unwrap().entry(k).or_insert(v);
         }
     }
-    if turn == 0 {
+    let first = body["messages"][0]["content"].as_str().unwrap_or_default().to_string();
+    if first.contains("decide for me") {
+        // Turn 0: the model makes a choice itself; turn 1 (after the push back): it asks instead.
+        if turn == 0 {
+            spec["decisions"] = json!([{ "question": "Should count wrap at 255?", "answer": "Wrap to 0" }]);
+            spec["questions"] = json!([]);
+        }
+    } else if turn == 0 {
         spec["examples"][0]["steps"][1]["signal"] = json!("enable");
     }
     Json(json!({
@@ -83,6 +90,7 @@ async fn call(addr: &str, tok: &str, method: reqwest::Method, path: &str, body: 
 #[sqlx::test(migrator = "sc_api::MIGRATOR")]
 async fn spec_examples_and_drafting(db: PgPool) {
     let seen: Seen = Arc::default();
+    let seen_handle = seen.clone();
     let mock = axum::Router::new().route("/v1/messages", post(messages)).with_state(seen.clone());
     let ml = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let mock_url = format!("http://{}", ml.local_addr().unwrap());
@@ -204,11 +212,80 @@ async fn spec_examples_and_drafting(db: PgPool) {
     assert_eq!(d["spec"]["examples"][0]["steps"][1]["signal"], "en");
     assert_eq!(d["spec"]["questions"][0]["options"][1], "Stop at 255");
     assert_eq!(d["usage"]["output_tokens"], 100);
-    let seen = seen.lock().unwrap();
-    assert_eq!(seen.len(), 2);
-    let feedback = &seen[1]["messages"].as_array().unwrap().last().unwrap()["content"][0];
-    assert_eq!(feedback["is_error"], true);
-    assert!(feedback["content"].as_str().unwrap().contains("'enable' is not one of the connections"), "{feedback}");
-    assert!(seen[0]["messages"][0]["content"].as_str().unwrap().contains("--- src/pulse.v ---"), "the RTL is context");
-    assert_eq!(seen[0]["tools"][0]["strict"], true);
+    {
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 2);
+        let feedback = &seen[1]["messages"].as_array().unwrap().last().unwrap()["content"][0];
+        assert_eq!(feedback["is_error"], true);
+        assert!(feedback["content"].as_str().unwrap().contains("'enable' is not one of the connections"), "{feedback}");
+        assert!(
+            seen[0]["messages"][0]["content"].as_str().unwrap().contains("--- src/pulse.v ---"),
+            "the RTL is context"
+        );
+        assert_eq!(seen[0]["tools"][0]["strict"], true);
+    }
+
+    // Decisions the user didn't make are pushed back once, and become questions.
+    let (s, d) = call(
+        &addr,
+        &ada,
+        M::POST,
+        &format!("/projects/{id}/spec/draft"),
+        Some(json!({ "instruction": "A counter; decide for me" })),
+    )
+    .await;
+    assert_eq!(s, 200, "{d}");
+    assert_eq!(d["spec"]["decisions"], json!([]));
+    assert_eq!(d["spec"]["questions"][0]["question"], "Should count wrap at 255?");
+    let seen = seen_handle.lock().unwrap();
+    let feedback = &seen[3]["messages"].as_array().unwrap().last().unwrap()["content"][0];
+    assert!(
+        feedback["content"].as_str().unwrap().contains("These decisions are new: \"Should count wrap at 255?\""),
+        "{feedback}"
+    );
+}
+
+#[sqlx::test(migrator = "sc_api::MIGRATOR")]
+async fn daily_ai_budget(db: PgPool) {
+    let seen: Seen = Arc::default();
+    let mock = axum::Router::new().route("/v1/messages", post(messages)).with_state(seen);
+    let ml = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let mock_url = format!("http://{}", ml.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(ml, mock).await.unwrap() });
+    let (mut state, _dir) = common::state(db, LspConfig::disabled());
+    let claude = Claude::new(ClaudeConfig {
+        api_key: "k".into(),
+        base_url: mock_url,
+        model: "claude-opus-5-5".into(),
+        effort: "high".into(),
+        max_tokens: 16_000,
+        bearer: false,
+        fallbacks: false,
+    });
+    // Two mock turns cost 200 input + 100 output tokens = $0.0028; the limit is less.
+    state.agent = Arc::new(AgentService::new(Some(claude), 1).with_daily_limit(Some(0.002)));
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = l.local_addr().unwrap().to_string();
+    tokio::spawn(async move { axum::serve(l, router(state)).await.unwrap() });
+    let ada = token("ada", "ada@example.org");
+    let bob = token("bob", "bob@example.org");
+    use reqwest::Method as M;
+
+    let (_, p) = call(&addr, &ada, M::POST, "/projects", Some(json!({ "name": "Pulse" }))).await;
+    let id = p["id"].as_str().unwrap().to_string();
+    let draft = json!({ "instruction": "A counter that counts while enabled" });
+    let (s, _) = call(&addr, &ada, M::POST, &format!("/projects/{id}/spec/draft"), Some(draft.clone())).await;
+    assert_eq!(s, 200);
+    let (_, u) = call(&addr, &ada, M::GET, "/me/ai-usage", None).await;
+    assert!((u["today_usd"].as_f64().unwrap() - 0.0028).abs() < 1e-9, "{u}");
+    assert_eq!(u["limit_usd"], 0.002);
+    let (s, e) = call(&addr, &ada, M::POST, &format!("/projects/{id}/spec/draft"), Some(draft)).await;
+    assert_eq!(s, 429, "{e}");
+    assert!(e["message"].as_str().unwrap().contains("today's AI budget"), "{e}");
+    let (s, _) =
+        call(&addr, &ada, M::POST, &format!("/projects/{id}/agent"), Some(json!({ "request": "anything" }))).await;
+    assert_eq!(s, 429, "the agent shares the budget");
+    // Budgets are per person.
+    let (_, u) = call(&addr, &bob, M::GET, "/me/ai-usage", None).await;
+    assert_eq!(u["today_usd"], 0.0);
 }

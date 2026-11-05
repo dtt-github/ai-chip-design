@@ -11,7 +11,14 @@ pub struct Parser<'a> {
     toks: &'a [Token],
     pos: usize,
     file: String,
+    /// Current nesting of expressions and statements; bounded so hostile input can't exhaust the stack.
+    depth: usize,
 }
+
+/// Deeper nesting is refused (real designs stay far below it).
+const MAX_DEPTH: usize = 512;
+/// Operands in one chain like `a + b + c + ...` (each makes the tree one level deeper).
+const MAX_CHAIN: usize = 1000;
 
 const NOT_SUPPORTED: &[&str] = &[
     "function",
@@ -40,7 +47,7 @@ const NOT_SUPPORTED: &[&str] = &[
 
 impl<'a> Parser<'a> {
     pub fn new(toks: &'a [Token], file: &str) -> Self {
-        Parser { toks, pos: 0, file: file.to_string() }
+        Parser { toks, pos: 0, file: file.to_string(), depth: 0 }
     }
 
     fn peek(&self) -> &Tok {
@@ -61,6 +68,17 @@ impl<'a> Parser<'a> {
             self.pos += 1;
         }
         t
+    }
+
+    /// Runs `f` one nesting level deeper, refusing input nested beyond `MAX_DEPTH`.
+    fn nested<T>(&mut self, f: impl FnOnce(&mut Self) -> Result<T>) -> Result<T> {
+        if self.depth >= MAX_DEPTH {
+            return self.err(format!("nested more than {MAX_DEPTH} levels deep"));
+        }
+        self.depth += 1;
+        let r = f(self);
+        self.depth -= 1;
+        r
     }
 
     fn err<T>(&self, msg: impl Into<String>) -> Result<T> {
@@ -408,6 +426,10 @@ impl<'a> Parser<'a> {
     // ---- statements ----
 
     fn stmt(&mut self) -> Result<Stmt> {
+        self.nested(Self::stmt_inner)
+    }
+
+    fn stmt_inner(&mut self) -> Result<Stmt> {
         let line = self.line();
         if self.eat_op(";") {
             return Ok(Stmt::Null);
@@ -694,6 +716,10 @@ impl<'a> Parser<'a> {
     // ---- expressions (lowest to highest precedence) ----
 
     pub fn expr(&mut self) -> Result<Expr> {
+        self.nested(Self::expr_inner)
+    }
+
+    fn expr_inner(&mut self) -> Result<Expr> {
         let c = self.binary(0)?;
         if self.eat_op("?") {
             let t = self.expr()?;
@@ -722,12 +748,17 @@ impl<'a> Parser<'a> {
             return self.unary();
         }
         let mut lhs = self.binary(level + 1)?;
+        let mut chain = 0;
         loop {
             let op = match self.peek() {
                 Tok::Op(o) if LEVELS[level].contains(o) => *o,
                 _ => break,
             };
             self.bump();
+            chain += 1;
+            if chain > MAX_CHAIN {
+                return self.err(format!("more than {MAX_CHAIN} operators in a row"));
+            }
             let rhs = self.binary(level + 1)?;
             let op = match op {
                 "===" => "==",
@@ -741,6 +772,10 @@ impl<'a> Parser<'a> {
     }
 
     fn unary(&mut self) -> Result<Expr> {
+        self.nested(Self::unary_inner)
+    }
+
+    fn unary_inner(&mut self) -> Result<Expr> {
         for op in ["!", "~", "-", "+", "&", "|", "^", "~&", "~|", "~^"] {
             if self.is_op(op) {
                 self.bump();

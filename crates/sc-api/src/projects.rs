@@ -445,6 +445,31 @@ pub async fn add_member(
     Ok(Json(Member { user_id: target_id, email, display_name, role: req.role.as_str().into() }))
 }
 
+/// Takes a person out of a project (owner only; the owner can't be removed).
+pub async fn remove_member(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path((id, member)): Path<(Uuid, Uuid)>,
+) -> ApiResult<StatusCode> {
+    let (project, _) = authorize(&state, &user, id, Role::Owner).await?;
+    if member == project.owner_id {
+        return Err(ApiError::BadRequest("the owner can't be removed".into()));
+    }
+    let n = sqlx::query("DELETE FROM project_members WHERE project_id = $1 AND user_id = $2")
+        .bind(id)
+        .bind(member)
+        .execute(&state.db)
+        .await?
+        .rows_affected();
+    if n == 0 {
+        return Err(ApiError::NotFound("not a member of this project".into()));
+    }
+    // Their open co-editing sessions are closed so the removal takes effect now.
+    state.collab.disconnect(id, member).await;
+    tracing::info!(project = %id, %member, by = %user.id, "member removed");
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[cfg(test)]
 mod tests {
     use super::slugify;

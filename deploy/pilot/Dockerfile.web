@@ -1,0 +1,33 @@
+# syntax=docker/dockerfile:1
+# The web app (with its WebAssembly simulator and layout parser), served by Caddy, which also
+# terminates HTTPS and routes /api to the API and /auth/v1 to Rauthy.
+# Build from the repository root: docker build -f deploy/pilot/Dockerfile.web --build-arg SC_DOMAIN=... .
+
+FROM rust:1.99.1-slim-trixie AS wasm
+RUN rustup target add wasm32-unknown-unknown
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    cargo install wasm-bindgen-cli --version 0.2.130 --locked
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY crates crates
+COPY scripts/build-wasm.sh scripts/build-wasm.sh
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/src/target \
+    mkdir -p apps/web/src/wasm && bash scripts/build-wasm.sh
+
+FROM node:22-slim AS web
+RUN corepack enable
+WORKDIR /src
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/web/package.json apps/web/package.json
+RUN pnpm install --frozen-lockfile
+COPY apps/web apps/web
+COPY --from=wasm /src/apps/web/src/wasm apps/web/src/wasm
+ARG SC_DOMAIN
+ENV VITE_OIDC_AUTHORITY=https://${SC_DOMAIN}/auth/v1/ \
+    VITE_OIDC_CLIENT_ID=siliconcommons-web
+RUN test -n "$SC_DOMAIN" && pnpm --filter @siliconcommons/web build
+
+FROM caddy:2.10-alpine
+COPY deploy/pilot/Caddyfile /etc/caddy/Caddyfile
+COPY --from=web /src/apps/web/dist /srv/web
