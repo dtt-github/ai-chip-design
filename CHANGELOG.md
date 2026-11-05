@@ -31,6 +31,11 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Changed
 
+- AI costs are priced for the model that served each call (Claude Opus 5.5 and Gemini 4 Argon
+  built in, `SC_AI_PRICES` for anything else) instead of always at Opus 5.5 prices, and recorded
+  with the model. Drafts return their cost (`usd`), proposals keep it in the evidence log, and the
+  eval runner uses the server's figure.
+
 - Gate-level simulation and Health say how many testbenches test a block rather than the chip, and
   don't call a chip working when nothing tests it as a whole.
 

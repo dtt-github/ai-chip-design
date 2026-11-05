@@ -87,6 +87,19 @@ async fn main() -> anyhow::Result<()> {
                 fallbacks: !openrouter,
             };
             tracing::info!(model = %cfg.model, effort = %cfg.effort, base = %cfg.base_url, "agent enabled");
+            if let Ok(v) = env("SC_AI_PRICES")
+                && sc_api::spend::parse_prices(&v).is_none()
+            {
+                anyhow::bail!(
+                    "SC_AI_PRICES must be four numbers: input,output,cache_read,cache_write (US$ per million tokens)"
+                );
+            }
+            let (p, known) = sc_api::spend::prices(&cfg.model);
+            if known {
+                tracing::info!(model = %cfg.model, input = p.input, output = p.output, "AI prices (US$ per million tokens)");
+            } else {
+                tracing::warn!(model = %cfg.model, "no prices known for this model: costs are counted at the dearest known prices; set SC_AI_PRICES");
+            }
             Some(sc_api::claude::Claude::new(cfg))
         }
         None => {

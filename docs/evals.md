@@ -118,8 +118,9 @@ that account.
 
 ## Cost
 
-A live run costs what the model is billed for the drafts or proposals, priced as the server prices
-them (the runner's figures match the server's `ai_usage` records). Measure it with a small run
+A live run costs what the model is billed for the drafts or proposals. The runner takes each run's
+cost from the server, which prices it for the model that served it (`SC_AI_PRICES` overrides; see
+[configuration.md](configuration.md)) (the runner's figures match the server's `ai_usage` records). Measure it with a small run
 first (`SC_EVAL_TASKS=blinker --reps 1`) and multiply by the task count and repeats.
 
 The first pilot (2026-11-05; Claude Opus 5.5 via OpenRouter; blinker, uart_tx and traffic, one

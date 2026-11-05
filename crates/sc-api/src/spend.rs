@@ -1,5 +1,6 @@
 //! What the AI costs, per person: every assistant (spec drafting) and agent
-//! (proposal) call records its token usage priced in US dollars, and a
+//! (proposal) call records its token usage priced in US dollars for the model
+//! that served it, and a
 //! person who has spent their daily limit gets a clear "come back tomorrow"
 //! instead of another call. Days are UTC.
 
@@ -14,18 +15,78 @@ use crate::AppState;
 use crate::auth::AuthUser;
 use crate::error::{ApiError, ApiResult};
 
-/// US dollars per million tokens: Claude Opus 5.5 (cache writes are 5-minute, 1.25x input).
-const INPUT: f64 = 4.0;
-const OUTPUT: f64 = 20.0;
-const CACHE_READ: f64 = 0.20;
-const CACHE_WRITE: f64 = 5.0;
+/// US dollars per million tokens.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Prices {
+    pub input: f64,
+    pub output: f64,
+    pub cache_read: f64,
+    pub cache_write: f64,
+}
 
-pub fn usd(usage: &BTreeMap<String, u64>) -> f64 {
+/// Known models, by name without the provider prefix, dots as dashes and any date suffix
+/// (`anthropic/claude-opus-5.5` and `claude-opus-5-5-20260921` are both `claude-opus-5-5`).
+/// Anthropic cache writes are 5-minute (1.25x input); OpenRouter lists no cache-write price for
+/// Gemini, so it is charged as input.
+const KNOWN: &[(&str, Prices)] = &[
+    ("claude-opus-5-5", Prices { input: 4.0, output: 20.0, cache_read: 0.20, cache_write: 5.0 }),
+    ("gemini-4-argon", Prices { input: 2.0, output: 10.0, cache_read: 0.10, cache_write: 2.0 }),
+];
+
+/// For a model this table doesn't know (and no `SC_AI_PRICES`): the dearest known prices, so a
+/// daily limit errs towards stopping early rather than overspending.
+const UNKNOWN: Prices = Prices { input: 4.0, output: 20.0, cache_read: 0.20, cache_write: 5.0 };
+
+/// The table's key for a model id as the API or OpenRouter reports it.
+fn model_key(model: &str) -> String {
+    let name = model.rsplit('/').next().unwrap_or(model).to_lowercase().replace('.', "-");
+    // A trailing date: -20260921 or @20260921.
+    let parts: Vec<&str> = name.split(['-', '@']).collect();
+    match parts.last() {
+        Some(d) if d.len() == 8 && d.chars().all(|c| c.is_ascii_digit()) => {
+            name[..name.len() - d.len() - 1].to_string()
+        }
+        _ => name,
+    }
+}
+
+/// `SC_AI_PRICES`: "input,output,cache_read,cache_write" in US dollars per million tokens, for every
+/// model (a model the table doesn't know, or a negotiated price).
+fn configured() -> Option<Prices> {
+    static P: std::sync::OnceLock<Option<Prices>> = std::sync::OnceLock::new();
+    *P.get_or_init(|| std::env::var("SC_AI_PRICES").ok().and_then(|v| parse_prices(&v)))
+}
+
+pub fn parse_prices(v: &str) -> Option<Prices> {
+    let n: Vec<f64> = v.split(',').map(|x| x.trim().parse::<f64>()).collect::<Result<_, _>>().ok()?;
+    match n[..] {
+        [input, output, cache_read, cache_write] if n.iter().all(|x| x.is_finite() && *x >= 0.0) => {
+            Some(Prices { input, output, cache_read, cache_write })
+        }
+        _ => None,
+    }
+}
+
+/// The prices for a model, and whether they are known (from `SC_AI_PRICES` or the table).
+pub fn prices(model: &str) -> (Prices, bool) {
+    if let Some(p) = configured() {
+        return (p, true);
+    }
+    let key = model_key(model);
+    match KNOWN.iter().find(|(k, _)| *k == key) {
+        Some((_, p)) => (*p, true),
+        None => (UNKNOWN, false),
+    }
+}
+
+/// What `usage` cost on `model`, in US dollars.
+pub fn usd(model: &str, usage: &BTreeMap<String, u64>) -> f64 {
+    let (p, _) = prices(model);
     let n = |k: &str| *usage.get(k).unwrap_or(&0) as f64 / 1e6;
-    n("input_tokens") * INPUT
-        + n("output_tokens") * OUTPUT
-        + n("cache_read_input_tokens") * CACHE_READ
-        + n("cache_creation_input_tokens") * CACHE_WRITE
+    n("input_tokens") * p.input
+        + n("output_tokens") * p.output
+        + n("cache_read_input_tokens") * p.cache_read
+        + n("cache_creation_input_tokens") * p.cache_write
 }
 
 async fn spent_today(state: &AppState, user: Uuid) -> ApiResult<f64> {
@@ -49,16 +110,27 @@ pub async fn check(state: &AppState, user: &AuthUser) -> ApiResult<()> {
     Ok(())
 }
 
-pub async fn record(state: &AppState, user: Uuid, project: Uuid, kind: &str, usage: &BTreeMap<String, u64>) {
-    let cost = usd(usage);
-    let res = sqlx::query("INSERT INTO ai_usage (user_id, project_id, kind, usage, usd) VALUES ($1, $2, $3, $4, $5)")
-        .bind(user)
-        .bind(project)
-        .bind(kind)
-        .bind(json!(usage))
-        .bind(cost)
-        .execute(&state.db)
-        .await;
+/// Records a call's usage, priced for the model that served it.
+pub async fn record(
+    state: &AppState,
+    user: Uuid,
+    project: Uuid,
+    kind: &str,
+    model: &str,
+    usage: &BTreeMap<String, u64>,
+) {
+    let cost = usd(model, usage);
+    let res = sqlx::query(
+        "INSERT INTO ai_usage (user_id, project_id, kind, model, usage, usd) VALUES ($1, $2, $3, $4, $5, $6)",
+    )
+    .bind(user)
+    .bind(project)
+    .bind(kind)
+    .bind(model)
+    .bind(json!(usage))
+    .bind(cost)
+    .execute(&state.db)
+    .await;
     if let Err(e) = res {
         tracing::error!(error = ?e, %user, "recording AI usage failed");
     }
@@ -84,6 +156,27 @@ mod tests {
         .into_iter()
         .map(|(k, v)| (k.to_string(), v))
         .collect();
-        assert!((super::usd(&u) - 0.1828).abs() < 0.001, "{}", super::usd(&u));
+        assert!((super::usd("anthropic/claude-opus-5.5", &u) - 0.1828).abs() < 0.001);
+        // Gemini 4 Argon: half the price per token, cache writes as input.
+        let g = super::usd("google/gemini-4-argon", &u);
+        assert!((g - 0.0862).abs() < 0.001, "{g}");
+    }
+
+    #[test]
+    fn model_names_and_configured_prices() {
+        use super::{model_key, parse_prices, prices};
+        assert_eq!(model_key("anthropic/claude-opus-5.5"), "claude-opus-5-5");
+        assert_eq!(model_key("claude-opus-5-5-20260921"), "claude-opus-5-5");
+        assert_eq!(model_key("google/gemini-4-argon"), "gemini-4-argon");
+        assert_eq!(model_key("google/gemini-4-argon@20261001"), "gemini-4-argon");
+        assert!(prices("claude-opus-5-5").1);
+        // Unknown models are priced as the dearest known one, and flagged.
+        let (p, known) = prices("someone/new-model");
+        assert!(!known);
+        assert_eq!(p.output, 20.0);
+        assert_eq!(parse_prices("1, 2, 0.1, 1.25").map(|p| p.cache_write), Some(1.25));
+        assert_eq!(parse_prices("1,2,3"), None);
+        assert_eq!(parse_prices("1,2,x,4"), None);
+        assert_eq!(parse_prices("1,-2,3,4"), None);
     }
 }

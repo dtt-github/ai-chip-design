@@ -50,9 +50,10 @@ Without Docker or the image, the API starts with flow runs disabled (job creatio
 | `ANTHROPIC_API_KEY` | unset | Claude Messages API key. Takes precedence over OpenRouter. |
 | `OPENROUTER_API_KEY` | unset | OpenRouter key, used through its Anthropic-compatible endpoint (model `anthropic/claude-opus-5.5`). |
 | `SC_ANTHROPIC_BASE_URL` | provider default | Override the API base URL (tests point it at a mock). |
-| `SC_AGENT_MODEL` | `claude-opus-5-5` (OpenRouter: `anthropic/claude-opus-5.5`) | Model for the agent, the spec assistant and the connection review. |
+| `SC_AGENT_MODEL` | `claude-opus-5-5` (OpenRouter: `anthropic/claude-opus-5.5`) | Model for the agent, the spec assistant and the connection review. With OpenRouter any model it serves through its Anthropic-compatible endpoint can be named (e.g. `google/gemini-4-argon`); the prompts were tuned on Claude Opus 5.5, so run the [design evals](evals.md) before switching. |
 | `SC_AGENT_EFFORT` | `high` | Reasoning effort: `low`, `medium`, `high`, `xhigh` or `max`. |
 | `SC_AI_DAILY_USD` | `3` | Per-person daily AI budget in US dollars, priced from token usage; `0` turns the limit off. |
+| `SC_AI_PRICES` | unset | US dollars per million tokens as `input,output,cache_read,cache_write` (e.g. `2,10,0.1,2`), for every model. Without it, calls are priced for the model that served them from a built-in table (Claude Opus 5.5, Gemini 4 Argon); a model the table doesn't know is priced as the dearest known one, with a warning at startup. |
 
 Without a key, the AI endpoints answer 503 and everything else works.
 

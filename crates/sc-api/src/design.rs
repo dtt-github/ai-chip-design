@@ -362,6 +362,8 @@ pub struct DraftResult {
     pub note: String,
     pub model: String,
     pub usage: BTreeMap<String, u64>,
+    /// What the draft cost, priced for the model that served it.
+    pub usd: f64,
     pub elapsed_ms: u64,
 }
 
@@ -429,11 +431,15 @@ pub async fn draft(
         })
         .collect();
     let mut pushed_back = false;
+    let mut served = claude.cfg.model.clone();
     let result: ApiResult<DraftResult> = async {
     for _ in 0..DRAFT_TURNS {
         let resp =
             claude.create(DRAFT_SYSTEM, &tools, &messages).await.map_err(|e| ApiError::Unavailable(e.to_string()))?;
         let model = resp["model"].as_str().unwrap_or_default().to_string();
+        if !model.is_empty() {
+            served = model.clone();
+        }
         if let Some(u) = resp["usage"].as_object() {
             for k in ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"] {
                 *usage.entry(k.to_string()).or_default() += u.get(k).and_then(Value::as_u64).unwrap_or(0);
@@ -478,6 +484,7 @@ pub async fn draft(
                     return Ok(DraftResult {
                         spec,
                         note: call["input"]["note"].as_str().unwrap_or_default().to_string(),
+                        usd: crate::spend::usd(&model, &usage),
                         model,
                         usage: usage.clone(),
                         elapsed_ms: started.elapsed().as_millis() as u64,
@@ -496,7 +503,7 @@ pub async fn draft(
     .await;
     // Every call costs, whether or not it produced a spec.
     if !usage.is_empty() {
-        crate::spend::record(&state, user.id, id, "draft", &usage).await;
+        crate::spend::record(&state, user.id, id, "draft", &served, &usage).await;
     }
     result.map(Json)
 }

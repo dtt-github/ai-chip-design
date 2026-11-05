@@ -35,6 +35,6 @@ commit, and **Re-run gate** checks that the recorded result reproduces.
 
 ## Cost and limits
 
-Each proposal's token usage is priced and counted against the person's daily AI budget
+Each proposal's token usage is priced for the model that served it and counted against the person's daily AI budget
 (`SC_AI_DAILY_USD`); each person can have 2 proposals running at once. Without an API key on the
 server, the agent is unavailable ([configuration.md](../configuration.md#ai-assistant-and-agent)).
