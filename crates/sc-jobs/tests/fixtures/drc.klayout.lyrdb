@@ -1,0 +1,88 @@
+<?xml version='1.0' encoding='utf-8'?>
+<report-database>
+ <description>Main DRC Run Report at</description>
+ <original-file />
+ <generator>drc: script='/pdk/ihp-sg13g2/libs.tech/klayout/tech/drc/ihp-sg13g2.drc'</generator>
+ <top-cell>uart_transmitter</top-cell>
+ <tags>
+ </tags>
+ <categories>
+  <category>
+   <name>M1.a</name>
+   <description>5.16. M1.a: Min. Metal1 width: 0.16 μm.</description>
+   <categories>
+   </categories>
+  </category>
+  <category>
+   <name>M2.b</name>
+   <description>5.17. M2.b: Min. Metal2 space or notch: 0.21 μm.</description>
+   <categories>
+   </categories>
+  </category>
+  <category>
+   <name>V1.a</name>
+   <description>5.19. V1.a : Min. and max. Via1 width: 0.19 µm</description>
+   <categories>
+   </categories>
+  </category>
+  </categories>
+ <cells>
+  <cell>
+   <name>uart_transmitter</name>
+   <variant />
+   <layout-name />
+   <references>
+   </references>
+  </cell>
+ </cells>
+ <items>
+  <item>
+   <tags />
+   <category>'M1.a'</category>
+   <cell>uart_transmitter</cell>
+   <visited>false</visited>
+   <multiplicity>1</multiplicity>
+   <comment />
+   <image />
+   <values>
+    <value>edge-pair: (2,5;2,9)|(2.1,9;2.1,5)</value>
+   </values>
+  </item>
+  <item>
+   <tags />
+   <category>'M2.b'</category>
+   <cell>uart_transmitter</cell>
+   <visited>false</visited>
+   <multiplicity>1</multiplicity>
+   <comment />
+   <image />
+   <values>
+    <value>edge-pair: (5.1,5;5.1,6)|(5,6;5,5)</value>
+   </values>
+  </item>
+  <item>
+   <tags />
+   <category>'V1.a'</category>
+   <cell>uart_transmitter</cell>
+   <visited>false</visited>
+   <multiplicity>1</multiplicity>
+   <comment />
+   <image />
+   <values>
+    <value>polygon: (8,5;8,5.12;8.12,5.12;8.12,5)</value>
+   </values>
+  </item>
+  <item>
+   <tags />
+   <category>'V1.a'</category>
+   <cell>uart_transmitter</cell>
+   <visited>false</visited>
+   <multiplicity>1</multiplicity>
+   <comment />
+   <image />
+   <values>
+    <value>polygon: (8,5;8,5.12;8.12,5.12;8.12,5)</value>
+   </values>
+  </item>
+ </items>
+</report-database>

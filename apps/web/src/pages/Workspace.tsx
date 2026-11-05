@@ -31,6 +31,7 @@ export function WorkspacePage() {
   const [status, setStatus] = useState<{ kind: "error" | "info"; text: string } | null>(null);
   const [panelTab, setPanelTab] = useState<"changes" | "runs">("changes");
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
+  const [runMaximized, setRunMaximized] = useState(false);
   const [committing, setCommitting] = useState(false);
   const messageRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -240,7 +241,7 @@ export function WorkspacePage() {
         />
       </aside>
 
-      <section className="editor-area">
+      <section className={`editor-area ${selectedJob && runMaximized ? "run-max" : ""}`}>
         <div className="tabs" role="tablist">
           {tabs.map((p) => (
             <div key={p} className={`tab ${p === active ? "active" : ""}`} role="tab" aria-selected={p === active}>
@@ -289,7 +290,18 @@ export function WorkspacePage() {
           <span className="spacer" />
           {status && <span className={status.kind === "error" ? "error" : ""}>{status.text}</span>}
         </footer>
-        {selectedJob && <RunView jobId={selectedJob} canCancel={!readOnly} onClose={() => setSelectedJob(null)} />}
+        {selectedJob && (
+          <RunView
+            jobId={selectedJob}
+            canCancel={!readOnly}
+            maximized={runMaximized}
+            onMaximize={setRunMaximized}
+            onClose={() => {
+              setSelectedJob(null);
+              setRunMaximized(false);
+            }}
+          />
+        )}
       </section>
 
       <aside className="panel">

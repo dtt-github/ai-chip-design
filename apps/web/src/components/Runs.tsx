@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, isFinished, type Artifact, type Job, type JobSummary } from "../api";
+import { LayoutViewer } from "./LayoutViewer";
+import { Report } from "./Report";
 
 const POLL_MS = 1500;
 
@@ -104,10 +106,22 @@ export function RunsList({ projectId, head, canRun, dirty, selected, onSelect }:
   );
 }
 
-type Tab = "log" | "summary" | "layout" | "files";
+type Tab = "log" | "summary" | "report" | "layout" | "files";
 
 /** Details of one run: live log, sign-off summary, layout render and files. */
-export function RunView({ jobId, canCancel, onClose }: { jobId: string; canCancel: boolean; onClose: () => void }) {
+export function RunView({
+  jobId,
+  canCancel,
+  onClose,
+  maximized,
+  onMaximize,
+}: {
+  jobId: string;
+  canCancel: boolean;
+  onClose: () => void;
+  maximized: boolean;
+  onMaximize: (max: boolean) => void;
+}) {
   const [job, setJob] = useState<Job | null>(null);
   const [tab, setTab] = useState<Tab>("log");
   const [log, setLog] = useState("");
@@ -160,8 +174,18 @@ export function RunView({ jobId, canCancel, onClose }: { jobId: string; canCance
         )}
         <span className="spacer" />
         <div className="run-tabs" role="tablist">
-          {(["log", "summary", "layout", "files"] as Tab[]).map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
+          {(["log", "summary", "report", "layout", "files"] as Tab[]).map((t) => (
+            <button
+              key={t}
+              role="tab"
+              aria-selected={tab === t}
+              className={tab === t ? "active" : ""}
+              onClick={() => {
+                setTab(t);
+                // The layout viewer needs room.
+                if (t === "layout") onMaximize(true);
+              }}
+            >
               {t}
             </button>
           ))}
@@ -171,6 +195,9 @@ export function RunView({ jobId, canCancel, onClose }: { jobId: string; canCance
             Cancel
           </button>
         )}
+        <button className="ghost small" onClick={() => onMaximize(!maximized)} aria-label={maximized ? "Restore run panel" : "Maximize run panel"} title={maximized ? "Restore" : "Maximize"}>
+          {maximized ? "▾" : "▴"}
+        </button>
         <button className="ghost small" onClick={onClose} aria-label="Close run details">
           ×
         </button>
@@ -191,6 +218,7 @@ export function RunView({ jobId, canCancel, onClose }: { jobId: string; canCance
           </pre>
         )}
         {tab === "summary" && <Summary job={job} />}
+        {tab === "report" && job && <Report job={job} />}
         {tab === "layout" && job && <Layout job={job} />}
         {tab === "files" && job && <Files job={job} />}
       </div>
@@ -260,27 +288,11 @@ function useArtifacts(job: Job) {
 
 function Layout({ job }: { job: Job }) {
   const list = useArtifacts(job);
-  const [url, setUrl] = useState<string | null>(null);
-  const render = list?.find((a) => a.path.startsWith("render/") && a.path.endsWith(".png"));
-  useEffect(() => {
-    if (!render) return;
-    let objectUrl: string | null = null;
-    api.artifactBlob(job.id, render.path).then((b) => {
-      objectUrl = URL.createObjectURL(b);
-      setUrl(objectUrl);
-    });
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [job.id, render?.path]);
   if (!isFinished(job.status)) return <p className="muted pad">Available when the run finishes.</p>;
-  if (list && !render) return <p className="muted pad">No layout render in this run.</p>;
-  return (
-    <div className="layout-view">
-      {url ? <img src={url} alt={`Layout of ${render?.path}`} /> : <p className="muted pad">Loading…</p>}
-      <p className="muted small">Static KLayout render. The interactive GDS viewer comes in Sprint 3.</p>
-    </div>
-  );
+  if (!list) return <p className="muted pad">Loading…</p>;
+  const gds = list.find((a) => a.path.startsWith("gds/") && a.path.endsWith(".gds"));
+  if (!gds) return <p className="muted pad">This run produced no GDS.</p>;
+  return <LayoutViewer job={job} gdsPath={gds.path} />;
 }
 
 function Files({ job }: { job: Job }) {

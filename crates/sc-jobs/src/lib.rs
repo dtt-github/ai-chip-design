@@ -7,6 +7,7 @@
 //! up in [`final_dir`].
 
 mod docker;
+pub mod reports;
 mod summary;
 
 use std::future::Future;

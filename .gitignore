@@ -8,3 +8,4 @@ dist/
 .claude/
 *.tsbuildinfo
 .tools/
+apps/web/src/wasm/

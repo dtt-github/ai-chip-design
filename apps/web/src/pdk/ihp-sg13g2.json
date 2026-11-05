@@ -1,0 +1,3766 @@
+{
+ "pdk": "ihp-sg13g2",
+ "source": "KLayout layer properties (sg13g2.lyp) from the IHP Open PDK, Apache-2.0, (c) IHP PDK Authors",
+ "layers": [
+  {
+   "name": "Activ.drawing",
+   "layer": 1,
+   "datatype": 0,
+   "fill": "#00ff00",
+   "frame": "#00ff00",
+   "dither": "C2",
+   "order": 20,
+   "visible": true
+  },
+  {
+   "name": "Activ.label",
+   "layer": 1,
+   "datatype": 1,
+   "fill": "#00ff00",
+   "frame": "#00ff00",
+   "dither": "C3",
+   "order": 20,
+   "visible": false
+  },
+  {
+   "name": "Activ.pin",
+   "layer": 1,
+   "datatype": 2,
+   "fill": "#00ff00",
+   "frame": "#00ff00",
+   "dither": "C2",
+   "order": 21,
+   "visible": true
+  },
+  {
+   "name": "Activ.net",
+   "layer": 1,
+   "datatype": 3,
+   "fill": "#00ff00",
+   "frame": "#00ff00",
+   "dither": "C2",
+   "order": 20,
+   "visible": false
+  },
+  {
+   "name": "Activ.boundary",
+   "layer": 1,
+   "datatype": 4,
+   "fill": "#00ff00",
+   "frame": "#00ff00",
+   "dither": "C3",
+   "order": 20,
+   "visible": false
+  },
+  {
+   "name": "Activ.lvs",
+   "layer": 1,
+   "datatype": 19,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "I1",
+   "order": 20,
+   "visible": false
+  },
+  {
+   "name": "Activ.mask",
+   "layer": 1,
+   "datatype": 20,
+   "fill": "#00ff00",
+   "frame": "#00ff00",
+   "dither": "C2",
+   "order": 20,
+   "visible": false
+  },
+  {
+   "name": "Activ.filler",
+   "layer": 1,
+   "datatype": 22,
+   "fill": "#00ff00",
+   "frame": "#00ff00",
+   "dither": "C4",
+   "order": 20,
+   "visible": false
+  },
+  {
+   "name": "Activ.nofill",
+   "layer": 1,
+   "datatype": 23,
+   "fill": "#00ff00",
+   "frame": "#00ff00",
+   "dither": "I1",
+   "order": 20,
+   "visible": false
+  },
+  {
+   "name": "Activ.OPC",
+   "layer": 1,
+   "datatype": 26,
+   "fill": "#00cc66",
+   "frame": "#00cc66",
+   "dither": "C5",
+   "order": 20,
+   "visible": false
+  },
+  {
+   "name": "Activ.iOPC",
+   "layer": 1,
+   "datatype": 27,
+   "fill": "#00ff00",
+   "frame": "#00ff00",
+   "dither": "C6",
+   "order": 20,
+   "visible": false
+  },
+  {
+   "name": "Activ.noqrc",
+   "layer": 1,
+   "datatype": 28,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 20,
+   "visible": false
+  },
+  {
+   "name": "BiWind.drawing",
+   "layer": 3,
+   "datatype": 0,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C7",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BiWind.OPC",
+   "layer": 3,
+   "datatype": 26,
+   "fill": "#0000ff",
+   "frame": "#0000ff",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GatPoly.drawing",
+   "layer": 5,
+   "datatype": 0,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C7",
+   "order": 50,
+   "visible": true
+  },
+  {
+   "name": "GatPoly.label",
+   "layer": 5,
+   "datatype": 1,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C3",
+   "order": 50,
+   "visible": false
+  },
+  {
+   "name": "GatPoly.pin",
+   "layer": 5,
+   "datatype": 2,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C3",
+   "order": 51,
+   "visible": true
+  },
+  {
+   "name": "GatPoly.net",
+   "layer": 5,
+   "datatype": 3,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C7",
+   "order": 50,
+   "visible": false
+  },
+  {
+   "name": "GatPoly.boundary",
+   "layer": 5,
+   "datatype": 4,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C7",
+   "order": 50,
+   "visible": false
+  },
+  {
+   "name": "GatPoly.filler",
+   "layer": 5,
+   "datatype": 22,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C7",
+   "order": 50,
+   "visible": false
+  },
+  {
+   "name": "GatPoly.nofill",
+   "layer": 5,
+   "datatype": 23,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "I1",
+   "order": 50,
+   "visible": false
+  },
+  {
+   "name": "GatPoly.OPC",
+   "layer": 5,
+   "datatype": 26,
+   "fill": "#9900e6",
+   "frame": "#ffff00",
+   "dither": "I1",
+   "order": 50,
+   "visible": false
+  },
+  {
+   "name": "GatPoly.iOPC",
+   "layer": 5,
+   "datatype": 27,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C8",
+   "order": 50,
+   "visible": false
+  },
+  {
+   "name": "GatPoly.noqrc",
+   "layer": 5,
+   "datatype": 28,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 50,
+   "visible": false
+  },
+  {
+   "name": "Cont.drawing",
+   "layer": 6,
+   "datatype": 0,
+   "fill": "#00ffff",
+   "frame": "#00ffff",
+   "dither": "C17",
+   "order": 60,
+   "visible": true
+  },
+  {
+   "name": "Cont.net",
+   "layer": 6,
+   "datatype": 3,
+   "fill": "#00ffff",
+   "frame": "#00ffff",
+   "dither": "C17",
+   "order": 60,
+   "visible": false
+  },
+  {
+   "name": "Cont.boundary",
+   "layer": 6,
+   "datatype": 4,
+   "fill": "#00ffff",
+   "frame": "#00ffff",
+   "dither": "C17",
+   "order": 60,
+   "visible": false
+  },
+  {
+   "name": "Cont.OPC",
+   "layer": 6,
+   "datatype": 26,
+   "fill": "#ffff00",
+   "frame": "#39bfff",
+   "dither": "I1",
+   "order": 60,
+   "visible": false
+  },
+  {
+   "name": "nSD.drawing",
+   "layer": 7,
+   "datatype": 0,
+   "fill": "#00cc66",
+   "frame": "#00cc66",
+   "dither": "C13",
+   "order": 40,
+   "visible": true
+  },
+  {
+   "name": "nSD.block",
+   "layer": 7,
+   "datatype": 21,
+   "fill": "#00cc66",
+   "frame": "#00cc66",
+   "dither": "C14",
+   "order": 40,
+   "visible": false
+  },
+  {
+   "name": "Metal1.drawing",
+   "layer": 8,
+   "datatype": 0,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "C1",
+   "order": 70,
+   "visible": true
+  },
+  {
+   "name": "Metal1.label",
+   "layer": 8,
+   "datatype": 1,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "C1",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Metal1.pin",
+   "layer": 8,
+   "datatype": 2,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "C1",
+   "order": 71,
+   "visible": true
+  },
+  {
+   "name": "Metal1.net",
+   "layer": 8,
+   "datatype": 3,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "C1",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Metal1.boundary",
+   "layer": 8,
+   "datatype": 4,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "I1",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Metal1.mask",
+   "layer": 8,
+   "datatype": 20,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "C1",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Metal1.filler",
+   "layer": 8,
+   "datatype": 22,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "C1",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Metal1.nofill",
+   "layer": 8,
+   "datatype": 23,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "I1",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Metal1.slit",
+   "layer": 8,
+   "datatype": 24,
+   "fill": "#000000",
+   "frame": "#39bfff",
+   "dither": "C18",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Metal1.text",
+   "layer": 8,
+   "datatype": 25,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "C1",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Metal1.OPC",
+   "layer": 8,
+   "datatype": 26,
+   "fill": "#ffff00",
+   "frame": "#00ffff",
+   "dither": "I1",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Metal1.noqrc",
+   "layer": 8,
+   "datatype": 28,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Metal1.res",
+   "layer": 8,
+   "datatype": 29,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C19",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Metal1.iprobe",
+   "layer": 8,
+   "datatype": 33,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "I1",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Metal1.diffprb",
+   "layer": 8,
+   "datatype": 34,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "I1",
+   "order": 70,
+   "visible": false
+  },
+  {
+   "name": "Passiv.drawing",
+   "layer": 9,
+   "datatype": 0,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C3",
+   "order": 200,
+   "visible": true
+  },
+  {
+   "name": "Passiv.label",
+   "layer": 9,
+   "datatype": 1,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C3",
+   "order": 200,
+   "visible": false
+  },
+  {
+   "name": "Passiv.pin",
+   "layer": 9,
+   "datatype": 2,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C3",
+   "order": 201,
+   "visible": true
+  },
+  {
+   "name": "Passiv.net",
+   "layer": 9,
+   "datatype": 3,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C3",
+   "order": 200,
+   "visible": false
+  },
+  {
+   "name": "Passiv.boundary",
+   "layer": 9,
+   "datatype": 4,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C3",
+   "order": 200,
+   "visible": false
+  },
+  {
+   "name": "Passiv.pillar",
+   "layer": 9,
+   "datatype": 35,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C3",
+   "order": 200,
+   "visible": false
+  },
+  {
+   "name": "Passiv.sbump",
+   "layer": 9,
+   "datatype": 36,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C3",
+   "order": 200,
+   "visible": false
+  },
+  {
+   "name": "Passiv.pdl",
+   "layer": 9,
+   "datatype": 40,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C3",
+   "order": 200,
+   "visible": false
+  },
+  {
+   "name": "Metal2.drawing",
+   "layer": 10,
+   "datatype": 0,
+   "fill": "#ccccd9",
+   "frame": "#ccccd9",
+   "dither": "C21",
+   "order": 90,
+   "visible": true
+  },
+  {
+   "name": "Metal2.label",
+   "layer": 10,
+   "datatype": 1,
+   "fill": "#ccccd9",
+   "frame": "#ccccd9",
+   "dither": "C21",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "Metal2.pin",
+   "layer": 10,
+   "datatype": 2,
+   "fill": "#ccccd9",
+   "frame": "#ccccd9",
+   "dither": "C21",
+   "order": 91,
+   "visible": true
+  },
+  {
+   "name": "Metal2.net",
+   "layer": 10,
+   "datatype": 3,
+   "fill": "#ccccd9",
+   "frame": "#ccccd9",
+   "dither": "C21",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "Metal2.boundary",
+   "layer": 10,
+   "datatype": 4,
+   "fill": "#ccccd9",
+   "frame": "#ccccd9",
+   "dither": "C21",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "Metal2.mask",
+   "layer": 10,
+   "datatype": 20,
+   "fill": "#ccccd9",
+   "frame": "#ccccd9",
+   "dither": "C21",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "Metal2.filler",
+   "layer": 10,
+   "datatype": 22,
+   "fill": "#ccccd9",
+   "frame": "#ccccd9",
+   "dither": "C21",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "Metal2.nofill",
+   "layer": 10,
+   "datatype": 23,
+   "fill": "#ccccd9",
+   "frame": "#ccccd9",
+   "dither": "I1",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "Metal2.slit",
+   "layer": 10,
+   "datatype": 24,
+   "fill": "#000000",
+   "frame": "#ccccd9",
+   "dither": "C18",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "Metal2.text",
+   "layer": 10,
+   "datatype": 25,
+   "fill": "#ccccd9",
+   "frame": "#ccccd9",
+   "dither": "C21",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "Metal2.OPC",
+   "layer": 10,
+   "datatype": 26,
+   "fill": "#ffff00",
+   "frame": "#ccccd9",
+   "dither": "I1",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "Metal2.noqrc",
+   "layer": 10,
+   "datatype": 28,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "Metal2.res",
+   "layer": 10,
+   "datatype": 29,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C19",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "Metal2.iprobe",
+   "layer": 10,
+   "datatype": 33,
+   "fill": "#ccccd9",
+   "frame": "#ccccd9",
+   "dither": "I1",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "Metal2.diffprb",
+   "layer": 10,
+   "datatype": 34,
+   "fill": "#ccccd9",
+   "frame": "#ccccd9",
+   "dither": "I1",
+   "order": 90,
+   "visible": false
+  },
+  {
+   "name": "BasPoly.drawing",
+   "layer": 13,
+   "datatype": 0,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C34",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BasPoly.label",
+   "layer": 13,
+   "datatype": 1,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BasPoly.pin",
+   "layer": 13,
+   "datatype": 2,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C3",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "BasPoly.net",
+   "layer": 13,
+   "datatype": 3,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C35",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BasPoly.boundary",
+   "layer": 13,
+   "datatype": 4,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "pSD.drawing",
+   "layer": 14,
+   "datatype": 0,
+   "fill": "#ccb899",
+   "frame": "#ccb899",
+   "dither": "C12",
+   "order": 30,
+   "visible": true
+  },
+  {
+   "name": "NLDB.drawing",
+   "layer": 15,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "DigiBnd.drawing",
+   "layer": 16,
+   "datatype": 0,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C11",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "DigiBnd.drawing0",
+   "layer": 16,
+   "datatype": 10,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C11",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Via1.drawing",
+   "layer": 19,
+   "datatype": 0,
+   "fill": "#ccccff",
+   "frame": "#ccccff",
+   "dither": "C20",
+   "order": 80,
+   "visible": true
+  },
+  {
+   "name": "Via1.net",
+   "layer": 19,
+   "datatype": 3,
+   "fill": "#ccccff",
+   "frame": "#ccccff",
+   "dither": "C20",
+   "order": 80,
+   "visible": false
+  },
+  {
+   "name": "Via1.boundary",
+   "layer": 19,
+   "datatype": 4,
+   "fill": "#ccccff",
+   "frame": "#ccccff",
+   "dither": "C20",
+   "order": 80,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.drawing",
+   "layer": 20,
+   "datatype": 0,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.label",
+   "layer": 20,
+   "datatype": 1,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.pin",
+   "layer": 20,
+   "datatype": 2,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.net",
+   "layer": 20,
+   "datatype": 3,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.boundary",
+   "layer": 20,
+   "datatype": 4,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.mask",
+   "layer": 20,
+   "datatype": 20,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.filler",
+   "layer": 20,
+   "datatype": 22,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.nofill",
+   "layer": 20,
+   "datatype": 23,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.slit",
+   "layer": 20,
+   "datatype": 24,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.text",
+   "layer": 20,
+   "datatype": 25,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "C1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.OPC",
+   "layer": 20,
+   "datatype": 26,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.noqrc",
+   "layer": 20,
+   "datatype": 28,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.res",
+   "layer": 20,
+   "datatype": 29,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C19",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.iprobe",
+   "layer": 20,
+   "datatype": 33,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackMetal1.diffprb",
+   "layer": 20,
+   "datatype": 34,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "BackPassiv.drawing",
+   "layer": 23,
+   "datatype": 0,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "RES.drawing",
+   "layer": 24,
+   "datatype": 0,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C19",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "RES.label",
+   "layer": 24,
+   "datatype": 1,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SRAM.drawing",
+   "layer": 25,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C2",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SRAM.label",
+   "layer": 25,
+   "datatype": 1,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SRAM.boundary",
+   "layer": 25,
+   "datatype": 4,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "TRANS.drawing",
+   "layer": 26,
+   "datatype": 0,
+   "fill": "#00ffff",
+   "frame": "#00ffff",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "IND.drawing",
+   "layer": 27,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "IND.pin",
+   "layer": 27,
+   "datatype": 2,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C0",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "IND.boundary",
+   "layer": 27,
+   "datatype": 4,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "IND.text",
+   "layer": 27,
+   "datatype": 25,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SalBlock.drawing",
+   "layer": 28,
+   "datatype": 0,
+   "fill": "#9900e6",
+   "frame": "#9900e6",
+   "dither": "C15",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Via2.drawing",
+   "layer": 29,
+   "datatype": 0,
+   "fill": "#ff3736",
+   "frame": "#ff3736",
+   "dither": "C22",
+   "order": 100,
+   "visible": true
+  },
+  {
+   "name": "Via2.net",
+   "layer": 29,
+   "datatype": 3,
+   "fill": "#ff3736",
+   "frame": "#ff3736",
+   "dither": "C22",
+   "order": 100,
+   "visible": false
+  },
+  {
+   "name": "Via2.boundary",
+   "layer": 29,
+   "datatype": 4,
+   "fill": "#ff3736",
+   "frame": "#ff3736",
+   "dither": "C22",
+   "order": 100,
+   "visible": false
+  },
+  {
+   "name": "Metal3.drawing",
+   "layer": 30,
+   "datatype": 0,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "C23",
+   "order": 110,
+   "visible": true
+  },
+  {
+   "name": "Metal3.label",
+   "layer": 30,
+   "datatype": 1,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "C23",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "Metal3.pin",
+   "layer": 30,
+   "datatype": 2,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "C23",
+   "order": 111,
+   "visible": true
+  },
+  {
+   "name": "Metal3.net",
+   "layer": 30,
+   "datatype": 3,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "C23",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "Metal3.boundary",
+   "layer": 30,
+   "datatype": 4,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "C23",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "Metal3.mask",
+   "layer": 30,
+   "datatype": 20,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "C23",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "Metal3.filler",
+   "layer": 30,
+   "datatype": 22,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "C23",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "Metal3.nofill",
+   "layer": 30,
+   "datatype": 23,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "I1",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "Metal3.slit",
+   "layer": 30,
+   "datatype": 24,
+   "fill": "#000000",
+   "frame": "#d80000",
+   "dither": "C18",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "Metal3.text",
+   "layer": 30,
+   "datatype": 25,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "C23",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "Metal3.OPC",
+   "layer": 30,
+   "datatype": 26,
+   "fill": "#ffff00",
+   "frame": "#d80000",
+   "dither": "I1",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "Metal3.noqrc",
+   "layer": 30,
+   "datatype": 28,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "Metal3.res",
+   "layer": 30,
+   "datatype": 29,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C19",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "Metal3.iprobe",
+   "layer": 30,
+   "datatype": 33,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "I1",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "Metal3.diffprb",
+   "layer": 30,
+   "datatype": 34,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "I1",
+   "order": 110,
+   "visible": false
+  },
+  {
+   "name": "NWell.drawing",
+   "layer": 31,
+   "datatype": 0,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C9",
+   "order": 10,
+   "visible": true
+  },
+  {
+   "name": "NWell.label",
+   "layer": 31,
+   "datatype": 1,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C3",
+   "order": 10,
+   "visible": false
+  },
+  {
+   "name": "NWell.pin",
+   "layer": 31,
+   "datatype": 2,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C3",
+   "order": 11,
+   "visible": true
+  },
+  {
+   "name": "NWell.net",
+   "layer": 31,
+   "datatype": 3,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C9",
+   "order": 10,
+   "visible": false
+  },
+  {
+   "name": "NWell.boundary",
+   "layer": 31,
+   "datatype": 4,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C3",
+   "order": 10,
+   "visible": false
+  },
+  {
+   "name": "nBuLay.drawing",
+   "layer": 32,
+   "datatype": 0,
+   "fill": "#8c8ca6",
+   "frame": "#8c8ca6",
+   "dither": "C10",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "nBuLay.label",
+   "layer": 32,
+   "datatype": 1,
+   "fill": "#8c8ca6",
+   "frame": "#8c8ca6",
+   "dither": "C10",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "nBuLay.pin",
+   "layer": 32,
+   "datatype": 2,
+   "fill": "#8c8ca6",
+   "frame": "#8c8ca6",
+   "dither": "C10",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "nBuLay.net",
+   "layer": 32,
+   "datatype": 3,
+   "fill": "#8c8ca6",
+   "frame": "#8c8ca6",
+   "dither": "C10",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "nBuLay.boundary",
+   "layer": 32,
+   "datatype": 4,
+   "fill": "#8c8ca6",
+   "frame": "#8c8ca6",
+   "dither": "C10",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "nBuLay.block",
+   "layer": 32,
+   "datatype": 21,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "EmWind.drawing",
+   "layer": 33,
+   "datatype": 0,
+   "fill": "#00cc66",
+   "frame": "#00cc66",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "EmWind.OPC",
+   "layer": 33,
+   "datatype": 26,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "DeepCo.drawing",
+   "layer": 35,
+   "datatype": 0,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "MIM.drawing",
+   "layer": 36,
+   "datatype": 0,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C24",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "MIM.net",
+   "layer": 36,
+   "datatype": 3,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C24",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "MIM.boundary",
+   "layer": 36,
+   "datatype": 4,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "EdgeSeal.drawing",
+   "layer": 39,
+   "datatype": 0,
+   "fill": "#5e00e6",
+   "frame": "#5e00e6",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "EdgeSeal.boundary",
+   "layer": 39,
+   "datatype": 4,
+   "fill": "#5e00e6",
+   "frame": "#5e00e6",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Substrate.drawing",
+   "layer": 40,
+   "datatype": 0,
+   "fill": "#ffffff",
+   "frame": "#ffffff",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Substrate.text",
+   "layer": 40,
+   "datatype": 25,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "C1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "dfpad.drawing",
+   "layer": 41,
+   "datatype": 0,
+   "fill": "#5e00e6",
+   "frame": "#5e00e6",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "dfpad.pillar",
+   "layer": 41,
+   "datatype": 35,
+   "fill": "#5e00e6",
+   "frame": "#5e00e6",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "dfpad.sbump",
+   "layer": 41,
+   "datatype": 36,
+   "fill": "#5e00e6",
+   "frame": "#5e00e6",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "ThickGateOx.drawing",
+   "layer": 44,
+   "datatype": 0,
+   "fill": "#ffffcc",
+   "frame": "#ffffcc",
+   "dither": "C16",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PLDB.drawing",
+   "layer": 45,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PWell.drawing",
+   "layer": 46,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C47",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PWell.label",
+   "layer": 46,
+   "datatype": 1,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PWell.pin",
+   "layer": 46,
+   "datatype": 2,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C0",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "PWell.net",
+   "layer": 46,
+   "datatype": 3,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C47",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PWell.boundary",
+   "layer": 46,
+   "datatype": 4,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PWell.block",
+   "layer": 46,
+   "datatype": 21,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C11",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "IC.drawing",
+   "layer": 48,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#802626",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Via3.drawing",
+   "layer": 49,
+   "datatype": 0,
+   "fill": "#9ba940",
+   "frame": "#9ba940",
+   "dither": "C26",
+   "order": 120,
+   "visible": true
+  },
+  {
+   "name": "Via3.net",
+   "layer": 49,
+   "datatype": 3,
+   "fill": "#9ba940",
+   "frame": "#9ba940",
+   "dither": "C26",
+   "order": 120,
+   "visible": false
+  },
+  {
+   "name": "Via3.boundary",
+   "layer": 49,
+   "datatype": 4,
+   "fill": "#9ba940",
+   "frame": "#9ba940",
+   "dither": "C26",
+   "order": 120,
+   "visible": false
+  },
+  {
+   "name": "Metal4.drawing",
+   "layer": 50,
+   "datatype": 0,
+   "fill": "#93e837",
+   "frame": "#93e837",
+   "dither": "C27",
+   "order": 130,
+   "visible": true
+  },
+  {
+   "name": "Metal4.label",
+   "layer": 50,
+   "datatype": 1,
+   "fill": "#93e837",
+   "frame": "#93e837",
+   "dither": "C27",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "Metal4.pin",
+   "layer": 50,
+   "datatype": 2,
+   "fill": "#93e837",
+   "frame": "#93e837",
+   "dither": "C27",
+   "order": 131,
+   "visible": true
+  },
+  {
+   "name": "Metal4.net",
+   "layer": 50,
+   "datatype": 3,
+   "fill": "#93e837",
+   "frame": "#93e837",
+   "dither": "C27",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "Metal4.boundary",
+   "layer": 50,
+   "datatype": 4,
+   "fill": "#93e837",
+   "frame": "#93e837",
+   "dither": "C27",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "Metal4.mask",
+   "layer": 50,
+   "datatype": 20,
+   "fill": "#93e837",
+   "frame": "#93e837",
+   "dither": "C27",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "Metal4.filler",
+   "layer": 50,
+   "datatype": 22,
+   "fill": "#93e837",
+   "frame": "#93e837",
+   "dither": "C27",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "Metal4.nofill",
+   "layer": 50,
+   "datatype": 23,
+   "fill": "#93e837",
+   "frame": "#93e837",
+   "dither": "I1",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "Metal4.slit",
+   "layer": 50,
+   "datatype": 24,
+   "fill": "#000000",
+   "frame": "#93e837",
+   "dither": "C18",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "Metal4.text",
+   "layer": 50,
+   "datatype": 25,
+   "fill": "#93e837",
+   "frame": "#93e837",
+   "dither": "C27",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "Metal4.OPC",
+   "layer": 50,
+   "datatype": 26,
+   "fill": "#ffff00",
+   "frame": "#ccb899",
+   "dither": "I1",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "Metal4.noqrc",
+   "layer": 50,
+   "datatype": 28,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "Metal4.res",
+   "layer": 50,
+   "datatype": 29,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C19",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "Metal4.iprobe",
+   "layer": 50,
+   "datatype": 33,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "I1",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "Metal4.diffprb",
+   "layer": 50,
+   "datatype": 34,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "I1",
+   "order": 130,
+   "visible": false
+  },
+  {
+   "name": "HeatTrans.drawing",
+   "layer": 51,
+   "datatype": 0,
+   "fill": "#8c8ca6",
+   "frame": "#8c8ca6",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "HeatRes.drawing",
+   "layer": 52,
+   "datatype": 0,
+   "fill": "#8c8ca6",
+   "frame": "#8c8ca6",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "FBE.drawing",
+   "layer": 54,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#802626",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "EmPoly.drawing",
+   "layer": 55,
+   "datatype": 0,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "DigiSub.drawing",
+   "layer": 60,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C11",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoDRC.drawing",
+   "layer": 62,
+   "datatype": 0,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "TEXT.drawing",
+   "layer": 63,
+   "datatype": 0,
+   "fill": "#ffffff",
+   "frame": "#ffffff",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Via4.drawing",
+   "layer": 66,
+   "datatype": 0,
+   "fill": "#deac5e",
+   "frame": "#deac5e",
+   "dither": "C28",
+   "order": 140,
+   "visible": true
+  },
+  {
+   "name": "Via4.net",
+   "layer": 66,
+   "datatype": 3,
+   "fill": "#deac5e",
+   "frame": "#deac5e",
+   "dither": "C28",
+   "order": 140,
+   "visible": false
+  },
+  {
+   "name": "Via4.boundary",
+   "layer": 66,
+   "datatype": 4,
+   "fill": "#deac5e",
+   "frame": "#deac5e",
+   "dither": "C28",
+   "order": 140,
+   "visible": false
+  },
+  {
+   "name": "Metal5.drawing",
+   "layer": 67,
+   "datatype": 0,
+   "fill": "#dcd146",
+   "frame": "#dcd146",
+   "dither": "C29",
+   "order": 150,
+   "visible": true
+  },
+  {
+   "name": "Metal5.label",
+   "layer": 67,
+   "datatype": 1,
+   "fill": "#dcd146",
+   "frame": "#dcd146",
+   "dither": "C29",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "Metal5.pin",
+   "layer": 67,
+   "datatype": 2,
+   "fill": "#dcd146",
+   "frame": "#dcd146",
+   "dither": "C29",
+   "order": 151,
+   "visible": true
+  },
+  {
+   "name": "Metal5.net",
+   "layer": 67,
+   "datatype": 3,
+   "fill": "#dcd146",
+   "frame": "#dcd146",
+   "dither": "C29",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "Metal5.boundary",
+   "layer": 67,
+   "datatype": 4,
+   "fill": "#dcd146",
+   "frame": "#dcd146",
+   "dither": "C29",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "Metal5.mask",
+   "layer": 67,
+   "datatype": 20,
+   "fill": "#dcd146",
+   "frame": "#dcd146",
+   "dither": "C29",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "Metal5.filler",
+   "layer": 67,
+   "datatype": 22,
+   "fill": "#dcd146",
+   "frame": "#dcd146",
+   "dither": "C29",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "Metal5.nofill",
+   "layer": 67,
+   "datatype": 23,
+   "fill": "#dcd146",
+   "frame": "#dcd146",
+   "dither": "I1",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "Metal5.slit",
+   "layer": 67,
+   "datatype": 24,
+   "fill": "#000000",
+   "frame": "#dcd146",
+   "dither": "C18",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "Metal5.text",
+   "layer": 67,
+   "datatype": 25,
+   "fill": "#dcd146",
+   "frame": "#dcd146",
+   "dither": "C29",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "Metal5.OPC",
+   "layer": 67,
+   "datatype": 26,
+   "fill": "#ffff00",
+   "frame": "#9900e6",
+   "dither": "I1",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "Metal5.noqrc",
+   "layer": 67,
+   "datatype": 28,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "Metal5.res",
+   "layer": 67,
+   "datatype": 29,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C19",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "Metal5.iprobe",
+   "layer": 67,
+   "datatype": 33,
+   "fill": "#dcd146",
+   "frame": "#dcd146",
+   "dither": "I1",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "Metal5.diffprb",
+   "layer": 67,
+   "datatype": 34,
+   "fill": "#dcd146",
+   "frame": "#dcd146",
+   "dither": "I1",
+   "order": 150,
+   "visible": false
+  },
+  {
+   "name": "RadHard.drawing",
+   "layer": 68,
+   "datatype": 0,
+   "fill": "#ff76fb",
+   "frame": "#ff76fb",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "MemCap.drawing",
+   "layer": 69,
+   "datatype": 0,
+   "fill": "#ff00ff",
+   "frame": "#ff00ff",
+   "dither": "C48",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Varicap.drawing",
+   "layer": 70,
+   "datatype": 0,
+   "fill": "#00cc66",
+   "frame": "#00cc66",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "IntBondVia.drawing",
+   "layer": 72,
+   "datatype": 0,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C29",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "IntBondMet.drawing",
+   "layer": 73,
+   "datatype": 0,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C29",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "DevBondVia.drawing",
+   "layer": 74,
+   "datatype": 0,
+   "fill": "#5e00e6",
+   "frame": "#5e00e6",
+   "dither": "C30",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "DevBondMet.drawing",
+   "layer": 75,
+   "datatype": 0,
+   "fill": "#5e00e6",
+   "frame": "#5e00e6",
+   "dither": "C30",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "DevTrench.drawing",
+   "layer": 76,
+   "datatype": 0,
+   "fill": "#ffffff",
+   "frame": "#ffffff",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Redist.drawing",
+   "layer": 77,
+   "datatype": 0,
+   "fill": "#ff00ff",
+   "frame": "#ff00ff",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphBot.drawing",
+   "layer": 78,
+   "datatype": 0,
+   "fill": "#9900e6",
+   "frame": "#9900e6",
+   "dither": "C39",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphTop.drawing",
+   "layer": 79,
+   "datatype": 0,
+   "fill": "#ff00ff",
+   "frame": "#ff00ff",
+   "dither": "C46",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "AntVia1.drawing",
+   "layer": 83,
+   "datatype": 0,
+   "fill": "#9900e6",
+   "frame": "#9900e6",
+   "dither": "C38",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "AntMetal2.drawing",
+   "layer": 84,
+   "datatype": 0,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C39",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphCont.drawing",
+   "layer": 85,
+   "datatype": 0,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C29",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SiWG.drawing",
+   "layer": 86,
+   "datatype": 0,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "C15",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SiWG.filler",
+   "layer": 86,
+   "datatype": 22,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "C15",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SiWG.nofill",
+   "layer": 86,
+   "datatype": 23,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SiGrating.drawing",
+   "layer": 87,
+   "datatype": 0,
+   "fill": "#8c8ca6",
+   "frame": "#8c8ca6",
+   "dither": "C4",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SiNGrating.drawing",
+   "layer": 88,
+   "datatype": 0,
+   "fill": "#008539",
+   "frame": "#008539",
+   "dither": "C9",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphPas.drawing",
+   "layer": 89,
+   "datatype": 0,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "EmWind3.drawing",
+   "layer": 90,
+   "datatype": 0,
+   "fill": "#00cc66",
+   "frame": "#00cc66",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "EmWiHV3.drawing",
+   "layer": 91,
+   "datatype": 0,
+   "fill": "#00cc66",
+   "frame": "#00cc66",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "RedBuLay.drawing",
+   "layer": 92,
+   "datatype": 0,
+   "fill": "#d9cc00",
+   "frame": "#d9cc00",
+   "dither": "C10",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SMOS.drawing",
+   "layer": 93,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C39",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphPad.drawing",
+   "layer": 97,
+   "datatype": 0,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C4",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Polimide.drawing",
+   "layer": 98,
+   "datatype": 0,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C10",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Polimide.label",
+   "layer": 98,
+   "datatype": 1,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C10",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Polimide.pin",
+   "layer": 98,
+   "datatype": 2,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C10",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "Polimide.net",
+   "layer": 98,
+   "datatype": 3,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C10",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Recog.drawing",
+   "layer": 99,
+   "datatype": 0,
+   "fill": "#bdcccc",
+   "frame": "#bdcccc",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Recog.pin",
+   "layer": 99,
+   "datatype": 2,
+   "fill": "#bdcccc",
+   "frame": "#bdcccc",
+   "dither": "C0",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "Recog.esd",
+   "layer": 99,
+   "datatype": 30,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Recog.diode",
+   "layer": 99,
+   "datatype": 31,
+   "fill": "#5e00e6",
+   "frame": "#5e00e6",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Recog.tsv",
+   "layer": 99,
+   "datatype": 32,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Recog.iprobe",
+   "layer": 99,
+   "datatype": 33,
+   "fill": "#d9e6ff",
+   "frame": "#d9e6ff",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Recog.diffprb",
+   "layer": 99,
+   "datatype": 34,
+   "fill": "#d9e6ff",
+   "frame": "#d9e6ff",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Recog.pillar",
+   "layer": 99,
+   "datatype": 35,
+   "fill": "#5e00e6",
+   "frame": "#5e00e6",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Recog.sbump",
+   "layer": 99,
+   "datatype": 36,
+   "fill": "#5e00e6",
+   "frame": "#5e00e6",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Recog.otp",
+   "layer": 99,
+   "datatype": 37,
+   "fill": "#d9cc00",
+   "frame": "#d9cc00",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Recog.pdiode",
+   "layer": 99,
+   "datatype": 38,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Recog.mom",
+   "layer": 99,
+   "datatype": 39,
+   "fill": "#268c6b",
+   "frame": "#268c6b",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Recog.pcm",
+   "layer": 99,
+   "datatype": 100,
+   "fill": "#ffffcc",
+   "frame": "#ffffcc",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "ColOpen.drawing",
+   "layer": 101,
+   "datatype": 0,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "C36",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphMetal1.drawing",
+   "layer": 109,
+   "datatype": 0,
+   "fill": "#00b300",
+   "frame": "#00b300",
+   "dither": "C29",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphMetal1.filler",
+   "layer": 109,
+   "datatype": 22,
+   "fill": "#00b300",
+   "frame": "#00b300",
+   "dither": "C29",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphMetal1.nofill",
+   "layer": 109,
+   "datatype": 23,
+   "fill": "#00b300",
+   "frame": "#00b300",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphMetal1.slit",
+   "layer": 109,
+   "datatype": 24,
+   "fill": "#00b300",
+   "frame": "#00b300",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphMetal1.OPC",
+   "layer": 109,
+   "datatype": 26,
+   "fill": "#00b300",
+   "frame": "#00b300",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphMet1L.drawing",
+   "layer": 110,
+   "datatype": 0,
+   "fill": "#34b7ab",
+   "frame": "#34b7ab",
+   "dither": "C27",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphMet1L.filler",
+   "layer": 110,
+   "datatype": 22,
+   "fill": "#34b7ab",
+   "frame": "#34b7ab",
+   "dither": "C27",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphMet1L.nofill",
+   "layer": 110,
+   "datatype": 23,
+   "fill": "#34b7ab",
+   "frame": "#34b7ab",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphMet1L.slit",
+   "layer": 110,
+   "datatype": 24,
+   "fill": "#34b7ab",
+   "frame": "#34b7ab",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphMet1L.OPC",
+   "layer": 110,
+   "datatype": 26,
+   "fill": "#34b7ab",
+   "frame": "#34b7ab",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "EXTBlock.drawing",
+   "layer": 111,
+   "datatype": 0,
+   "fill": "#5e00e6",
+   "frame": "#5e00e6",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NLDD.drawing",
+   "layer": 112,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C41",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PLDD.drawing",
+   "layer": 113,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C42",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NExt.drawing",
+   "layer": 114,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C43",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PExt.drawing",
+   "layer": 115,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C44",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NExtHV.drawing",
+   "layer": 116,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C49",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PExtHV.drawing",
+   "layer": 117,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C8",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "GraphGate.drawing",
+   "layer": 118,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C2",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SiNWG.drawing",
+   "layer": 119,
+   "datatype": 0,
+   "fill": "#ffffcc",
+   "frame": "#ffffcc",
+   "dither": "C15",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SiNWG.filler",
+   "layer": 119,
+   "datatype": 22,
+   "fill": "#ffffcc",
+   "frame": "#ffffcc",
+   "dither": "C15",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SiNWG.nofill",
+   "layer": 119,
+   "datatype": 23,
+   "fill": "#ffffcc",
+   "frame": "#ffffcc",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "MEMPAD.drawing",
+   "layer": 124,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C50",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "TopVia1.drawing",
+   "layer": 125,
+   "datatype": 0,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C25",
+   "order": 160,
+   "visible": true
+  },
+  {
+   "name": "TopVia1.net",
+   "layer": 125,
+   "datatype": 3,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C25",
+   "order": 160,
+   "visible": false
+  },
+  {
+   "name": "TopVia1.boundary",
+   "layer": 125,
+   "datatype": 4,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "I1",
+   "order": 160,
+   "visible": false
+  },
+  {
+   "name": "TopMetal1.drawing",
+   "layer": 126,
+   "datatype": 0,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 170,
+   "visible": true
+  },
+  {
+   "name": "TopMetal1.label",
+   "layer": 126,
+   "datatype": 1,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 170,
+   "visible": false
+  },
+  {
+   "name": "TopMetal1.pin",
+   "layer": 126,
+   "datatype": 2,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 171,
+   "visible": true
+  },
+  {
+   "name": "TopMetal1.net",
+   "layer": 126,
+   "datatype": 3,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 170,
+   "visible": false
+  },
+  {
+   "name": "TopMetal1.boundary",
+   "layer": 126,
+   "datatype": 4,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "I1",
+   "order": 170,
+   "visible": false
+  },
+  {
+   "name": "TopMetal1.mask",
+   "layer": 126,
+   "datatype": 20,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 170,
+   "visible": false
+  },
+  {
+   "name": "TopMetal1.filler",
+   "layer": 126,
+   "datatype": 22,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C30",
+   "order": 170,
+   "visible": false
+  },
+  {
+   "name": "TopMetal1.nofill",
+   "layer": 126,
+   "datatype": 23,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "I1",
+   "order": 170,
+   "visible": false
+  },
+  {
+   "name": "TopMetal1.slit",
+   "layer": 126,
+   "datatype": 24,
+   "fill": "#000000",
+   "frame": "#ffe6bf",
+   "dither": "I1",
+   "order": 170,
+   "visible": false
+  },
+  {
+   "name": "TopMetal1.text",
+   "layer": 126,
+   "datatype": 25,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C0",
+   "order": 170,
+   "visible": false
+  },
+  {
+   "name": "TopMetal1.noqrc",
+   "layer": 126,
+   "datatype": 28,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 170,
+   "visible": false
+  },
+  {
+   "name": "TopMetal1.res",
+   "layer": 126,
+   "datatype": 29,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C19",
+   "order": 170,
+   "visible": false
+  },
+  {
+   "name": "TopMetal1.iprobe",
+   "layer": 126,
+   "datatype": 33,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "I1",
+   "order": 170,
+   "visible": false
+  },
+  {
+   "name": "TopMetal1.diffprb",
+   "layer": 126,
+   "datatype": 34,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "I1",
+   "order": 170,
+   "visible": false
+  },
+  {
+   "name": "INLDPWL.drawing",
+   "layer": 127,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C41",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PolyRes.drawing",
+   "layer": 128,
+   "datatype": 0,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C7",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PolyRes.label",
+   "layer": 128,
+   "datatype": 1,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PolyRes.pin",
+   "layer": 128,
+   "datatype": 2,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C3",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "PolyRes.net",
+   "layer": 128,
+   "datatype": 3,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C7",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "PolyRes.boundary",
+   "layer": 128,
+   "datatype": 4,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C7",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Vmim.drawing",
+   "layer": 129,
+   "datatype": 0,
+   "fill": "#ffe6bf",
+   "frame": "#ffe6bf",
+   "dither": "C25",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "nBuLayCut.drawing",
+   "layer": 131,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C45",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "AntMetal1.drawing",
+   "layer": 132,
+   "datatype": 0,
+   "fill": "#9900e6",
+   "frame": "#9900e6",
+   "dither": "C38",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "TopVia2.drawing",
+   "layer": 133,
+   "datatype": 0,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C31",
+   "order": 180,
+   "visible": true
+  },
+  {
+   "name": "TopVia2.net",
+   "layer": 133,
+   "datatype": 3,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C31",
+   "order": 180,
+   "visible": false
+  },
+  {
+   "name": "TopVia2.boundary",
+   "layer": 133,
+   "datatype": 4,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "I1",
+   "order": 180,
+   "visible": false
+  },
+  {
+   "name": "TopMetal2.drawing",
+   "layer": 134,
+   "datatype": 0,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C32",
+   "order": 190,
+   "visible": true
+  },
+  {
+   "name": "TopMetal2.label",
+   "layer": 134,
+   "datatype": 1,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C32",
+   "order": 190,
+   "visible": false
+  },
+  {
+   "name": "TopMetal2.pin",
+   "layer": 134,
+   "datatype": 2,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C32",
+   "order": 191,
+   "visible": true
+  },
+  {
+   "name": "TopMetal2.net",
+   "layer": 134,
+   "datatype": 3,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C32",
+   "order": 190,
+   "visible": false
+  },
+  {
+   "name": "TopMetal2.boundary",
+   "layer": 134,
+   "datatype": 4,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "I1",
+   "order": 190,
+   "visible": false
+  },
+  {
+   "name": "TopMetal2.mask",
+   "layer": 134,
+   "datatype": 20,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C32",
+   "order": 190,
+   "visible": false
+  },
+  {
+   "name": "TopMetal2.filler",
+   "layer": 134,
+   "datatype": 22,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C1",
+   "order": 190,
+   "visible": false
+  },
+  {
+   "name": "TopMetal2.nofill",
+   "layer": 134,
+   "datatype": 23,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "I1",
+   "order": 190,
+   "visible": false
+  },
+  {
+   "name": "TopMetal2.slit",
+   "layer": 134,
+   "datatype": 24,
+   "fill": "#000000",
+   "frame": "#ff8000",
+   "dither": "I1",
+   "order": 190,
+   "visible": false
+  },
+  {
+   "name": "TopMetal2.text",
+   "layer": 134,
+   "datatype": 25,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C32",
+   "order": 190,
+   "visible": false
+  },
+  {
+   "name": "TopMetal2.noqrc",
+   "layer": 134,
+   "datatype": 28,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 190,
+   "visible": false
+  },
+  {
+   "name": "TopMetal2.res",
+   "layer": 134,
+   "datatype": 29,
+   "fill": "#bf4026",
+   "frame": "#bf4026",
+   "dither": "C19",
+   "order": 190,
+   "visible": false
+  },
+  {
+   "name": "TopMetal2.iprobe",
+   "layer": 134,
+   "datatype": 33,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "I1",
+   "order": 190,
+   "visible": false
+  },
+  {
+   "name": "TopMetal2.diffprb",
+   "layer": 134,
+   "datatype": 34,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "I1",
+   "order": 190,
+   "visible": false
+  },
+  {
+   "name": "SNSRing.drawing",
+   "layer": 135,
+   "datatype": 0,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C7",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Sensor.drawing",
+   "layer": 136,
+   "datatype": 0,
+   "fill": "#bdcccc",
+   "frame": "#bdcccc",
+   "dither": "C7",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SNSArms.drawing",
+   "layer": 137,
+   "datatype": 0,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C7",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SNSCMOSVia.drawing",
+   "layer": 138,
+   "datatype": 0,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C7",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "ColWind.drawing",
+   "layer": 139,
+   "datatype": 0,
+   "fill": "#ff00ff",
+   "frame": "#ff00ff",
+   "dither": "C37",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "FLM.drawing",
+   "layer": 142,
+   "datatype": 0,
+   "fill": "#333399",
+   "frame": "#333399",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "HafniumOx.drawing",
+   "layer": 143,
+   "datatype": 0,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C7",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "MEMVia.drawing",
+   "layer": 145,
+   "datatype": 0,
+   "fill": "#d9cc00",
+   "frame": "#d9cc00",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "ThinFilmRes.drawing",
+   "layer": 146,
+   "datatype": 0,
+   "fill": "#e61f0d",
+   "frame": "#e61f0d",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "RFMEM.drawing",
+   "layer": 147,
+   "datatype": 0,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.drawing",
+   "layer": 148,
+   "datatype": 0,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m2m3",
+   "layer": 148,
+   "datatype": 41,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m2m4",
+   "layer": 148,
+   "datatype": 42,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m2m5",
+   "layer": 148,
+   "datatype": 43,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m2tm1",
+   "layer": 148,
+   "datatype": 44,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m2tm2",
+   "layer": 148,
+   "datatype": 45,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m3m4",
+   "layer": 148,
+   "datatype": 46,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m3m5",
+   "layer": 148,
+   "datatype": 47,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m3tm1",
+   "layer": 148,
+   "datatype": 48,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m3tm2",
+   "layer": 148,
+   "datatype": 49,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m4m5",
+   "layer": 148,
+   "datatype": 50,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m4tm1",
+   "layer": 148,
+   "datatype": 51,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m4tm2",
+   "layer": 148,
+   "datatype": 52,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m5tm1",
+   "layer": 148,
+   "datatype": 53,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m5tm2",
+   "layer": 148,
+   "datatype": 54,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.tm1tm2",
+   "layer": 148,
+   "datatype": 55,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m1sub",
+   "layer": 148,
+   "datatype": 123,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m2sub",
+   "layer": 148,
+   "datatype": 124,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m3sub",
+   "layer": 148,
+   "datatype": 125,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m4sub",
+   "layer": 148,
+   "datatype": 126,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.m5sub",
+   "layer": 148,
+   "datatype": 127,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.tm1sub",
+   "layer": 148,
+   "datatype": 300,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoRCX.tm2sub",
+   "layer": 148,
+   "datatype": 301,
+   "fill": "#ff0000",
+   "frame": "#ff0000",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SNSBotVia.drawing",
+   "layer": 149,
+   "datatype": 0,
+   "fill": "#ccb899",
+   "frame": "#ccb899",
+   "dither": "C40",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "SNSTopVia.drawing",
+   "layer": 151,
+   "datatype": 0,
+   "fill": "#00ff00",
+   "frame": "#00ff00",
+   "dither": "C40",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "DeepVia.drawing",
+   "layer": 152,
+   "datatype": 0,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "FGEtch.drawing",
+   "layer": 153,
+   "datatype": 0,
+   "fill": "#5e00e6",
+   "frame": "#5e00e6",
+   "dither": "C11",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "CtrGat.drawing",
+   "layer": 154,
+   "datatype": 0,
+   "fill": "#ffffff",
+   "frame": "#ffffff",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "FGImp.drawing",
+   "layer": 155,
+   "datatype": 0,
+   "fill": "#d80000",
+   "frame": "#d80000",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "EmWiHV.drawing",
+   "layer": 156,
+   "datatype": 0,
+   "fill": "#00cc66",
+   "frame": "#00cc66",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "LBE.drawing",
+   "layer": 157,
+   "datatype": 0,
+   "fill": "#ff00ff",
+   "frame": "#ff00ff",
+   "dither": "C8",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "AlCuStop.drawing",
+   "layer": 159,
+   "datatype": 0,
+   "fill": "#ffffcc",
+   "frame": "#ffffcc",
+   "dither": "C0",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "NoMetFiller.drawing",
+   "layer": 160,
+   "datatype": 0,
+   "fill": "#d9e6ff",
+   "frame": "#d9e6ff",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "prBoundary.drawing",
+   "layer": 189,
+   "datatype": 0,
+   "fill": "#9900e6",
+   "frame": "#9900e6",
+   "dither": "I1",
+   "order": 210,
+   "visible": true
+  },
+  {
+   "name": "prBoundary.label",
+   "layer": 189,
+   "datatype": 1,
+   "fill": "#9900e6",
+   "frame": "#9900e6",
+   "dither": "I1",
+   "order": 210,
+   "visible": true
+  },
+  {
+   "name": "prBoundary.boundary",
+   "layer": 189,
+   "datatype": 4,
+   "fill": "#9900e6",
+   "frame": "#9900e6",
+   "dither": "I1",
+   "order": 210,
+   "visible": true
+  },
+  {
+   "name": "Exchange0.drawing",
+   "layer": 190,
+   "datatype": 0,
+   "fill": "#00cc66",
+   "frame": "#00cc66",
+   "dither": "C51",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange0.label",
+   "layer": 190,
+   "datatype": 1,
+   "fill": "#00ff00",
+   "frame": "#00ff00",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange0.pin",
+   "layer": 190,
+   "datatype": 2,
+   "fill": "#00cc66",
+   "frame": "#d80000",
+   "dither": "C52",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "Exchange0.text",
+   "layer": 190,
+   "datatype": 25,
+   "fill": "#ccb899",
+   "frame": "#ccb899",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange1.drawing",
+   "layer": 191,
+   "datatype": 0,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C42",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange1.label",
+   "layer": 191,
+   "datatype": 1,
+   "fill": "#ffff00",
+   "frame": "#ffff00",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange1.pin",
+   "layer": 191,
+   "datatype": 2,
+   "fill": "#ffff00",
+   "frame": "#d80000",
+   "dither": "C52",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "Exchange1.text",
+   "layer": 191,
+   "datatype": 25,
+   "fill": "#00cc66",
+   "frame": "#00cc66",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange2.drawing",
+   "layer": 192,
+   "datatype": 0,
+   "fill": "#ffbff2",
+   "frame": "#ffbff2",
+   "dither": "C43",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange2.label",
+   "layer": 192,
+   "datatype": 1,
+   "fill": "#ffbff2",
+   "frame": "#ffbff2",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange2.pin",
+   "layer": 192,
+   "datatype": 2,
+   "fill": "#ffbff2",
+   "frame": "#e61f0d",
+   "dither": "C52",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "Exchange2.text",
+   "layer": 192,
+   "datatype": 25,
+   "fill": "#ff76fb",
+   "frame": "#ff76fb",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange3.drawing",
+   "layer": 193,
+   "datatype": 0,
+   "fill": "#00ffff",
+   "frame": "#00ffff",
+   "dither": "C44",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange3.label",
+   "layer": 193,
+   "datatype": 1,
+   "fill": "#00ffff",
+   "frame": "#00ffff",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange3.pin",
+   "layer": 193,
+   "datatype": 2,
+   "fill": "#00ffff",
+   "frame": "#e61f0d",
+   "dither": "C53",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "Exchange3.text",
+   "layer": 193,
+   "datatype": 25,
+   "fill": "#ffba31",
+   "frame": "#ffba31",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange4.drawing",
+   "layer": 194,
+   "datatype": 0,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "C49",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange4.label",
+   "layer": 194,
+   "datatype": 1,
+   "fill": "#ff8000",
+   "frame": "#ff8000",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "Exchange4.pin",
+   "layer": 194,
+   "datatype": 2,
+   "fill": "#ff8000",
+   "frame": "#e61f0d",
+   "dither": "C52",
+   "order": 1,
+   "visible": false
+  },
+  {
+   "name": "Exchange4.text",
+   "layer": 194,
+   "datatype": 25,
+   "fill": "#39bfff",
+   "frame": "#39bfff",
+   "dither": "C3",
+   "order": 0,
+   "visible": false
+  },
+  {
+   "name": "isoNWell.drawing",
+   "layer": 257,
+   "datatype": 0,
+   "fill": "#ff00ff",
+   "frame": "#ff00ff",
+   "dither": "I1",
+   "order": 0,
+   "visible": false
+  }
+ ]
+}

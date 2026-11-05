@@ -78,6 +78,60 @@ export interface Artifact {
   size: number;
 }
 
+export interface DrcViolation {
+  source: string;
+  rule: string;
+  description: string;
+  shapes: [number, number][][];
+  bbox: [number, number, number, number] | null;
+}
+
+export interface DrcReport {
+  violations: DrcViolation[];
+  counts: { source: string; rule: string; description: string; count: number }[];
+  truncated: boolean;
+  sources: string[];
+}
+
+export interface PathStage {
+  pin: string;
+  cell: string | null;
+  edge: string;
+  delay_ns: number;
+  time_ns: number;
+  fanout: number | null;
+}
+
+export interface TimingPath {
+  check: string;
+  corner: string;
+  startpoint: string;
+  endpoint: string;
+  group: string;
+  arrival_ns: number | null;
+  required_ns: number | null;
+  slack_ns: number | null;
+  stages: PathStage[];
+}
+
+export interface RunReport {
+  corners: {
+    name: string;
+    setup_ws: number | null;
+    setup_tns: number | null;
+    setup_violations: number | null;
+    hold_ws: number | null;
+    hold_tns: number | null;
+    hold_violations: number | null;
+  }[];
+  die_area_um2: number | null;
+  core_area_um2: number | null;
+  stdcell_area_um2: number | null;
+  utilization: number | null;
+  classes: { class: string; count: number | null; area_um2: number | null }[];
+  paths: TimingPath[];
+}
+
 export const isFinished = (s: JobStatus) => s === "succeeded" || s === "failed" || s === "canceled";
 
 export type Change = { op: "write"; path: string; content: string } | { op: "delete"; path: string };
@@ -141,6 +195,8 @@ export const api = {
   jobLog: (job: string, offset: number) => request<LogChunk>("GET", `/jobs/${enc(job)}/log?offset=${offset}`),
   cancelJob: (job: string) => request<Job>("POST", `/jobs/${enc(job)}/cancel`),
   artifacts: (job: string) => request<Artifact[]>("GET", `/jobs/${enc(job)}/artifacts`),
+  drc: (job: string) => request<DrcReport>("GET", `/jobs/${enc(job)}/drc`),
+  report: (job: string) => request<RunReport>("GET", `/jobs/${enc(job)}/report`),
   artifactBlob: async (job: string, path: string) =>
     (await send("GET", `/jobs/${enc(job)}/artifacts/${filePath(path)}`)).blob(),
 };

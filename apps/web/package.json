@@ -8,7 +8,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "wasm": "../../scripts/build-wasm.sh",
+    "predev": "test -f src/wasm/sc_gds.js || ../../scripts/build-wasm.sh",
+    "prebuild": "test -f src/wasm/sc_gds.js || ../../scripts/build-wasm.sh",
+    "pretypecheck": "test -f src/wasm/sc_gds.js || ../../scripts/build-wasm.sh"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -22,6 +26,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.2.1",
+    "@webgpu/types": "^0.1.74",
     "typescript": "^7.0.2",
     "vite": "^8.3.6"
   }

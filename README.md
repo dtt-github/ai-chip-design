@@ -1,8 +1,9 @@
 # SiliconCommons
 
 Open, browser-based, physics-aware chip design platform. Design Verilog in the browser with a real
-language server, keep every project in Git, and run it from RTL to GDS with LibreLane on the IHP
-SG13G2 130 nm open PDK.
+language server, keep every project in Git, run it from RTL to GDS with LibreLane on the IHP SG13G2
+130 nm open PDK, and inspect the result in a WebGPU layout viewer with DRC markers and timing/area
+reports.
 
 Licensed under [Apache-2.0](LICENSE).
 
@@ -12,7 +13,9 @@ Licensed under [Apache-2.0](LICENSE).
 crates/
   sc-api/      axum HTTP API (binary: siliconcommons-api), Postgres via sqlx, OIDC bearer auth
   sc-git/      per-project bare Git repositories (libgit2), commits without a worktree
-  sc-jobs/     job backends: LibreLane in Docker, metrics summary
+  sc-jobs/     job backends: LibreLane in Docker, metrics summary, DRC/STA report parsing
+  sc-gds/      GDSII reader: parse, flatten hierarchy, tessellate for the GPU (pure Rust)
+  sc-gds-wasm/ WebAssembly bindings for sc-gds, used by the web viewer
 apps/
   web/         React + TypeScript shell with the Monaco editor (Vite)
 deploy/
@@ -21,7 +24,20 @@ deploy/
 
 ## Run it locally
 
-Prerequisites: Rust (stable), Node 22 with pnpm (`corepack enable pnpm`), Docker.
+Prerequisites: Rust (stable), Node 22 with pnpm (`corepack enable pnpm`), Docker, and for the
+layout viewer's WebAssembly:
+
+```bash
+rustup target add wasm32-unknown-unknown
+```
+
+```bash
+cargo install wasm-bindgen-cli --version 0.2.130 --locked
+```
+
+`pnpm dev:web` builds the WebAssembly on first start (`scripts/build-wasm.sh`, output in
+`apps/web/src/wasm/`, not committed); rerun `pnpm --filter @siliconcommons/web wasm` after changing
+`sc-gds`.
 
 ```bash
 ./scripts/fetch-verible.sh
@@ -115,6 +131,8 @@ All `/api` routes need `Authorization: Bearer <access token>`.
 | POST   | `/api/jobs/{id}/cancel`            | Cancel a queued or running run (editor)          |
 | GET    | `/api/jobs/{id}/artifacts`         | Files in the run's `final/` directory            |
 | GET    | `/api/jobs/{id}/artifacts/{path}`  | Download one (GDS, DEF, netlists, render, ...)   |
+| GET    | `/api/jobs/{id}/drc`               | DRC violations with geometry (KLayout, Magic, router) |
+| GET    | `/api/jobs/{id}/report`            | Timing per corner, worst paths, area by cell class |
 
 Commits are optimistic: pass the `parent` you edited against and you get `409` if `main` moved.
 Roles are `owner` > `editor` > `viewer`; public projects are readable by any signed-in user.
@@ -135,6 +153,28 @@ inside the API (`FOR UPDATE SKIP LOCKED`, `SC_JOB_WORKERS`, default 2). Each run
 The web app shows the live log, the summary, the KLayout render and downloads for every file in
 `final/`. On startup the API marks runs interrupted by a restart as failed and kills their
 containers. Artifacts stay on local disk for now; object storage is a later backend.
+
+### Layout viewer
+
+The Layout tab of a run opens the run's GDS in the browser:
+
+- `sc-gds` (Rust, compiled to WebAssembly) parses GDSII, flattens SREF/AREF hierarchy (rotation,
+  reflection, magnification), tessellates polygons and paths once per cell, and returns one triangle
+  buffer and one outline buffer per layer in µm. The UART example (78 instances, 20k triangles)
+  parses in a few milliseconds.
+- WebGPU draws fills and outlines per layer with the PDK's colours and stack order; browsers
+  without a WebGPU adapter get a Canvas 2D renderer with the same features.
+- Layer names, colours, default visibility and order come from the PDK's own KLayout layer file
+  (`sg13g2.lyp`, Apache-2.0), converted by `scripts/gen-layer-stack.sh` into
+  `apps/web/src/pdk/ihp-sg13g2.json`. Hollow KLayout layers (boundaries) are drawn as outlines.
+- Pan by dragging, zoom with the wheel, double-click or `F` to fit; pin labels appear when zoomed
+  in.
+- The DRC tab lists violations from the KLayout, Magic and router DRC reports (all in KLayout's
+  report-database format, with sub-cell items mapped to the top cell), grouped by rule with the PDK's
+  rule text. Clicking one zooms to it.
+
+The Report tab shows setup/hold slack and TNS per corner, the worst setup and hold paths
+stage by stage (from OpenSTA's reports), and area by cell class.
 
 ### Verilog language server
 
@@ -157,6 +197,8 @@ URI. `SC_VERIBLE_LS` sets the binary (default `.tools/verible/bin/verible-verilo
 - **Jobs**: LibreLane runs in local Docker containers behind the `sc_jobs::Backend` trait;
   Kubernetes is a later backend. Temporal is deferred: job state lives in Postgres.
 - **Results**: on local disk under `data/jobs/`, not object storage yet.
+- **Layout viewer**: flattens the whole layout in the browser, which is fine for blocks up to a few
+  million triangles. Large SoCs will need tiling and per-cell instancing on the GPU.
 - **Language server transport**: a Rust WebSocket bridge (`sc-api/src/lsp.rs`) and a small
   client in `apps/web/src/lsp.ts`, instead of Monaco's bundled LSP client, which cannot be torn
   down when you switch projects.

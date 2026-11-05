@@ -315,6 +315,34 @@ pub async fn artifact(
         .into_response())
 }
 
+/// DRC violations with geometry from the run's KLayout, Magic and router DRC reports.
+pub async fn drc(
+    State(state): State<AppState>,
+    user: AuthUser,
+    UrlPath(id): UrlPath<Uuid>,
+) -> ApiResult<Json<sc_jobs::reports::DrcReport>> {
+    load(&state, &user, id, Role::Viewer).await?;
+    let run = sc_jobs::run_dir(&state.jobs.workdir(id));
+    Ok(Json(tokio::task::spawn_blocking(move || sc_jobs::reports::drc_report(&run)).await?))
+}
+
+/// Timing by corner, worst setup/hold paths, and area by cell class.
+pub async fn report(
+    State(state): State<AppState>,
+    user: AuthUser,
+    UrlPath(id): UrlPath<Uuid>,
+) -> ApiResult<Json<sc_jobs::reports::RunReport>> {
+    load(&state, &user, id, Role::Viewer).await?;
+    let workdir = state.jobs.workdir(id);
+    let report = tokio::task::spawn_blocking(move || {
+        let bytes = std::fs::read(sc_jobs::final_dir(&workdir).join("metrics.json")).ok()?;
+        let metrics = sc_jobs::parse_metrics(&bytes).ok()?;
+        Some(sc_jobs::reports::run_report(&sc_jobs::run_dir(&workdir), &metrics))
+    })
+    .await?;
+    report.map(Json).ok_or_else(|| ApiError::NotFound("this run has no metrics".into()))
+}
+
 fn content_type(path: &str) -> &'static str {
     match path.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).as_deref() {
         Some("png") => "image/png",

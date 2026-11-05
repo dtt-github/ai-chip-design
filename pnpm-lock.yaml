@@ -38,6 +38,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.2.1
         version: 6.2.1(vite@8.3.6)
+      '@webgpu/types':
+        specifier: ^0.1.74
+        version: 0.1.74
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -308,6 +311,9 @@ packages:
         optional: true
       oxc-transform-react:
         optional: true
+
+  '@webgpu/types@0.1.74':
+    resolution: {integrity: sha512-lgiI4hbuLcI9unnm2cL/tvCaQU45dp0xcLWJh5uB/9MBGvIA4F8XIk7nSiBeg+K4xWGYwgZKn80LmERI5CxoTA==}
 
   cookie-es@3.1.1:
     resolution: {integrity: sha512-UaXxwISYJPTr9hwQxMFYZ7kNhSXboMXP+Z3TRX6f1/NyaGPfuNUZOWP1pUEb75B2HjfklIYLVRfWiFZJyC6Npg==}
@@ -673,6 +679,8 @@ snapshots:
     dependencies:
       '@rolldown/pluginutils': 1.0.1
       vite: 8.3.6
+
+  '@webgpu/types@0.1.74': {}
 
   cookie-es@3.1.1: {}
 

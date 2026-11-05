@@ -47,6 +47,8 @@ pub fn router(state: AppState) -> Router {
         .route("/jobs/{id}/log", get(jobs::log))
         .route("/jobs/{id}/cancel", post(jobs::cancel))
         .route("/jobs/{id}/artifacts", get(jobs::artifacts))
+        .route("/jobs/{id}/drc", get(jobs::drc))
+        .route("/jobs/{id}/report", get(jobs::report))
         .route("/jobs/{id}/artifacts/{*path}", get(jobs::artifact));
 
     Router::new()
