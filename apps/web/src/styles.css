@@ -1861,3 +1861,69 @@ select.small {
   overflow-wrap: anywhere;
   color: var(--muted);
 }
+
+/* What actually happened: simulated example */
+.happened {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.hp-grid {
+  display: grid;
+  align-items: center;
+  row-gap: 2px;
+  column-gap: 6px;
+}
+
+.hp-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hp-axis {
+  font-size: 10px;
+  fill: var(--muted);
+  font-family: var(--mono);
+}
+
+.hp-wave {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.hp-bus {
+  fill: color-mix(in srgb, var(--accent) 16%, transparent);
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+
+.hp-val {
+  font-size: 11px;
+  font-family: var(--mono);
+  fill: var(--text);
+}
+
+.hp-check {
+  fill: color-mix(in srgb, var(--warn) 20%, transparent);
+}
+
+.hp-fail {
+  fill: color-mix(in srgb, var(--danger) 45%, transparent);
+  stroke: var(--danger);
+  stroke-width: 1.5;
+}
+
+.hp-set {
+  fill: var(--accent);
+}
+
+.hp-after {
+  fill: color-mix(in srgb, var(--bg) 55%, transparent);
+}

@@ -11,6 +11,8 @@ import {
   type SpecView,
   type StepOp,
 } from "../api";
+import { extendTestbench, fmt as fmtValue, replay, type Replay } from "../lib/replay";
+import { SimClient } from "../sim/client";
 
 type Step = "describe" | "examples" | "health";
 
@@ -132,15 +134,9 @@ export function DesignFlow({ projectId, head, canEdit, onOpenFile, onShowRun, on
     }
   }
 
-  async function makeItPass() {
-    if (!run) return;
-    const failing = run.examples.filter((e) => e.verdict !== "pass");
-    const list = failing.map((e) => `- ${e.id} (${e.title}): ${e.reason ?? e.log.find((l) => l.includes("FAIL")) ?? e.verdict}`).join("\n");
-    const request =
-      `Update the design so every example in spec.json passes. The examples are compiled into tb/examples/tb_ex_*.v; ` +
-      `read spec.json and those testbenches, and change the RTL (not the spec or the examples).\n` +
-      (failing.length ? `Failing now:\n${list}` : "All examples pass now; check the design still matches the spec's description.");
+  async function propose(request: string) {
     setBusy("Asking the agent for a proposal…");
+    setError(null);
     try {
       const p = await api.propose(projectId, request);
       onShowProposal(p.id);
@@ -149,6 +145,17 @@ export function DesignFlow({ projectId, head, canEdit, onOpenFile, onShowRun, on
     } finally {
       setBusy(null);
     }
+  }
+
+  async function makeItPass() {
+    if (!run) return;
+    const failing = run.examples.filter((e) => e.verdict !== "pass");
+    const list = failing.map((e) => `- ${e.id} (${e.title}): ${e.reason ?? e.log.find((l) => l.includes("FAIL")) ?? e.verdict}`).join("\n");
+    const request =
+      `Update the design so every example in spec.json passes. The examples are compiled into tb/examples/tb_ex_*.v; ` +
+      `read spec.json and those testbenches, and change the RTL (not the spec or the examples).\n` +
+      (failing.length ? `Failing now:\n${list}` : "All examples pass now; check the design still matches the spec's description.");
+    await propose(request);
   }
 
   if (!view || !draft) return <div className="center muted">{error ?? "Loading the spec…"}</div>;
@@ -222,6 +229,21 @@ export function DesignFlow({ projectId, head, canEdit, onOpenFile, onShowRun, on
             runExamples={runExamples}
             makeItPass={makeItPass}
             onOpenFile={onOpenFile}
+            projectId={projectId}
+            head={view.head}
+            fixDesign={(ex, story) =>
+              propose(
+                `Example "${ex.title}" (${ex.id}) in spec.json fails. What happened in simulation: ${story}\n` +
+                  `Change the RTL so this example passes, keeping every other example passing. Don't change spec.json or tb/examples/.`,
+              )
+            }
+            fixExample={(ex, story) =>
+              ask(
+                `The person thinks example "${ex.title}" (id ${ex.id}) is wrong, not the design. What happened in simulation: ${story} ` +
+                  `Check the example against the description and decisions. If the example is wrong, correct its steps (keep its id) and say what you changed; ` +
+                  `if the example is right and the design is wrong, leave it and say so.`,
+              )
+            }
           />
         )}
         {step === "health" && (
@@ -474,7 +496,15 @@ function Examples({
   runExamples,
   makeItPass,
   onOpenFile,
+  projectId,
+  head,
+  fixDesign,
+  fixExample,
 }: {
+  projectId: string;
+  head: string;
+  fixDesign: (ex: SpecExample, story: string) => void;
+  fixExample: (ex: SpecExample, story: string) => void;
   spec: Spec;
   update: (p: Partial<Spec>) => void;
   canEdit: boolean;
@@ -592,6 +622,18 @@ function Examples({
             )}
             <Timeline spec={spec} ex={sel} />
             <ExampleResultView r={dirty ? undefined : results.get(sel.id)} />
+            {!dirty && results.get(sel.id) && results.get(sel.id)!.verdict !== "missing" && (
+              <Happened
+                key={`${sel.id}@${head}`}
+                projectId={projectId}
+                spec={spec}
+                ex={sel}
+                canEdit={canEdit}
+                busy={busy}
+                onFixDesign={(story) => fixDesign(sel, story)}
+                onFixExample={(story) => fixExample(sel, story)}
+              />
+            )}
             <div className="design-scroll">
               <table className="design-table design-steps-table">
                 <thead>
@@ -687,6 +729,188 @@ function ExampleResultView({ r }: { r: ExampleResult | undefined }) {
         <code key={l}>{l}</code>
       ))}
     </div>
+  );
+}
+
+/** The example's testbench simulated in the browser: what each connection did, with the checks over it. */
+function Happened({
+  projectId,
+  spec,
+  ex,
+  canEdit,
+  busy,
+  onFixDesign,
+  onFixExample,
+}: {
+  projectId: string;
+  spec: Spec;
+  ex: SpecExample;
+  canEdit: boolean;
+  busy: boolean;
+  onFixDesign: (story: string) => void;
+  onFixExample: (story: string) => void;
+}) {
+  const [rep, setRep] = useState<Replay | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  // Fit the cycles to the space available; long examples scroll.
+  const box = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState(600);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setRoom(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [rep]);
+
+  useEffect(() => {
+    const client = new SimClient();
+    let cancelled = false;
+    (async () => {
+      // The committed files: the same ones "Run examples" and the gate use.
+      const snap = await api.snapshot(projectId);
+      const files = Object.entries(snap.files)
+        .filter(([p]) => /\.s?v$/.test(p))
+        .map(([name, source]) => ({ name, source: name === `tb/examples/tb_ex_${ex.id}.v` ? extendTestbench(source, spec) : source }));
+      const sim = await client.run(files, `tb_ex_${ex.id}`);
+      if (!cancelled) setRep(replay(spec, ex, sim));
+    })().catch((e: Error) => !cancelled && setError(e.message));
+    return () => {
+      cancelled = true;
+      client.dispose();
+    };
+  }, [projectId, spec, ex]);
+
+  if (error) return <p className="error small">Couldn't simulate this example: {error}</p>;
+  if (!rep) return <p className="muted small">Simulating what the design does…</p>;
+  const cell = Math.max(6, Math.min(56, Math.floor((room - 84) / Math.max(rep.cycles, 1))));
+  const width = rep.cycles * cell;
+  const every = rep.cycles > 200 ? 50 : rep.cycles > 80 ? 20 : rep.cycles > 30 ? 10 : 5;
+  const failing = rep.firstFail;
+
+  return (
+    <div className="happened">
+      <div className="design-row">
+        <strong>What actually happened</strong>
+        <span className={`status ${failing ? "status-failed" : "status-succeeded"}`}>{failing ? "differs from the example" : "matches the example"}</span>
+      </div>
+      <p className={`small ${failing ? "" : "muted"}`} style={{ margin: 0 }}>
+        {rep.story}
+      </p>
+      {rep.problem && <p className="warn small">Note: {rep.problem}.</p>}
+      <div className="design-scroll" ref={box}>
+        <div className="hp-grid" style={{ gridTemplateColumns: `72px ${width}px` }}>
+          <span />
+          <svg width={width} height={16} aria-hidden="true">
+            {Array.from({ length: Math.floor((rep.cycles - 1) / every) + 1 }, (_, i) => i * every).map((c) => (
+              <text key={c} x={c * cell + 1} y={11} className="hp-axis">
+                {c}
+              </text>
+            ))}
+          </svg>
+          {rep.rows.map((r) => {
+            const after = (rep.cycles - rep.exampleCycles) * cell;
+            const checks = rep.checks.filter((c) => c.signal === r.name);
+            return (
+              <HpRow
+                key={r.name}
+                row={r}
+                cell={cell}
+                width={width}
+                after={after}
+                checks={checks}
+                sets={rep.sets.filter((s) => s.signal === r.name).map((s) => s.cycle)}
+              />
+            );
+          })}
+        </div>
+      </div>
+      <p className="muted small" style={{ margin: 0 }}>
+        Cycle by cycle, from the simulator. Amber: what the example checks; red: where it differs; blue marks: inputs the example sets;
+        shaded: the cycles after the example ends.
+      </p>
+      {failing && canEdit && (
+        <div className="design-row">
+          <span className="small">Which is wrong?</span>
+          <button className="primary" disabled={busy} onClick={() => onFixDesign(rep.story)}>
+            The design: ask the AI to fix it
+          </button>
+          <button disabled={busy} onClick={() => onFixExample(rep.story)}>
+            The example: ask the assistant to correct it
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HpRow({
+  row,
+  cell,
+  width,
+  after,
+  checks,
+  sets,
+}: {
+  row: Replay["rows"][number];
+  cell: number;
+  width: number;
+  /** Width of the cycles past the end of the example. */
+  after: number;
+  checks: Replay["checks"];
+  sets: number[];
+}) {
+  const H = 26;
+  const hi = 5;
+  const lo = H - 5;
+  const parts: React.ReactNode[] = [];
+  for (const c of checks) {
+    parts.push(<rect key={`c${c.step}`} x={c.from * cell} y={1} width={(c.to - c.from + 1) * cell} height={H - 2} className="hp-check" />);
+    if (!c.ok && c.failCycle !== undefined) {
+      parts.push(<rect key={`f${c.step}`} x={c.failCycle * cell} y={1} width={cell} height={H - 2} className="hp-fail" />);
+    }
+  }
+  if (row.width === 1) {
+    let d = "";
+    row.values.forEach((v, i) => {
+      if (v === null) return;
+      const y = v ? hi : lo;
+      d += `${d && row.values[i - 1] !== null ? "L" : "M"}${i * cell},${y} L${(i + 1) * cell},${y} `;
+    });
+    parts.push(<path key="w" d={d} className="hp-wave" />);
+  } else {
+    let start = 0;
+    for (let i = 1; i <= row.values.length; i++) {
+      if (i === row.values.length || row.values[i] !== row.values[start]) {
+        const v = row.values[start];
+        const x = start * cell;
+        const w = (i - start) * cell;
+        if (v !== null) {
+          parts.push(<rect key={`b${start}`} x={x + 1} y={hi} width={Math.max(w - 2, 1)} height={lo - hi} className="hp-bus" />);
+          const label = fmtValue(v, row.width).split(" ")[0];
+          if (w > label.length * 6.5) {
+            parts.push(
+              <text key={`t${start}`} x={x + 4} y={H / 2 + 4} className="hp-val">
+                {label}
+              </text>,
+            );
+          }
+        }
+        start = i;
+      }
+    }
+  }
+  for (const c of sets) parts.push(<path key={`s${c}`} d={`M${c * cell},0 l4,0 l-4,5 z`} className="hp-set" />);
+  if (after > 0) parts.push(<rect key="after" x={width - after} y={0} width={after} height={H} className="hp-after" />);
+  return (
+    <>
+      <span className="mono small hp-label" title={row.dir === "in" ? "input" : "output"}>
+        {row.name}
+      </span>
+      <svg width={width} height={H} role="img" aria-label={`${row.name}: ${row.values.map((v) => fmtValue(v, row.width).split(" ")[0]).join(", ")}`}>
+        {parts}
+      </svg>
+    </>
   );
 }
 
@@ -805,16 +1029,24 @@ function Health({
 
   type Card = { id: string; ok: boolean | null; title: string; plain: string; explain: string; expert: string };
   const cards: Card[] = [];
-  const works = exTotal > 0 && exPass === exTotal && (!gls || gls.status !== "failed");
+  // Examples on the gates: some are for other settings (e.g. N = 2) and are skipped on this build.
+  const gEx = (gls?.runs ?? []).filter((r) => r.top.startsWith("tb_ex_"));
+  const gPass = gEx.filter((r) => r.verdict === "pass").length;
+  const gSkip = gEx.filter((r) => r.verdict === "skipped").length;
+  const gRan = gEx.length - gSkip;
+  const gatesOk = !gls || (gls.status !== "failed" && gPass === gRan);
+  const works = exTotal > 0 && exPass === exTotal && gatesOk;
+  const onGates = !gls
+    ? " Build the design to check them on the synthesised gates too."
+    : gRan === 0
+      ? " None of them match this build's settings, so none ran on the synthesised gates."
+      : ` On the synthesised gates, ${gPass} of ${gRan} pass` +
+        (gSkip ? `; ${gSkip} ${gSkip === 1 ? "is" : "are"} for a different setting, so not part of this build.` : ".");
   cards.push({
     id: "works",
     ok: exTotal === 0 ? null : works,
     title: exTotal === 0 ? "Works: no examples yet" : works ? "It works" : "Not working yet",
-    plain:
-      exTotal === 0
-        ? "Add examples so there's something to check the design against."
-        : `${exPass} of ${exTotal} examples pass on your design` +
-          (gls?.status === "passed" ? ", and again on the synthesised gates." : gls?.status === "failed" ? ", but some fail on the synthesised gates." : "."),
+    plain: exTotal === 0 ? "Add examples so there's something to check the design against." : `${exPass} of ${exTotal} examples pass on your design.${onGates}`,
     explain:
       "Each example is run in simulation on the Verilog. After a build, the testbenches that match the build's settings run again on the gate-level netlist the chip would be made from.",
     expert: `${run?.engine ?? "sc-sim"} · examples ${exPass}/${exTotal}` + (gls ? ` · gate-level: ${gls.summary}` : " · no gate-level run yet"),

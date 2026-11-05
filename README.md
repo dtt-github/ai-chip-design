@@ -179,6 +179,13 @@ tree and editor for those who do. Both work on the same files and Git history.
   testbenches, the simulation gate, the browser simulator and gate-level simulation all run them.
   `POST .../spec/run` reports each example's result; "Ask the AI to make them pass" opens an agent
   proposal with the failures. The agent may not write `spec.json` or `tb/examples/`.
+- **What actually happened**: selecting an example runs its testbench in the browser simulator
+  (continuing 20 cycles past the end) and replays the steps against the result exactly as the
+  testbench does (`apps/web/src/lib/replay.ts`): each connection per clock cycle, the checks laid
+  over it, and the first difference in plain words, including when the expected value did appear
+  ("one cycle later, so the design may be one cycle slower than the example says"). Two buttons
+  answer the only question a non-expert has to decide: the design is wrong (an agent proposal with
+  that explanation) or the example is wrong (the assistant re-checks and corrects it).
 - **Health**: the latest default build in plain language (works, fast enough with the margin as
   "about N× faster", can be manufactured, size and power), each with "What does this mean?" and
   the expert numbers, plus what still needs an expert before a real chip run.
