@@ -1,0 +1,48 @@
+# Rauthy config for LOCAL DEVELOPMENT ONLY.
+# Plain HTTP, insecure cookies and checked-in secrets. Never use this outside localhost.
+
+[access]
+cookie_mode = 'danger-insecure'
+token_revoke_on_logout = true
+
+[bootstrap]
+admin_email = 'admin@localhost'
+bootstrap_dir = 'bootstrap'
+
+[cluster]
+node_id = 1
+nodes = ["1 localhost:8100 localhost:8200"]
+secret_raft = "SiliconCommonsDevRaftSecret"
+secret_api = "SiliconCommonsDevApiSecret"
+
+[database]
+hiqlite = true
+
+[email]
+rauthy_admin_email = 'admin@localhost'
+
+[encryption]
+keys = ['dev01/mABObO+UJGEuzU+Ks41MyHcmNkfqDe2rx38VvLTxnD4=']
+key_active = 'dev01'
+
+[mfa]
+admin_force_mfa = false
+
+[pow]
+difficulty = 10
+
+[server]
+port_http = 8080
+scheme = 'http'
+pub_url = 'localhost:8180'
+http_workers = 2
+metrics_enable = false
+swagger_ui_enable = false
+
+[user_registration]
+enable = false
+
+[webauthn]
+rp_id = 'localhost'
+rp_origin = 'http://localhost:8180'
+rp_name = 'SiliconCommons (dev)'
