@@ -9,6 +9,9 @@ use std::time::Duration;
 use serde_json::{Value, json};
 
 pub const DEFAULT_MODEL: &str = "claude-opus-5-5";
+/// OpenRouter's Anthropic-compatible endpoint and its id for the same model.
+pub const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api";
+pub const OPENROUTER_MODEL: &str = "anthropic/claude-opus-5.5";
 const API_VERSION: &str = "2023-06-01";
 const FALLBACK_BETA: &str = "server-side-fallback-2026-07-01";
 const MAX_ATTEMPTS: u32 = 4;
@@ -22,6 +25,10 @@ pub struct ClaudeConfig {
     /// `low` | `medium` | `high` | `xhigh` | `max` (Opus 5.5 defaults to `medium`; we set it).
     pub effort: String,
     pub max_tokens: u32,
+    /// Send the key as `Authorization: Bearer` (OpenRouter) instead of `x-api-key` (Anthropic).
+    pub bearer: bool,
+    /// Ask for the server-side refusal fallback (Anthropic API only; not documented on OpenRouter).
+    pub fallbacks: bool,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -48,7 +55,7 @@ impl Claude {
     }
 
     pub fn request_body(&self, system: &str, tools: &Value, messages: &[Value]) -> Value {
-        json!({
+        let mut body = json!({
             "model": self.cfg.model,
             "max_tokens": self.cfg.max_tokens,
             "system": system,
@@ -58,8 +65,11 @@ impl Claude {
             "output_config": { "effort": self.cfg.effort },
             // Cache the growing conversation prefix between turns.
             "cache_control": { "type": "ephemeral" },
-            "fallbacks": "default",
-        })
+        });
+        if self.cfg.fallbacks {
+            body["fallbacks"] = json!("default");
+        }
+        body
     }
 
     /// One Messages API call; retries rate limits, overload and server errors.
@@ -69,15 +79,16 @@ impl Claude {
         let mut attempt = 0;
         loop {
             attempt += 1;
-            let sent = self
-                .http
-                .post(&url)
-                .header("x-api-key", &self.cfg.api_key)
-                .header("anthropic-version", API_VERSION)
-                .header("anthropic-beta", FALLBACK_BETA)
-                .json(&body)
-                .send()
-                .await;
+            let mut req = self.http.post(&url).header("anthropic-version", API_VERSION).json(&body);
+            req = if self.cfg.bearer {
+                req.bearer_auth(&self.cfg.api_key)
+            } else {
+                req.header("x-api-key", &self.cfg.api_key)
+            };
+            if self.cfg.fallbacks {
+                req = req.header("anthropic-beta", FALLBACK_BETA);
+            }
+            let sent = req.send().await;
             let res = match sent {
                 Ok(r) => r,
                 Err(e) if attempt < MAX_ATTEMPTS => {

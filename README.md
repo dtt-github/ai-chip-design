@@ -173,8 +173,10 @@ tool call with its input (file hashes, not contents) and result, token usage, th
 hashes, and the gate report with the hash of every simulated file. A sha256 over the whole log goes
 into the merge commit, and "Re-run gate" checks that the recorded result reproduces.
 
-Set `ANTHROPIC_API_KEY` to enable it (`SC_AGENT_MODEL`, `SC_AGENT_EFFORT` and
-`SC_ANTHROPIC_BASE_URL` are optional); without a key the endpoint answers 503.
+Set `ANTHROPIC_API_KEY` to enable it, or `OPENROUTER_API_KEY` to go through OpenRouter's
+Anthropic-compatible endpoint (`anthropic/claude-opus-5.5`, bearer auth, no server-side refusal
+fallback). `SC_AGENT_MODEL`, `SC_AGENT_EFFORT` and `SC_ANTHROPIC_BASE_URL` are optional; without a
+key the endpoint answers 503.
 
 ### Co-editing
 

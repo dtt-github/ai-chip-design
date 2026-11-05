@@ -65,20 +65,29 @@ async fn main() -> anyhow::Result<()> {
             None
         }
     };
-    let claude = match env("ANTHROPIC_API_KEY").ok().filter(|k| !k.is_empty()) {
-        Some(api_key) => {
+    // The Anthropic API directly, or OpenRouter's Anthropic-compatible endpoint.
+    let key = |k: &str| env(k).ok().filter(|v| !v.trim().is_empty());
+    let provider = match (key("ANTHROPIC_API_KEY"), key("OPENROUTER_API_KEY")) {
+        (Some(k), _) => Some((k, "https://api.anthropic.com", sc_api::claude::DEFAULT_MODEL, false)),
+        (None, Some(k)) => Some((k, sc_api::claude::OPENROUTER_BASE_URL, sc_api::claude::OPENROUTER_MODEL, true)),
+        (None, None) => None,
+    };
+    let claude = match provider {
+        Some((api_key, base_url, model, openrouter)) => {
             let cfg = sc_api::claude::ClaudeConfig {
                 api_key,
-                base_url: env("SC_ANTHROPIC_BASE_URL").unwrap_or_else(|_| "https://api.anthropic.com".into()),
-                model: env("SC_AGENT_MODEL").unwrap_or_else(|_| sc_api::claude::DEFAULT_MODEL.into()),
+                base_url: env("SC_ANTHROPIC_BASE_URL").unwrap_or_else(|_| base_url.into()),
+                model: env("SC_AGENT_MODEL").unwrap_or_else(|_| model.into()),
                 effort: env("SC_AGENT_EFFORT").unwrap_or_else(|_| "high".into()),
                 max_tokens: 16_000,
+                bearer: openrouter,
+                fallbacks: !openrouter,
             };
-            tracing::info!(model = %cfg.model, effort = %cfg.effort, "agent enabled");
+            tracing::info!(model = %cfg.model, effort = %cfg.effort, base = %cfg.base_url, "agent enabled");
             Some(sc_api::claude::Claude::new(cfg))
         }
         None => {
-            tracing::warn!("agent disabled: set ANTHROPIC_API_KEY to enable it");
+            tracing::warn!("agent disabled: set ANTHROPIC_API_KEY or OPENROUTER_API_KEY to enable it");
             None
         }
     };

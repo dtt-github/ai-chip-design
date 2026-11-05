@@ -93,6 +93,8 @@ async fn env(db: PgPool) -> Env {
             model: "claude-opus-5-5".into(),
             effort: "high".into(),
             max_tokens: 16_000,
+            bearer: false,
+            fallbacks: true,
         })),
         2,
     ));
