@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   isFinished,
+  type Blocks,
   type ExampleResult,
   type Job,
   type Spec,
@@ -11,7 +12,7 @@ import {
   type SpecView,
   type StepOp,
 } from "../api";
-import { extendTestbench, fmt as fmtValue, replay, type Replay } from "../lib/replay";
+import { extendTestbench, fmt as fmtValue, replay, targetSpec, type Replay } from "../lib/replay";
 import { SimClient } from "../sim/client";
 import { BlocksStep } from "./Blocks";
 
@@ -253,6 +254,7 @@ export function DesignFlow({ projectId, startIntent, onWide, head, canEdit, onOp
             onOpenFile={onOpenFile}
             projectId={projectId}
             head={view.head}
+            chip={view.chip}
             fixDesign={(ex, story) =>
               propose(
                 `Example "${ex.title}" (${ex.id}) in spec.json fails. What happened in simulation: ${story}\n` +
@@ -594,11 +596,14 @@ function Examples({
   onOpenFile,
   projectId,
   head,
+  chip,
   fixDesign,
   fixExample,
 }: {
   projectId: string;
   head: string;
+  /** The chip from the Blocks view, which examples can target. */
+  chip: Blocks | null;
   fixDesign: (ex: SpecExample, story: string) => void;
   fixExample: (ex: SpecExample, story: string) => void;
   spec: Spec;
@@ -620,6 +625,9 @@ function Examples({
   const setEx = (patch: Partial<SpecExample>) => update({ examples: spec.examples.map((e) => (e.id === sel.id ? { ...e, ...patch } : e)) });
   const setStep = (i: number, patch: Partial<SpecStep>) => setEx({ steps: sel.steps.map((s, j) => (j === i ? { ...s, ...patch } : s)) });
   const ro = !canEdit;
+  // What the selected example drives: the design, or the whole chip through its pins.
+  const tspec = sel ? targetSpec(spec, sel, chip) : spec;
+  const chipExamples = chip ? spec.examples.filter((e) => e.target === chip.top).length : 0;
 
   return (
     <div className="design-col">
@@ -657,7 +665,10 @@ function Examples({
               <button key={e.id} className={`design-ex ${e.id === sel?.id ? "on" : ""}`} onClick={() => setSelId(e.id)}>
                 <span className="design-num">{i + 1}</span>
                 <span className="design-ex-text">
-                  <strong>{e.title}</strong>
+                  <strong>
+                    {e.title}
+                    {chip && e.target === chip.top && <span className="design-chip-tag">chip</span>}
+                  </strong>
                   <span className="muted small">{e.expect || e.given}</span>
                 </span>
                 <span className={`status ${cls}`}>{label}</span>
@@ -676,6 +687,25 @@ function Examples({
                 value={words}
                 onChange={(e) => setWords(e.target.value)}
               />
+              {chip && chipExamples === 0 && (
+                <div className="design-chip-hint">
+                  <span className="small">
+                    These examples test <code>{spec.top}</code>. The chip <code>{chip.top}</code> built in Blocks has none of its own, so nothing
+                    checks it as a whole.
+                  </span>
+                  <button
+                    className="primary small"
+                    disabled={busy}
+                    onClick={() =>
+                      ask(
+                        `Add examples that test the whole chip ${chip.top} through its pins (target "${chip.top}"), covering its main behaviour end to end, including the timing of everything between the pins and ${spec.top}.`,
+                      )
+                    }
+                  >
+                    Add chip examples with the assistant
+                  </button>
+                </div>
+              )}
               <div className="design-row">
                 <button
                   disabled={busy || !words.trim()}
@@ -705,6 +735,20 @@ function Examples({
         {sel && (
           <section className="design-card design-detail">
             <input className="design-title" aria-label="Example title" value={sel.title} readOnly={ro} onChange={(e) => setEx({ title: e.target.value })} />
+            {chip && (
+              <label className="design-row small">
+                <span className="muted">Tests</span>
+                <select
+                  aria-label="What this example tests"
+                  value={sel.target === chip.top ? chip.top : ""}
+                  disabled={ro}
+                  onChange={(e) => setEx({ target: e.target.value || undefined, params: e.target.value ? [] : sel.params })}
+                >
+                  <option value="">the design {spec.top}</option>
+                  <option value={chip.top}>the whole chip {chip.top} (its pins)</option>
+                </select>
+              </label>
+            )}
             <div className="design-ge">
               <label htmlFor="given">Given</label>
               <input id="given" value={sel.given} readOnly={ro} onChange={(e) => setEx({ given: e.target.value })} />
@@ -716,13 +760,13 @@ function Examples({
                 Settings for this example: {sel.params.map((p) => <code key={p.name}>{`${p.name} = ${p.value} `}</code>)}
               </p>
             )}
-            <Timeline spec={spec} ex={sel} />
+            <Timeline spec={tspec} ex={sel} />
             <ExampleResultView r={dirty ? undefined : results.get(sel.id)} />
             {!dirty && results.get(sel.id) && results.get(sel.id)!.verdict !== "missing" && (
               <Happened
                 key={`${sel.id}@${head}`}
                 projectId={projectId}
-                spec={spec}
+                spec={tspec}
                 ex={sel}
                 canEdit={canEdit}
                 busy={busy}
@@ -760,8 +804,8 @@ function Examples({
                         {s.op !== "wait" && (
                           <select aria-label="Connection" value={s.signal} disabled={ro} onChange={(e) => setStep(i, { signal: e.target.value })}>
                             <option value="">…</option>
-                            {spec.ports
-                              .filter((p) => (s.op === "set" ? p.dir === "in" : true) && p.name !== spec.clock?.port)
+                            {tspec.ports
+                              .filter((p) => (s.op === "set" ? p.dir === "in" : true) && p.name !== tspec.clock?.port)
                               .map((p) => (
                                 <option key={p.name} value={p.name}>
                                   {p.name}
@@ -1133,6 +1177,7 @@ function Health({
   const gPass = gEx.filter((r) => r.verdict === "pass").length;
   const gSkip = gEx.filter((r) => r.verdict === "skipped").length;
   const gRan = gEx.length - gSkip;
+  const gBlock = gEx.filter((r) => r.verdict === "skipped" && r.reason?.startsWith("does not instantiate")).length;
   const gatesOk = !gls || (gls.status !== "failed" && gPass === gRan);
   const works = exTotal > 0 && exPass === exTotal && gatesOk;
   // The build is a chip made of blocks and no example drives the chip itself.
@@ -1144,7 +1189,9 @@ function Health({
         ? ` They test ${gls.design === specTop ? "the design" : `the block ${specTop ?? ""}`}, but this build is the whole chip ${gls.design}, so none ran on its gates.`
         : " None of them match this build's settings, so none ran on the synthesised gates."
       : ` On the synthesised gates, ${gPass} of ${gRan} pass` +
-        (gSkip ? `; ${gSkip} ${gSkip === 1 ? "is" : "are"} for a different setting, so not part of this build.` : ".");
+        (gBlock ? `; ${gBlock} test${gBlock === 1 ? "s" : ""} the block ${specTop ?? ""} rather than the chip, so ran in simulation only` : "") +
+        (gSkip - gBlock ? `; ${gSkip - gBlock} ${gSkip - gBlock === 1 ? "is" : "are"} for a different setting, so not part of this build` : "") +
+        ".";
   cards.push({
     id: "works",
     ok: exTotal === 0 || (works && chipUntested) ? null : works,

@@ -5,7 +5,7 @@
 // actually did per cycle, every check with its outcome, and the first
 // difference explained in plain words.
 
-import type { Spec, SpecExample } from "../api";
+import type { Blocks, Spec, SpecExample } from "../api";
 import type { SimResult, SimSignal } from "../sim/protocol";
 
 export interface Row {
@@ -206,4 +206,20 @@ function explain(spec: Spec, read: (port: string, c: number) => bigint | null, f
     s += ` It wasn't ${want} at any point within ${EXTRA_CYCLES} cycles either side.`;
   }
   return s;
+}
+
+/**
+ * The spec as one example sees it: the design, or, for an example that targets the chip from the
+ * Blocks view, the chip's pins, clock and reset (mirrors `Spec::resolve` on the server).
+ */
+export function targetSpec(spec: Spec, ex: SpecExample, chip: Blocks | null): Spec {
+  if (!ex.target || ex.target === spec.top || !chip || chip.top !== ex.target) return spec;
+  return {
+    ...spec,
+    top: chip.top,
+    params: [],
+    ports: chip.pins.map((p) => ({ name: p.name, dir: p.dir, width: p.width, meaning: p.meaning })),
+    clock: chip.clock ? { port: chip.clock, mhz: spec.clock?.mhz ?? 50 } : null,
+    reset: chip.reset ? { port: chip.reset, active_low: spec.reset?.active_low ?? chip.reset.endsWith("_n") } : null,
+  };
 }

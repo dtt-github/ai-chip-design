@@ -161,6 +161,8 @@ export interface SpecStep {
 }
 
 export interface SpecExample {
+  /** The chip's name when the example tests the whole chip; absent for the design. */
+  target?: string;
   id: string;
   title: string;
   given: string;
@@ -197,6 +199,8 @@ export interface SpecView {
   in_sync: boolean;
   design_name: string | null;
   clock_mhz: number | null;
+  /** The chip from the Blocks view; examples can target it. */
+  chip: Blocks | null;
 }
 
 export interface ExampleResult {

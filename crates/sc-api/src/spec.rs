@@ -116,6 +116,10 @@ pub struct Example {
     #[serde(default)]
     pub params: Vec<ParamValue>,
     pub steps: Vec<Step>,
+    /// What the example drives: the design (`None`, or the spec's `top`) or the whole chip from
+    /// the Blocks view (`blocks.json`'s `top`), whose connections are the chip's pins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -187,6 +191,73 @@ fn fits(v: u64, width: u32) -> bool {
 }
 
 impl Spec {
+    /// The spec as seen by one example: the design it drives (this spec's `top`, or the chip),
+    /// with that design's connections, clock and reset, and only this example.
+    pub fn resolve(&self, e: &Example, chip: Option<&crate::blocks::Blocks>) -> Result<Spec, String> {
+        let mut one = Spec { examples: vec![e.clone()], ..self.clone() };
+        match e.target.as_deref() {
+            None => Ok(one),
+            Some(t) if t == self.top => Ok(one),
+            Some(t) => {
+                let Some(chip) = chip.filter(|c| c.top == t) else {
+                    return Err(format!("example '{}' tests '{t}', which is neither the design nor the chip", e.title));
+                };
+                if !e.params.is_empty() {
+                    return Err(format!("example '{}': the chip has no settings of its own", e.title));
+                }
+                one.top = chip.top.clone();
+                one.params = Vec::new();
+                one.ports = chip
+                    .pins
+                    .iter()
+                    .map(|p| Port {
+                        name: p.name.clone(),
+                        dir: p.dir.clone(),
+                        width: p.width,
+                        meaning: p.meaning.clone(),
+                    })
+                    .collect();
+                one.clock =
+                    chip.clock.clone().map(|port| Clock { port, mhz: self.clock.as_ref().map_or(50.0, |c| c.mhz) });
+                one.reset = chip.reset.clone().map(|port| Reset {
+                    active_low: self.reset.as_ref().map_or(port.ends_with("_n"), |r| r.active_low),
+                    port,
+                });
+                Ok(one)
+            }
+        }
+    }
+
+    /// Every problem with the spec and its examples, each checked against what it drives.
+    pub fn check(&self, chip: Option<&crate::blocks::Blocks>) -> Vec<String> {
+        let mut errs = Spec { examples: Vec::new(), ..self.clone() }.validate();
+        let mut ids = BTreeSet::new();
+        for e in &self.examples {
+            if !ids.insert(e.id.as_str()) {
+                errs.push(format!("example '{}': id '{}' is used twice", e.title, e.id));
+            }
+            match self.resolve(e, chip) {
+                Ok(one) => {
+                    for x in one.validate() {
+                        if !errs.contains(&x) {
+                            errs.push(x);
+                        }
+                    }
+                }
+                Err(x) => errs.push(x),
+            }
+        }
+        errs
+    }
+
+    /// The generated testbench of every example. Call only on a spec that [`check`](Self::check)s.
+    pub fn testbenches_for(&self, chip: Option<&crate::blocks::Blocks>) -> BTreeMap<String, String> {
+        self.examples
+            .iter()
+            .filter_map(|e| self.resolve(e, chip).ok().map(|one| (tb_path(&e.id), one.testbench(e))))
+            .collect()
+    }
+
     /// Every problem, in plain language; empty when the spec can be compiled.
     pub fn validate(&self) -> Vec<String> {
         let mut errs = Vec::new();
@@ -461,6 +532,7 @@ endmodule
                 expect: String::new(),
                 params: vec![],
                 steps,
+                target: None,
             }],
             ..Default::default()
         }
@@ -500,6 +572,66 @@ endmodule
         let timeout = spec(vec![step("wait_until", "busy", "1", 3)]);
         let r = run(&timeout);
         assert!(r.runs[0].log.iter().any(|l| l.contains("never became 1 within 3")), "{:?}", r.runs[0].log);
+    }
+
+    #[test]
+    fn chip_examples_drive_the_chip_pins() {
+        use crate::blocks::{Block, Blocks, Pin, Wire};
+        let pin =
+            |name: &str, dir: &str, width| Pin { name: name.into(), dir: dir.into(), width, meaning: String::new() };
+        let block = |name: &str, module: &str| Block {
+            name: name.into(),
+            module: module.into(),
+            params: Default::default(),
+            x: 0.0,
+            y: 0.0,
+        };
+        let wire = |a: &str, b: &str| Wire { from: a.into(), to: b.into() };
+        // The pulse design behind a synchronizer: the button reaches it two cycles later.
+        let chip = Blocks {
+            top: "chip".into(),
+            clock: Some("clk".into()),
+            reset: Some("rst_n".into()),
+            pins: vec![pin("clk", "in", 1), pin("rst_n", "in", 1), pin("button", "in", 1), pin("busy_led", "out", 1)],
+            blocks: vec![block("sync", "sc_sync2"), block("p", "pulse")],
+            wires: vec![wire("button", "sync.d"), wire("sync.q", "p.go"), wire("p.busy", "busy_led")],
+        };
+        let mut s = spec(vec![step("expect", "busy", "0", 0)]);
+        s.examples.push(Example {
+            id: "press".into(),
+            title: "a press lights the LED for 5 cycles".into(),
+            given: String::new(),
+            expect: String::new(),
+            params: vec![],
+            steps: vec![
+                step("set", "button", "1", 0),
+                step("wait", "", "", 1),
+                step("set", "button", "0", 0),
+                // 2 cycles through the synchronizer, then the design's own cycle.
+                step("expect_for", "busy_led", "0", 2),
+                step("expect_for", "busy_led", "1", 5),
+                step("expect", "busy_led", "0", 0),
+            ],
+            target: Some("chip".into()),
+        });
+        assert_eq!(s.check(Some(&chip)), Vec::<String>::new());
+        assert!(s.check(None).iter().any(|e| e.contains("neither the design nor the chip")), "{:?}", s.check(None));
+        let mut bad = s.clone();
+        bad.examples[1].steps[0].signal = "go".into();
+        assert!(bad.check(Some(&chip)).iter().any(|e| e.contains("'go' is not one of the connections")));
+
+        let tbs = s.testbenches_for(Some(&chip));
+        assert!(
+            tbs["tb/examples/tb_ex_press.v"]
+                .contains("chip dut (.clk(clk), .rst_n(rst_n), .button(button), .busy_led(busy_led))")
+        );
+        let mut files = tbs.clone();
+        files.insert("src/pulse.v".into(), DUT.into());
+        files.insert("src/chip.v".into(), chip.check(&files).verilog.expect("chip generates"));
+        files.insert(crate::blocks::ADAPTERS_FILE.into(), crate::blocks::adapters_source());
+        let r = crate::gate::run(&files);
+        assert!(r.passed, "{r:#?}");
+        assert_eq!(r.runs.len(), 2, "the design's example and the chip's");
     }
 
     #[test]

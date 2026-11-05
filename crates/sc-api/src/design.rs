@@ -37,6 +37,11 @@ async fn head(state: &AppState, project: Uuid) -> ApiResult<String> {
         .ok_or_else(|| ApiError::NotFound("the project has no commits".into()))
 }
 
+/// The chip from the Blocks view, if the project has one (examples may target it).
+pub(crate) fn chip_of(files: &BTreeMap<String, String>) -> Option<crate::blocks::Blocks> {
+    files.get(crate::blocks::BLOCKS_FILE).and_then(|t| serde_json::from_str(t).ok())
+}
+
 fn parse_spec(text: &str) -> ApiResult<Spec> {
     serde_json::from_str(text).map_err(|e| ApiError::Conflict(format!("{SPEC_FILE} can't be read: {e}")))
 }
@@ -53,6 +58,8 @@ pub struct SpecView {
     /// The flow config's top and clock, as defaults for a new spec.
     pub design_name: Option<String>,
     pub clock_mhz: Option<f64>,
+    /// The chip from the Blocks view, which examples can target instead of the design.
+    pub chip: Option<crate::blocks::Blocks>,
 }
 
 pub async fn get(State(state): State<AppState>, user: AuthUser, Path(id): Path<Uuid>) -> ApiResult<Json<SpecView>> {
@@ -62,16 +69,18 @@ pub async fn get(State(state): State<AppState>, user: AuthUser, Path(id): Path<U
     let config: Option<Value> = files.get("config.json").and_then(|c| serde_json::from_str(c).ok());
     let design_name = config.as_ref().and_then(|c| c["DESIGN_NAME"].as_str().map(String::from));
     let clock_mhz = config.as_ref().and_then(|c| c["CLOCK_PERIOD"].as_f64()).filter(|p| *p > 0.0).map(|p| 1000.0 / p);
+    let chip = chip_of(&files);
     let (spec, problems, in_sync) = match files.get(SPEC_FILE) {
         None => (None, vec![], true),
         Some(text) => {
             let s = parse_spec(text)?;
-            let problems = s.validate();
-            let in_sync = problems.is_empty() && s.testbenches().iter().all(|(p, c)| files.get(p) == Some(c));
+            let problems = s.check(chip.as_ref());
+            let in_sync =
+                problems.is_empty() && s.testbenches_for(chip.as_ref()).iter().all(|(p, c)| files.get(p) == Some(c));
             (Some(s), problems, in_sync)
         }
     };
-    Ok(Json(SpecView { head, spec, problems, in_sync, design_name, clock_mhz }))
+    Ok(Json(SpecView { head, spec, problems, in_sync, design_name, clock_mhz, chip }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -90,12 +99,13 @@ pub async fn save(
     Json(req): Json<SaveReq>,
 ) -> ApiResult<Json<Value>> {
     authorize(&state, &user, id, Role::Editor).await?;
-    let problems = req.spec.validate();
+    let files = files_at(&state, id, &req.parent).await?;
+    let chip = chip_of(&files);
+    let problems = req.spec.check(chip.as_ref());
     if !problems.is_empty() {
         return Err(ApiError::BadRequest(problems.join("\n")));
     }
-    let files = files_at(&state, id, &req.parent).await?;
-    let tbs = req.spec.testbenches();
+    let tbs = req.spec.testbenches_for(chip.as_ref());
     let mut changes = Vec::new();
     for (path, content) in &tbs {
         match files.get(path) {
@@ -231,6 +241,12 @@ exact cycle count)? List those questions in the example's `assumes`; such exampl
 rewritten until the question is answered. Keep the ids of existing examples. id: lowercase letters, digits, _. params: overrides \
 for that example (e.g. PARITY=1).
 
+If the project has a chip (blocks.json), examples can test the whole chip instead of the design: set target \
+to the chip's name; their steps then use the chip's pins (with blocks.json's clock and reset), and the timing \
+includes everything between the pins and the design (for example 2 extra cycles through a synchronizer). Keep \
+the design's own examples; when asked for chip examples, add a few that check the chip's main behaviour end to \
+end. Chip examples have no params.
+
 Example steps run on the falling clock edge; the design samples inputs on the rising edge. Before step 1 all \
 inputs are 0 and reset is held for 2 cycles, then released. Ops (unused fields: \"\" or 0):
 - set: drive input `signal` to `value` now (no time passes).
@@ -267,9 +283,10 @@ fn draft_tool() -> Value {
             "expect": s("What should happen, in plain words"),
             "params": { "type": "array", "items": obj(json!({ "name": s("Setting name"), "value": s("Number") }), &["name", "value"]) },
             "steps": { "type": "array", "items": step },
+            "target": s("\"\" for the design (the spec's top). The chip's name (blocks.json top) to test the whole chip through its pins."),
             "assumes": { "type": "array", "items": { "type": "string" }, "description": "Every question in `questions` (exact text) whose answer would change this example's steps or expected values. Empty only if the example holds whatever the answers are. The server refuses examples that depend on an open question." }
         }),
-        &["id", "title", "given", "expect", "params", "steps", "assumes"],
+        &["id", "title", "given", "expect", "params", "steps", "target", "assumes"],
     );
     let spec = obj(
         json!({
@@ -323,6 +340,11 @@ fn from_tool(v: &Value) -> Result<Spec, String> {
         }
     }
     v["version"] = json!(1);
+    for e in v["examples"].as_array_mut().into_iter().flatten() {
+        if e["target"].as_str().is_none_or(str::is_empty) {
+            e.as_object_mut().map(|o| o.remove("target"));
+        }
+    }
     serde_json::from_value(v).map_err(|e| format!("the spec doesn't have the right shape: {e}"))
 }
 
@@ -361,6 +383,7 @@ pub async fn draft(
     }
     let head = head(&state, id).await?;
     let files = files_at(&state, id, &head).await?;
+    let chip = chip_of(&files);
     let answering = instruction.starts_with("Answer to the open question");
     let current = match req.spec {
         Some(s) => Some(s),
@@ -371,6 +394,11 @@ pub async fn draft(
     let mut context = String::new();
     if let Some(c) = files.get("config.json") {
         context.push_str(&format!("--- config.json ---\n{c}\n"));
+    }
+    if let Some(c) = files.get(crate::blocks::BLOCKS_FILE) {
+        context.push_str(&format!(
+            "--- blocks.json (the chip, built from blocks in the Blocks view; its generated top is src/<top>.v) ---\n{c}\n"
+        ));
     }
     for (p, c) in files.iter().filter(|(p, _)| {
         p.ends_with(".v") && !p.starts_with("tb/") && !p.contains("/tb_") && !p.starts_with(&format!("{EXAMPLES_DIR}/"))
@@ -428,7 +456,7 @@ pub async fn draft(
         let problems = match from_tool(&call["input"]["spec"]) {
             Err(e) => vec![e],
             Ok(spec) => {
-                let mut p = spec.validate();
+                let mut p = spec.check(chip.as_ref());
                 p.extend(assumes_open(&call["input"]["spec"], &spec));
                 let invented: Vec<&str> = spec
                     .decisions

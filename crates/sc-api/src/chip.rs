@@ -159,6 +159,24 @@ pub async fn save(
     }
     stage(&mut changes, BLOCKS_FILE, serde_json::to_string_pretty(&b).map_err(anyhow::Error::from)? + "\n", &files)?;
 
+    // Examples of the chip drive its pins: check them against the new chip and regenerate them.
+    if let Some(spec) =
+        files.get(crate::spec::SPEC_FILE).and_then(|t| serde_json::from_str::<crate::spec::Spec>(t).ok())
+    {
+        let problems = spec.check(Some(&b));
+        if !problems.is_empty() {
+            return Err(ApiError::Conflict(format!(
+                "the examples don't fit this chip any more; change them first:\n{}",
+                problems.join("\n")
+            )));
+        }
+        for (path, content) in spec.testbenches_for(Some(&b)) {
+            if files.get(&path) != Some(&content) {
+                changes.push(Change::Write { path, content: content.into_bytes() });
+            }
+        }
+    }
+
     // The flow builds the chip: its top and every file it uses.
     let mut with_new = files.clone();
     with_new.insert(top_path.clone(), verilog);

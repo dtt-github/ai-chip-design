@@ -3,6 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "license": "Apache-2.0",
+  "author": "DigitalTwin Technology GmbH",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dtt-github/ai-chip-design.git",
+    "directory": "apps/web"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
