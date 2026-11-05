@@ -140,7 +140,7 @@ All `/api` routes need `Authorization: Bearer <access token>`.
 | POST   | `/api/agent/{id}/merge`            | Merge (editor; gate must pass, base must be head) |
 | POST   | `/api/agent/{id}/regate`           | Re-run the gate on the recorded inputs           |
 | POST   | `/api/agent/{id}/discard`          | Discard a finished proposal                      |
-| GET    | `/api/jobs/{id}`                   | Run status, error excerpt, sign-off summary      |
+| GET    | `/api/jobs/{id}`                   | Run status, error excerpt, sign-off summary, gate-level sim |
 | GET    | `/api/jobs/{id}/log?offset=`       | Log from `offset`; poll until `done`             |
 | POST   | `/api/jobs/{id}/cancel`            | Cancel a queued or running run (editor)          |
 | GET    | `/api/jobs/{id}/artifacts`         | Files in the run's `final/` directory            |
@@ -158,14 +158,17 @@ calls the Claude Messages API over HTTP (`claude-opus-5-5`, adaptive thinking wi
 reasoning, effort `high`, prompt caching, server-side refusal fallback `fallbacks: "default"`) and
 works on a private copy of the project at the current commit through four tools: `list_files`,
 `read_file`, `write_file` and `run_simulation` (the same `sc-sim` engine as the browser). It cannot
-commit.
+commit. It finishes by calling `submit_proposal` with a commit title and a summary for the reviewer
+(strict schema, so the title is a field, not parsed out of prose); an agent that ends with plain text
+instead gets the first line of the request as its title.
 
 When it finishes, the server runs the **simulation gate** (`sc-api/src/gate.rs`) on the tree the
 proposal would produce: every testbench (top-level `tb*`, `*_tb`, `*test*` modules) must reach
 `$finish`, print `PASS` and print no `FAIL`/`ERROR`/`MISMATCH`. A person with the editor role can
 merge only a proposal whose gate passed and whose base is still the branch tip; the gate runs again
-at merge time on the exact files committed. The commit is authored by the person who merged, and
-records the proposal, model, gate result and evidence hash.
+at merge time on the exact files committed. The commit is authored by the person who merged, is
+titled with the agent's commit title (at most 72 characters), and records the agent's summary, the
+proposal, model, gate result and evidence hash.
 
 Every proposal keeps an **evidence log**: the request and requester, base commit, model requested
 and served, effort, a hash of the agent's instructions, its reasoning summaries and messages, every
@@ -210,16 +213,26 @@ command-line runner.
 
 ### Flow runs
 
-"Run RTL → GDS" queues a job for the last commit. Jobs are rows in Postgres, claimed by workers
+"Run RTL → GDS" queues a job for the last commit, with the flow config picked next to the button
+(any `config*.json`/`.yaml`/`.tcl` in the project; `config.json` first). Jobs are rows in Postgres, claimed by workers
 inside the API (`FOR UPDATE SKIP LOCKED`, `SC_JOB_WORKERS`, default 2). Each run:
 
 - exports the project at the job's commit to `data/jobs/<job id>/work/`;
-- runs `librelane --manual-pdk --pdk ihp-sg13g2 --run-tag sc config.json` in a throwaway
+- runs `librelane --manual-pdk --pdk ihp-sg13g2 --run-tag sc <config>` in a throwaway
   container with no network, the PDK volume mounted read-only, CPU/memory/PID limits
   (`SC_JOB_CPUS`, `SC_JOB_MEMORY`) and the API's own uid;
 - streams output to `data/jobs/<job id>/flow.log`;
 - records the image digest, the commit, the exit code, the flow's ERROR lines and a summary of
-  `metrics.json` (area, cells, timing, power, IR drop, DRC/LVS/antenna) with a sign-off verdict.
+  `metrics.json` (area, cells, timing, power, IR drop, DRC/LVS/antenna) with a sign-off verdict;
+- after a successful flow, runs **gate-level simulation** (`sc-api/src/gls.rs`): the project's
+  testbenches again, on the synthesised netlist, with Icarus Verilog and the PDK's cell models
+  (`CELL_VERILOG_MODELS`, zero-delay) in the same container. Verdicts use the gate's rules (reach
+  `$finish`, print `PASS`, no `FAIL`/`ERROR`/`MISMATCH`). The netlist is built for one parameter set
+  (module defaults plus the config's `SYNTH_PARAMETERS`), so a testbench runs only if it
+  instantiates the design with exactly those values; the others are listed as skipped with the
+  difference. The netlist gets the build's values as dummy parameters so `#(...)` overrides
+  elaborate. Results go in the job's `gls` field and the Summary tab; a failure does not change the
+  job status or the physical sign-off verdict, but shows as "netlist sim fail".
 
 The web app shows the live log, the summary, the KLayout render and downloads for every file in
 `final/`. On startup the API marks runs interrupted by a restart as failed and kills their

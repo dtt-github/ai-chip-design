@@ -572,6 +572,24 @@ code {
   margin: 0;
 }
 
+.run-start-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.run-config {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.run-config select {
+  max-width: 100%;
+}
+
 .run-list {
   list-style: none;
   margin: 0;
@@ -709,6 +727,38 @@ table.files td {
 .summary td {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.gls h4 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.gls p {
+  margin: 0 0 6px;
+}
+
+.gls td {
+  text-align: left;
+  vertical-align: top;
+}
+
+.gls th,
+.gls td:nth-child(2) {
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.gls-log {
+  max-height: 240px;
+  overflow: auto;
+  margin: 4px 0 0;
+  font-size: 12px;
+  white-space: pre-wrap;
 }
 
 table.files {
@@ -1140,6 +1190,11 @@ select.small {
 
 .agent-head p {
   margin: 0 0 4px;
+}
+
+.agent-title {
+  margin: 0 0 4px;
+  font-weight: 600;
 }
 
 .agent-request-full {

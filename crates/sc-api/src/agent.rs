@@ -66,8 +66,8 @@ delete or bypass an existing check to make a test pass; if a test fails, fix the
 the test is wrong.
 - The simulator is 2-state (x and z read as 0), supports signals up to 64 bits, and does not support \
 functions, tasks or generate blocks yet; write code within those limits.
-- Run the simulation after your last change. Finish with a short summary of what you changed and the \
-simulation results, including anything you could not verify.";
+- Run the simulation after your last change, then call submit_proposal once with a commit title and a \
+short summary of what you changed and the simulation results, including anything you could not verify.";
 
 fn tools() -> Value {
     json!([
@@ -114,6 +114,20 @@ fn tools() -> Value {
                 "required": ["top"],
                 "additionalProperties": false
             }
+        },
+        {
+            "name": "submit_proposal",
+            "description": "Finish: submit your changes as a proposal for review. Call it once, after your last simulation run; nothing you do afterwards is kept. The title becomes the commit's subject line if the proposal is merged.",
+            "strict": true,
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string", "description": "Commit title: what the change does, imperative mood, at most 72 characters, no trailing period. E.g. \"Add optional even-parity bit to uart_tx\"" },
+                    "summary": { "type": "string", "description": "For the reviewer: what you changed and why, the simulation results, and anything you could not verify. Plain text or Markdown." }
+                },
+                "required": ["title", "summary"],
+                "additionalProperties": false
+            }
         }
     ])
 }
@@ -127,6 +141,8 @@ pub struct Proposal {
     pub base_commit: String,
     pub status: String,
     pub model: String,
+    /// Commit title the agent proposed (older proposals and plain-text finishes have none).
+    pub title: Option<String>,
     pub summary: Option<String>,
     pub error: Option<String>,
     pub files: Value,
@@ -216,13 +232,14 @@ pub async fn list(
         id: Uuid,
         request: String,
         status: String,
+        title: Option<String>,
         summary: Option<String>,
         base_commit: String,
         created_at: DateTime<Utc>,
         merged_commit: Option<String>,
     }
     let rows: Vec<Item> = sqlx::query_as(
-        "SELECT id, request, status, summary, base_commit, created_at, merged_commit FROM agent_proposals
+        "SELECT id, request, status, title, summary, base_commit, created_at, merged_commit FROM agent_proposals
          WHERE project_id = $1 ORDER BY created_at DESC LIMIT 50",
     )
     .bind(project_id)
@@ -327,8 +344,11 @@ pub async fn merge(State(state): State<AppState>, user: AuthUser, Path(id): Path
                 .collect()
         })
         .unwrap_or_default();
-    // The person's request is the subject; the agent's own summary goes in the body.
-    let title = commit_title(&p.request);
+    // The agent's title is the subject (else the person's request); its summary goes in the body.
+    let title = match p.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        Some(t) => commit_title(t),
+        None => commit_title(&p.request),
+    };
     let summary = p.summary.as_deref().unwrap_or_default().trim();
     let message = format!(
         "{title}\n\n{summary}{sep}Agent proposal {id} ({model}), merged by {who}.\nSimulation gate: passed ({gate}, {engine}).\nEvidence: sha256:{hash}\n\nCo-Authored-By: SiliconCommons agent <agent@siliconcommons.dev>\n",
@@ -361,9 +381,10 @@ pub async fn merge(State(state): State<AppState>, user: AuthUser, Path(id): Path
     Ok(Json(merged))
 }
 
-/// First line of `request`, at most 72 characters, cut at a word boundary.
-fn commit_title(request: &str) -> String {
-    let line = request.lines().find(|l| !l.trim().is_empty()).unwrap_or("Agent change").trim();
+/// First line of `text`, at most 72 characters, cut at a word boundary, without a trailing period.
+fn commit_title(text: &str) -> String {
+    let line = text.lines().find(|l| !l.trim().is_empty()).unwrap_or("Agent change").trim();
+    let line = line.strip_suffix('.').filter(|l| !l.ends_with('.')).unwrap_or(line);
     if line.chars().count() <= 72 {
         return line.to_string();
     }
@@ -553,6 +574,7 @@ async fn run(
     };
 
     let mut summary = None;
+    let mut title: Option<String> = None;
     for turn in 1..=MAX_TURNS {
         let resp = claude.create(SYSTEM, &tools, &messages).await?;
         if let Some(m) = resp["model"].as_str()
@@ -586,7 +608,13 @@ async fn run(
                     let name = block["name"].as_str().unwrap_or_default();
                     let t = Instant::now();
                     let input = block["input"].clone();
-                    let (out, is_error, rec) = if name == "run_simulation" {
+                    let (out, is_error, rec) = if name == "submit_proposal" {
+                        let t = input["title"].as_str().unwrap_or_default().trim().to_string();
+                        let sm = input["summary"].as_str().unwrap_or_default().trim().to_string();
+                        title = Some(t.clone()).filter(|t| !t.is_empty());
+                        summary = Some(sm);
+                        ("Submitted for review.".to_string(), false, json!({ "title": t }))
+                    } else if name == "run_simulation" {
                         // The simulator is CPU-bound; keep it off the async threads.
                         let mut moved =
                             std::mem::replace(&mut ws, Workspace { base: BTreeMap::new(), changed: BTreeMap::new() });
@@ -611,6 +639,9 @@ async fn run(
                 messages.push(json!({ "role": "assistant", "content": content }));
                 messages.push(json!({ "role": "user", "content": results }));
                 save_progress(state, id, &evidence(&steps, &models, &usage), &ws.changed).await?;
+                if summary.is_some() {
+                    break;
+                }
             }
             "end_turn" => {
                 let text: Vec<&str> =
@@ -649,13 +680,15 @@ async fn run(
     let report = run_gate(ws.tree()).await.map_err(|e| anyhow::anyhow!("{e}"))?;
     let mut ev = evidence(&steps, &models, &usage);
     ev["summary"] = json!(summary);
+    ev["title"] = json!(title);
     ev["files"] =
         json!(ws.changed.iter().map(|(p, c)| (p.clone(), gate::sha256_hex(c.as_bytes()))).collect::<BTreeMap<_, _>>());
     ev["gate"] = serde_json::to_value(&report)?;
     // serde_json maps are sorted, so this serialisation is canonical.
     let hash = gate::sha256_hex(serde_json::to_string(&ev)?.as_bytes());
     sqlx::query(
-        "UPDATE agent_proposals SET status = $2, summary = $3, files = $4, gate = $5, evidence = $6, evidence_hash = $7, finished_at = now()
+        "UPDATE agent_proposals SET status = $2, summary = $3, files = $4, gate = $5, evidence = $6, evidence_hash = $7,
+         title = $8, finished_at = now()
          WHERE id = $1",
     )
     .bind(id)
@@ -665,6 +698,7 @@ async fn run(
     .bind(serde_json::to_value(&report)?)
     .bind(&ev)
     .bind(&hash)
+    .bind(&title)
     .execute(&state.db)
     .await?;
     tracing::info!(proposal = %id, passed = report.passed, files = ws.changed.len(), "agent proposal finished");
@@ -676,6 +710,8 @@ mod tests {
     #[test]
     fn commit_titles() {
         assert_eq!(super::commit_title("Add a parity bit\nmore detail"), "Add a parity bit");
+        assert_eq!(super::commit_title("Add a parity bit."), "Add a parity bit");
+        assert_eq!(super::commit_title("Wait for it..."), "Wait for it...");
         let long = "Refactor the transmitter state machine so that the stop bit length becomes configurable at elaboration time";
         let t = super::commit_title(long);
         assert!(t.chars().count() <= 72 && t.ends_with('…') && !t.contains("elabor"), "{t}");

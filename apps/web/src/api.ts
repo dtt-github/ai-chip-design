@@ -88,6 +88,8 @@ export interface Proposal {
   base_commit: string;
   status: ProposalStatus;
   model: string;
+  /** The agent's commit title, when it gave one. */
+  title: string | null;
   summary: string | null;
   error: string | null;
   files: Record<string, string>;
@@ -113,6 +115,7 @@ export interface ProposalListItem {
   id: string;
   request: string;
   status: ProposalStatus;
+  title: string | null;
   summary: string | null;
   base_commit: string;
   created_at: string;
@@ -120,6 +123,30 @@ export interface ProposalListItem {
 }
 
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "canceled";
+
+export interface GlsRun {
+  top: string;
+  verdict: "pass" | "fail" | "no_verdict" | "error" | "skipped";
+  finished: boolean;
+  reason: string | null;
+  log: string[];
+}
+
+export interface GlsReport {
+  status: "passed" | "failed" | "skipped" | "unavailable";
+  summary: string;
+  design: string;
+  params: Record<string, number>;
+  simulator: string;
+  runs: GlsRun[];
+}
+
+/** Flow configs offered in the Runs panel: `config*.json` / `.yaml` / `.tcl` anywhere in the project. */
+export function flowConfigs(paths: string[]): string[] {
+  const configs = paths.filter((p) => /^config[^/]*\.(json|ya?ml|tcl)$/i.test(p.split("/").pop() ?? ""));
+  // The default first, then by path.
+  return configs.sort((a, b) => Number(b === "config.json") - Number(a === "config.json") || a.localeCompare(b));
+}
 
 export interface JobSummary {
   signoff_clean: boolean;
@@ -140,6 +167,8 @@ export interface Job {
   exit_code: number | null;
   error: string | null;
   summary: JobSummary | null;
+  /** Gate-level simulation of the netlist, after a successful flow. */
+  gls: GlsReport | null;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;

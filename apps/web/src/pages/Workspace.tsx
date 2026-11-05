@@ -4,7 +4,7 @@ import Editor, { type OnMount } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/editor/editor.api";
 import * as Y from "yjs";
 import { MonacoBinding } from "y-monaco";
-import { api, ApiError, type Change, type CommitInfo, type Project } from "../api";
+import { api, ApiError, flowConfigs, type Change, type CommitInfo, type Project } from "../api";
 import { currentUser, displayName } from "../auth";
 import { CollabSession, type Peer } from "../collab";
 import { languageFor } from "../monaco";
@@ -451,6 +451,7 @@ export function WorkspacePage() {
           <RunsList
             projectId={id}
             head={head}
+            configs={flowConfigs(tree)}
             canRun={!readOnly}
             dirty={changes.length > 0}
             selected={bottom?.kind === "run" ? bottom.jobId : null}

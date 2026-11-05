@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, isFinished, type Artifact, type Job, type JobSummary } from "../api";
+import { api, isFinished, type Artifact, type GlsReport, type Job, type JobSummary } from "../api";
 import { LayoutViewer } from "./LayoutViewer";
 import { Report } from "./Report";
 
@@ -15,10 +15,16 @@ function duration(job: Job): string {
 export function StatusBadge({ job }: { job: Job }) {
   const signoff =
     job.status === "succeeded" && job.summary ? (job.summary.signoff_clean ? "sign-off clean" : "violations") : null;
+  const gls = job.gls?.status === "passed" ? "netlist sim pass" : job.gls?.status === "failed" ? "netlist sim fail" : null;
   return (
     <>
       <span className={`status status-${job.status}`}>{job.status}</span>
       {signoff && <span className={`status ${job.summary?.signoff_clean ? "status-succeeded" : "status-failed"}`}>{signoff}</span>}
+      {gls && (
+        <span className={`status ${job.gls?.status === "passed" ? "status-succeeded" : "status-failed"}`} title={job.gls?.summary}>
+          {gls}
+        </span>
+      )}
     </>
   );
 }
@@ -26,6 +32,8 @@ export function StatusBadge({ job }: { job: Job }) {
 interface ListProps {
   projectId: string;
   head: string | null;
+  /** Flow configs in the project, the default first. */
+  configs: string[];
   canRun: boolean;
   dirty: boolean;
   selected: string | null;
@@ -33,8 +41,11 @@ interface ListProps {
 }
 
 /** Start runs and list recent ones; polls while any run is active. */
-export function RunsList({ projectId, head, canRun, dirty, selected, onSelect }: ListProps) {
+export function RunsList({ projectId, head, configs, canRun, dirty, selected, onSelect }: ListProps) {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [picked, setPicked] = useState<string | null>(null);
+  // Fall back to the default when the picked config is deleted.
+  const config = picked && configs.includes(picked) ? picked : (configs[0] ?? "config.json");
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [tick, setTick] = useState(0);
@@ -61,7 +72,7 @@ export function RunsList({ projectId, head, canRun, dirty, selected, onSelect }:
     setStarting(true);
     setError(null);
     try {
-      const job = await api.createJob(projectId);
+      const job = await api.createJob(projectId, { config });
       setJobs((j) => [job, ...j]);
       onSelect(job);
     } catch (e) {
@@ -75,10 +86,33 @@ export function RunsList({ projectId, head, canRun, dirty, selected, onSelect }:
     <div className="runs">
       {canRun && (
         <div className="run-start">
-          <button className="primary" onClick={start} disabled={starting || !head}>
-            {starting ? "Starting…" : "Run RTL → GDS"}
-          </button>
+          <div className="run-start-row">
+            <button className="primary" onClick={start} disabled={starting || !head || configs.length === 0}>
+              {starting ? "Starting…" : "Run RTL → GDS"}
+            </button>
+            {configs.length > 1 && (
+              <label className="run-config">
+                <span className="muted small">with</span>
+                <select value={config} onChange={(e) => setPicked(e.target.value)} aria-label="Flow config">
+                  {configs.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
           <p className="muted small">
+            {configs.length === 0 ? (
+              <span className="warn">Add a flow config (config.json) to run the flow. </span>
+            ) : (
+              configs.length === 1 && (
+                <>
+                  <code>{config}</code> ·{" "}
+                </>
+              )
+            )}
             LibreLane on the last commit <code>{head?.slice(0, 8)}</code>
             {dirty && <span className="warn"> · uncommitted changes are not included</span>}
           </p>
@@ -96,7 +130,13 @@ export function RunsList({ projectId, head, canRun, dirty, selected, onSelect }:
                 <span className="muted small">{duration(j)}</span>
               </span>
               <span className="muted small">
-                <code>{j.commit_id.slice(0, 8)}</code> · {new Date(j.created_at).toLocaleString()}
+                <code>{j.commit_id.slice(0, 8)}</code>
+                {j.config_path !== "config.json" && (
+                  <>
+                    {" "}· <code>{j.config_path}</code>
+                  </>
+                )}{" "}
+                · {new Date(j.created_at).toLocaleString()}
               </span>
             </button>
           </li>
@@ -169,7 +209,7 @@ export function RunView({
         {job && <StatusBadge job={job} />}
         {job && (
           <span className="muted small">
-            <code>{job.commit_id.slice(0, 8)}</code> · {job.pdk} · {duration(job)}
+            <code>{job.commit_id.slice(0, 8)}</code> · <code>{job.config_path}</code> · {job.pdk} · {duration(job)}
           </span>
         )}
         <span className="spacer" />
@@ -272,7 +312,62 @@ function Summary({ job }: { job: Job | null }) {
           </tbody>
         </table>
       </div>
+      {job.gls && <GateLevel gls={job.gls} />}
       <p className="muted small">Toolchain: <code>{job.toolchain}</code></p>
+    </div>
+  );
+}
+
+const VERDICT: Record<string, [string, string]> = {
+  pass: ["pass", "ok"],
+  fail: ["fail", "bad"],
+  no_verdict: ["no PASS line", "bad"],
+  error: ["error", "bad"],
+  skipped: ["skipped", "muted"],
+};
+
+/** The testbenches rerun on the synthesised netlist. */
+function GateLevel({ gls }: { gls: GlsReport }) {
+  const params = Object.entries(gls.params);
+  return (
+    <div className="gls">
+      <h4>Gate-level simulation</h4>
+      <p className={`small ${gls.status === "passed" ? "ok" : gls.status === "failed" ? "bad" : "muted"}`}>{gls.summary}</p>
+      <p className="muted small">
+        Netlist of <code>{gls.design}</code>
+        {params.length > 0 && (
+          <>
+            {" "}built with {params.map(([k, v]) => <code key={k}>{`${k}=${v}`} </code>)}
+          </>
+        )}
+        · {gls.simulator}
+      </p>
+      {gls.runs.length > 0 && (
+        <table>
+          <tbody>
+            {gls.runs.map((r) => {
+              const [label, cls] = VERDICT[r.verdict] ?? [r.verdict, "muted"];
+              return (
+                <tr key={r.top}>
+                  <th>
+                    <code>{r.top}</code>
+                  </th>
+                  <td className={cls}>{label}</td>
+                  <td className="muted small">
+                    {r.reason}
+                    {r.log.length > 0 && (
+                      <details>
+                        <summary>output ({r.log.length} lines)</summary>
+                        <pre className="gls-log">{r.log.join("\n")}</pre>
+                      </details>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ pub mod claude;
 pub mod collab;
 pub mod error;
 pub mod gate;
+pub mod gls;
 pub mod jobs;
 pub mod lsp;
 pub mod projects;

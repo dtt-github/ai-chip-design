@@ -71,6 +71,8 @@ pub struct Job {
     pub exit_code: Option<i32>,
     pub error: Option<String>,
     pub summary: Option<Value>,
+    /// Gate-level simulation of the netlist ([`crate::gls::GlsReport`]); set after a successful flow.
+    pub gls: Option<Value>,
     pub created_at: DateTime<Utc>,
     pub started_at: Option<DateTime<Utc>>,
     pub finished_at: Option<DateTime<Utc>>,
@@ -409,6 +411,7 @@ struct Finish {
     exit_code: Option<i32>,
     error: Option<String>,
     summary: Option<Value>,
+    gls: Option<Value>,
 }
 
 async fn execute(state: &AppState, job: Job) {
@@ -420,18 +423,20 @@ async fn execute(state: &AppState, job: Job) {
         Ok(f) => f,
         Err(e) => {
             tracing::error!(job = %id, error = ?e, "job failed to run");
-            Finish { status: "failed", exit_code: None, error: Some(format!("{e:#}")), summary: None }
+            Finish { status: "failed", exit_code: None, error: Some(format!("{e:#}")), summary: None, gls: None }
         }
     };
     state.jobs.running.lock().expect("lock").remove(&id);
     let res = sqlx::query(
-        "UPDATE jobs SET status = $2, exit_code = $3, error = $4, summary = $5, finished_at = now() WHERE id = $1",
+        "UPDATE jobs SET status = $2, exit_code = $3, error = $4, summary = $5, gls = $6, finished_at = now()
+         WHERE id = $1",
     )
     .bind(id)
     .bind(finish.status)
     .bind(finish.exit_code)
     .bind(&finish.error)
     .bind(&finish.summary)
+    .bind(&finish.gls)
     .execute(&state.db)
     .await;
     if let Err(e) = res {
@@ -454,7 +459,7 @@ async fn run(state: &AppState, job: &Job, cancel: CancellationToken) -> anyhow::
         pdk: job.pdk.clone(),
         log_path: dir.join("flow.log"),
     };
-    let outcome = backend.run(&spec, cancel).await?;
+    let outcome = backend.run(&spec, cancel.clone()).await?;
 
     let summary = match tokio::fs::read(sc_jobs::final_dir(&workdir).join("metrics.json")).await {
         Ok(bytes) => match sc_jobs::parse_metrics(&bytes) {
@@ -467,15 +472,60 @@ async fn run(state: &AppState, job: &Job, cancel: CancellationToken) -> anyhow::
         Err(_) => None,
     };
     Ok(match outcome {
-        Outcome::Exited(0) => Finish { status: "succeeded", exit_code: Some(0), error: None, summary },
+        Outcome::Exited(0) => {
+            let gls = gate_level(state, job, backend.as_ref(), &spec, cancel.clone()).await;
+            if cancel.is_cancelled() {
+                Finish { status: "canceled", exit_code: None, error: None, summary, gls: None }
+            } else {
+                Finish { status: "succeeded", exit_code: Some(0), error: None, summary, gls }
+            }
+        }
         Outcome::Exited(code) => Finish {
             status: "failed",
             exit_code: Some(code),
             error: Some(error_excerpt(&spec.log_path, code).await),
             summary,
+            gls: None,
         },
-        Outcome::Canceled => Finish { status: "canceled", exit_code: None, error: None, summary },
+        Outcome::Canceled => Finish { status: "canceled", exit_code: None, error: None, summary, gls: None },
     })
+}
+
+/// Reruns the matching testbenches on the netlist and notes the result in the flow log.
+async fn gate_level(
+    state: &AppState,
+    job: &Job,
+    backend: &dyn Backend,
+    spec: &JobSpec,
+    cancel: CancellationToken,
+) -> Option<Value> {
+    let files: std::collections::BTreeMap<String, String> =
+        match crate::workspace::text_files(state.repos.clone(), job.project_id, job.commit_id.clone(), 4 << 20).await {
+            Ok(f) => f.into_iter().collect(),
+            Err(e) => {
+                tracing::warn!(job = %job.id, error = ?e, "gate-level simulation: reading sources failed");
+                return None;
+            }
+        };
+    let config = files.get(&job.config_path).and_then(|c| serde_json::from_str::<Value>(c).ok());
+    let report = match config {
+        Some(config) => crate::gls::run(backend, spec, &files, &config, cancel).await,
+        None => return None,
+    };
+    let mut note = format!("\n[SiliconCommons] Gate-level simulation: {}\n", report.summary);
+    for r in &report.runs {
+        note.push_str(&format!("[SiliconCommons]   {}: {}", r.top, r.verdict));
+        if let Some(why) = &r.reason {
+            note.push_str(&format!(" ({why})"));
+        }
+        note.push('\n');
+    }
+    if let Ok(mut f) = tokio::fs::OpenOptions::new().append(true).open(&spec.log_path).await {
+        use tokio::io::AsyncWriteExt;
+        let _ = f.write_all(note.as_bytes()).await;
+    }
+    tracing::info!(job = %job.id, status = %report.status, "gate-level simulation finished");
+    serde_json::to_value(report).ok()
 }
 
 /// The flow's own error lines, for the job record.

@@ -3,7 +3,7 @@
 //! each `initial`/`always`/`assign` becomes a process compiled to a small
 //! bytecode (see [`Op`]).
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::ast::*;
 use crate::{Error, Result};
@@ -315,9 +315,23 @@ pub struct Design {
     pub processes: Vec<Process>,
     pub names: HashMap<String, usize>,
     pub warnings: Vec<String>,
+    /// Every module instance with its resolved (non-local) parameter values, top first.
+    pub instances: Vec<InstanceInfo>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct InstanceInfo {
+    pub path: String,
+    pub module: String,
+    pub params: BTreeMap<String, i64>,
 }
 
 pub fn elaborate(modules: &[Module], top: &str) -> Result<Design> {
+    elaborate_with(modules, top, &HashMap::new())
+}
+
+/// Like [`elaborate`], with parameter overrides for the top module (as a synthesis tool's `chparam`).
+pub fn elaborate_with(modules: &[Module], top: &str, overrides: &HashMap<String, i64>) -> Result<Design> {
     let by_name: HashMap<&str, &Module> = modules.iter().map(|m| (m.name.as_str(), m)).collect();
     let m = by_name.get(top).ok_or_else(|| Error::Elab {
         file: String::new(),
@@ -325,7 +339,17 @@ pub fn elaborate(modules: &[Module], top: &str) -> Result<Design> {
         msg: format!("no module named {top}"),
     })?;
     let mut e = Elab { by_name: &by_name, d: Design { top: top.to_string(), ..Default::default() }, tmp: 0 };
-    e.instance(m, top, &HashMap::new(), 0)?;
+    if let Some(name) = overrides
+        .keys()
+        .find(|k| !m.items.iter().any(|i| matches!(i, Item::Param { name, local: false, .. } if name == *k)))
+    {
+        return Err(Error::Elab {
+            file: m.file.clone(),
+            line: m.line,
+            msg: format!("module {top} has no parameter '{name}'"),
+        });
+    }
+    e.instance(m, top, overrides, 0)?;
     Ok(e.d)
 }
 
@@ -375,6 +399,15 @@ impl<'a> Elab<'a> {
                 s.params.insert(name.clone(), v);
             }
         }
+        let params = m
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                Item::Param { name, local: false, .. } => Some((name.clone(), s.params[name])),
+                _ => None,
+            })
+            .collect();
+        self.d.instances.push(InstanceInfo { path: path.to_string(), module: m.name.clone(), params });
         // Merge declarations per name (a port may be declared as `output` and again as `reg`).
         let mut decls: Vec<(String, MergedDecl)> = Vec::new();
         for item in &m.items {

@@ -56,6 +56,8 @@ pub enum JobError {
     Setup(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error("this backend cannot run extra commands")]
+    Unsupported,
 }
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -71,4 +73,18 @@ pub trait Backend: Send + Sync {
 
     /// Runs the flow to completion, or until `cancel` fires.
     fn run<'a>(&'a self, spec: &'a JobSpec, cancel: CancellationToken) -> BoxFuture<'a, Result<Outcome, JobError>>;
+
+    /// Runs `argv` in the flow's environment (same toolchain, PDK and work directory, `/work` as the
+    /// current directory), appending its output to `log`. Used for steps after the flow, such as
+    /// gate-level simulation. Backends without it report [`JobError::Unsupported`].
+    fn exec<'a>(
+        &'a self,
+        spec: &'a JobSpec,
+        argv: &'a [String],
+        log: &'a Path,
+        cancel: CancellationToken,
+    ) -> BoxFuture<'a, Result<Outcome, JobError>> {
+        let _ = (spec, argv, log, cancel);
+        Box::pin(async { Err(JobError::Unsupported) })
+    }
 }

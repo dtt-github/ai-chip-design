@@ -65,6 +65,18 @@ async fn messages(State(seen): State<Seen>, headers: HeaderMap, Json(body): Json
         (_, true, _, 0) => {
             msg("tool_use", json!([tool("b1", "write_file", json!({ "path": "tb/tb_bad.v", "content": TB_BAD }))]))
         }
+        // The first parity request finishes with submit_proposal; the rest end with plain text.
+        (true, _, _, 2) if !request.contains("again") => msg(
+            "tool_use",
+            json!([tool(
+                "t6",
+                "submit_proposal",
+                json!({
+                    "title": "Add 8-bit parity generator with testbench.",
+                    "summary": "Added an 8-bit parity generator with a testbench; tb_parity passes."
+                })
+            )]),
+        ),
         (_, _, _, _) => msg(
             "end_turn",
             json!([{ "type": "text", "text": "Added an 8-bit parity generator with a testbench; tb_parity passes." }]),
@@ -160,7 +172,10 @@ async fn proposal_gate_evidence_and_merge(db: PgPool) {
     // Evidence: steps, reasoning, models, usage, file hashes, and a hash over it all.
     let ev = &a["evidence"];
     let kinds: Vec<&str> = ev["steps"].as_array().unwrap().iter().map(|s| s["kind"].as_str().unwrap()).collect();
-    assert_eq!(kinds, vec!["reasoning", "message", "tool", "tool", "tool", "tool", "tool", "message"]);
+    assert_eq!(kinds, vec!["reasoning", "message", "tool", "tool", "tool", "tool", "tool", "tool"]);
+    assert_eq!(a["title"], "Add 8-bit parity generator with testbench.");
+    assert_eq!(a["summary"], "Added an 8-bit parity generator with a testbench; tb_parity passes.");
+    assert_eq!(ev["title"], a["title"]);
     let sim = ev["steps"].as_array().unwrap().iter().find(|s| s["name"] == "run_simulation").unwrap();
     assert!(sim["output"].as_str().unwrap().contains("PASS: parity"), "{sim}");
     let write = ev["steps"].as_array().unwrap().iter().find(|s| s["name"] == "write_file").unwrap();
@@ -198,6 +213,8 @@ async fn proposal_gate_evidence_and_merge(db: PgPool) {
     // A second proposal on the same base, to be made stale by merging the first.
     let b = propose(&e, &ada, &project, "Add a parity generator (again)").await;
     assert_eq!(b["status"], "ready");
+    assert!(b["title"].is_null(), "a plain-text finish has no title");
+    assert!(b["summary"].as_str().unwrap().contains("tb_parity passes"));
 
     let (s, m) =
         call(&e.addr, &ada, reqwest::Method::POST, &format!("/agent/{}/merge", a["id"].as_str().unwrap()), None).await;
@@ -207,6 +224,7 @@ async fn proposal_gate_evidence_and_merge(db: PgPool) {
     let (_, log) = call(&e.addr, &ada, reqwest::Method::GET, &format!("/projects/{project}/commits"), None).await;
     assert_eq!(log[0]["id"], commit);
     let message = log[0]["message"].as_str().unwrap();
+    assert!(message.starts_with("Add 8-bit parity generator with testbench\n\nAdded an 8-bit"), "{message}");
     assert!(message.contains(&format!("Evidence: sha256:{}", a["evidence_hash"].as_str().unwrap())), "{message}");
     assert!(message.contains("Simulation gate: passed (2 of 2 testbenches passed"), "{message}");
     let (_, f) =

@@ -103,7 +103,7 @@ export function AgentList({
                 <span className="spacer" />
                 <span className="muted small">{new Date(p.created_at).toLocaleTimeString()}</span>
               </span>
-              <span className="agent-request">{p.request}</span>
+              <span className="agent-request" title={p.request}>{p.title ?? p.request}</span>
             </button>
           </li>
         ))}
@@ -224,6 +224,7 @@ export function AgentView({
       ) : (
         <div className="run-body agent-body">
           <div className="agent-head">
+            {p.title && <p className="agent-title">{p.title}</p>}
             <p className="agent-request-full">{p.request}</p>
             {p.status === "merged" && (
               <p className="ok small">

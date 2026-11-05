@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::process::Stdio;
 
 use tokio::fs::OpenOptions;
@@ -25,6 +26,7 @@ pub struct DockerConfig {
 pub struct DockerBackend {
     config: DockerConfig,
     digest: String,
+    execs: std::sync::atomic::AtomicU64,
 }
 
 impl DockerBackend {
@@ -44,7 +46,7 @@ impl DockerBackend {
             )));
         }
         let digest = String::from_utf8_lossy(&out.stdout).trim().to_string();
-        Ok(Self { config, digest })
+        Ok(Self { config, digest, execs: Default::default() })
     }
 
     fn container_name(spec: &JobSpec) -> String {
@@ -52,10 +54,27 @@ impl DockerBackend {
     }
 
     async fn run_inner(&self, spec: &JobSpec, cancel: CancellationToken) -> Result<Outcome, JobError> {
+        let argv: Vec<String> = ["librelane", "--manual-pdk", "--pdk-root", "/pdk", "--pdk", &spec.pdk]
+            .into_iter()
+            .chain(["--run-tag", RUN_TAG, "--overwrite", &spec.config])
+            .map(String::from)
+            .collect();
+        self.container(spec, &Self::container_name(spec), &argv, &spec.log_path, cancel).await
+    }
+
+    /// One throwaway container over the job's work directory, output appended to `log`.
+    async fn container(
+        &self,
+        spec: &JobSpec,
+        name: &str,
+        argv: &[String],
+        log: &Path,
+        cancel: CancellationToken,
+    ) -> Result<Outcome, JobError> {
         let c = &self.config;
         let workdir = spec.workdir.canonicalize()?;
         let mut cmd = Command::new(&c.docker);
-        cmd.args(["run", "--rm", "--name", &Self::container_name(spec), "--network", "none"])
+        cmd.args(["run", "--rm", "--name", name, "--network", "none"])
             .args(["--cpus", &c.cpus.to_string(), "--memory", &c.memory, "--pids-limit", "4096"])
             .args(["--security-opt", "no-new-privileges"])
             .args(["-e", "HOME=/tmp", "-e", "PDK_ROOT=/pdk"])
@@ -66,15 +85,13 @@ impl DockerBackend {
             cmd.args(["--user", user]);
         }
         cmd.arg(&c.image)
-            .args(["librelane", "--manual-pdk", "--pdk-root", "/pdk", "--pdk", &spec.pdk])
-            .args(["--run-tag", RUN_TAG, "--overwrite"])
-            .arg(&spec.config)
+            .args(argv)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
 
-        let log = OpenOptions::new().create(true).append(true).open(&spec.log_path).await?;
+        let log = OpenOptions::new().create(true).append(true).open(log).await?;
         let log = std::sync::Arc::new(Mutex::new((log, 0u64)));
         let mut child = cmd.spawn()?;
         let stdout = pump(child.stdout.take().expect("piped"), log.clone());
@@ -84,7 +101,7 @@ impl DockerBackend {
             status = child.wait() => Outcome::Exited(status?.code().unwrap_or(-1)),
             _ = cancel.cancelled() => {
                 // Killing the CLI client does not stop the container; kill it by name.
-                let _ = Command::new(&c.docker).args(["kill", &Self::container_name(spec)]).output().await;
+                let _ = Command::new(&c.docker).args(["kill", name]).output().await;
                 let _ = child.wait().await;
                 Outcome::Canceled
             }
@@ -143,5 +160,20 @@ impl Backend for DockerBackend {
 
     fn run<'a>(&'a self, spec: &'a JobSpec, cancel: CancellationToken) -> BoxFuture<'a, Result<Outcome, JobError>> {
         Box::pin(self.run_inner(spec, cancel))
+    }
+
+    fn exec<'a>(
+        &'a self,
+        spec: &'a JobSpec,
+        argv: &'a [String],
+        log: &'a Path,
+        cancel: CancellationToken,
+    ) -> BoxFuture<'a, Result<Outcome, JobError>> {
+        Box::pin(async move {
+            // Unique per call; the `sc-job-` prefix keeps orphan cleanup working.
+            let n = self.execs.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let name = format!("{}-x{n}", Self::container_name(spec));
+            self.container(spec, &name, argv, log, cancel).await
+        })
     }
 }

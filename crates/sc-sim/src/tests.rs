@@ -215,3 +215,28 @@ fn vcd_output() {
     assert!(v.contains("$scope module tb $end"));
     assert!(v.contains("#5\nb11 !"));
 }
+
+#[test]
+fn resolved_instance_parameters() {
+    let src = r#"
+module dut #(parameter W = 4, parameter P = 0) (input wire a);
+    localparam L = W * 2;
+endmodule
+module tb;
+    localparam CPB = 8;
+    reg a = 0;
+    dut #(.W(CPB)) d1 (.a(a));
+    dut d2 (.a(a));
+endmodule
+"#;
+    let (modules, _) = parse(&[("t.v", src)]).unwrap();
+    let d = elab::elaborate(&modules, "tb").unwrap();
+    let get = |path: &str| d.instances.iter().find(|i| i.path == path).unwrap().params.clone();
+    assert_eq!(get("tb.d1"), [("P".to_string(), 0), ("W".to_string(), 8)].into());
+    assert_eq!(get("tb.d2")["W"], 4);
+    assert!(!get("tb.d1").contains_key("L"));
+
+    let top = elab::elaborate_with(&modules, "dut", &[("P".to_string(), 1)].into()).unwrap();
+    assert_eq!(top.instances[0].params["P"], 1);
+    assert!(elab::elaborate_with(&modules, "dut", &[("L".to_string(), 1)].into()).is_err());
+}

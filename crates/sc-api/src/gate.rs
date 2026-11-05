@@ -51,12 +51,12 @@ fn is_hdl(path: &str) -> bool {
     path.rsplit_once('.').is_some_and(|(_, e)| matches!(e.to_ascii_lowercase().as_str(), "v" | "sv"))
 }
 
-fn looks_like_tb(name: &str) -> bool {
+pub(crate) fn looks_like_tb(name: &str) -> bool {
     let n = name.to_ascii_lowercase();
     n.starts_with("tb") || n.ends_with("_tb") || n.contains("test")
 }
 
-fn verdict(log: &[String]) -> (&'static str, Option<String>) {
+pub(crate) fn verdict(log: &[String]) -> (&'static str, Option<String>) {
     let has = |word: &str| log.iter().find(|l| l.split(|c: char| !c.is_ascii_alphanumeric()).any(|w| w == word));
     for bad in ["FAIL", "ERROR", "MISMATCH"] {
         if let Some(line) = has(bad) {
