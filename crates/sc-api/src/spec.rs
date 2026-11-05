@@ -356,8 +356,31 @@ impl Spec {
                     other => errs.push(format!("{at}, step {n}: unknown step '{other}'")),
                 }
             }
+            // The simulation gate stops every testbench at a fixed time; a longer example could never pass.
+            let period = 2 * self.half_ps();
+            let start = if self.reset.is_some() { RESET_CYCLES } else { 1 } as u64;
+            let cycles = start
+                + e.steps
+                    .iter()
+                    .filter(|s| matches!(s.op.as_str(), "wait" | "wait_until" | "expect_for"))
+                    .map(|s| s.cycles as u64)
+                    .sum::<u64>();
+            // Each check waits 1 ps for outputs to settle.
+            if cycles.saturating_mul(period).saturating_add(e.steps.len() as u64) > crate::gate::MAX_TIME {
+                errs.push(format!(
+                    "{at} runs for up to {cycles} clock cycles, but the simulator stops after {} µs ({} cycles at this \
+                     clock): shorten it, or give the example smaller settings (for example a shorter delay)",
+                    crate::gate::MAX_TIME / 1_000_000,
+                    crate::gate::MAX_TIME / period
+                ));
+            }
         }
         errs
+    }
+
+    /// Half a clock period in whole picoseconds (5 ns without a clock), so any frequency works.
+    fn half_ps(&self) -> u64 {
+        self.clock.as_ref().map(|c| (500_000.0 / c.mhz).round().max(1.0) as u64).unwrap_or(5_000)
     }
 
     fn port(&self, name: &str) -> &Port {
@@ -382,7 +405,7 @@ impl Spec {
             o.push_str(&format!("// Expect: {}\n", clean(&e.expect)));
         }
         // Whole picoseconds per half period, so any clock frequency works.
-        let half_ps = self.clock.as_ref().map(|c| (500_000.0 / c.mhz).round().max(1.0) as u64).unwrap_or(5_000);
+        let half_ps = self.half_ps();
         o.push_str("`timescale 1ps/1ps\n");
         o.push_str(&format!("module {};\n", tb_name(&e.id)));
         let reset_on = self.reset.as_ref().map(|r| if r.active_low { "1'b0" } else { "1'b1" });
@@ -670,6 +693,19 @@ endmodule
         );
         let r = crate::gate::run(&files);
         assert!(r.passed, "{r:#?}");
+    }
+
+    #[test]
+    fn examples_longer_than_the_simulation_limit_are_refused() {
+        // 50 MHz: 20 ns a cycle, so the 50 µs limit is 2,500 cycles including the 2 reset cycles.
+        let ok = spec(vec![step("wait", "", "", 2_490), step("expect", "busy", "0", 0)]);
+        assert_eq!(ok.validate(), Vec::<String>::new());
+        let long = spec(vec![step("wait", "", "", 500_000), step("expect", "busy", "0", 0)]);
+        let errs = long.validate().join("\n");
+        assert!(errs.contains("runs for up to 500002 clock cycles") && errs.contains("2500 cycles"), "{errs}");
+        let mut slow = ok.clone();
+        slow.clock.as_mut().unwrap().mhz = 25.0;
+        assert!(slow.validate().iter().any(|e| e.contains("simulator stops after 50 µs")));
     }
 
     #[test]

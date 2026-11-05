@@ -30,6 +30,8 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Fixed
 
+- The spec check refuses an example that runs longer than the simulator's 50 µs limit (it could
+  never pass), saying how many cycles fit; the assistant is told to use small settings instead.
 - Drafting no longer crashes the request when the model sends the spec as JSON text instead of an
   object: the text is read, or the problem goes back to the model.
 - The simulator read a sized index with its top bit set as negative (`f[4'd8]`, or a 4-bit

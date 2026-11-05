@@ -264,7 +264,8 @@ mistakes are the most common error. Call the time of step 1 cycle 0; wait N and 
 on, set and expect don't. After `set start 1; wait 1` (cycle 1) the design has seen start on one rising edge, and \
 a register it updated on that edge shows the new value. Something that lasts exactly N cycles from cycle c is \
 still on at cycle c+N-1 and off at c+N; after K shifts a bit has moved K places. For every expected value, \
-write down the cycle and why, then recount before submitting. Prefer wait_until on an output over \
+write down the cycle and why, then recount before submitting. The simulator stops after 50 µs (2,500 cycles at \
+50 MHz): when the real setting is long (a 10 ms debounce), give the example a small value in its params. Prefer wait_until on an output over \
 counting exact latency when the request doesn't fix the latency; use exact counts when it does (\"each bit lasts \
 8 clocks\"). Add a short note to steps where it helps (\"start bit\", \"bit 0\").
 
