@@ -85,7 +85,13 @@ async fn project_lifecycle(db: PgPool) {
     let (s, tree) = h.call(Method::GET, &format!("/api/projects/{id}/tree"), Some(&ada), None).await;
     assert_eq!(s, StatusCode::OK);
     let paths: Vec<&str> = tree["files"].as_array().unwrap().iter().map(|f| f["path"].as_str().unwrap()).collect();
-    assert_eq!(paths, vec!["README.md", "config.json", "src/my_counter.v"]);
+    assert_eq!(paths, vec!["README.md", "config.json", "src/my_counter.v", "tb/tb_my_counter.v"]);
+
+    let (s, snap) = h.call(Method::GET, &format!("/api/projects/{id}/snapshot"), Some(&ada), None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(snap["commit"], head.as_str());
+    assert!(snap["files"]["src/my_counter.v"].as_str().unwrap().contains("module my_counter"));
+    assert_eq!(snap["files"].as_object().unwrap().len(), 4);
 
     let (s, f) = h.call(Method::GET, &format!("/api/projects/{id}/files/src/my_counter.v"), Some(&ada), None).await;
     assert_eq!(s, StatusCode::OK);

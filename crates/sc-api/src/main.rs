@@ -73,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
         verifier: Arc::new(Verifier::Jwks(JwksVerifier::new(issuer, audiences))),
         lsp: Arc::new(LspConfig::new(verible_ls, max_lsp)),
         jobs: Arc::new(JobService::new(backend, data_dir.join("jobs"))),
+        collab: Arc::new(sc_api::collab::Collab::new(data_dir.join("collab"))),
     };
     sc_api::jobs::start_workers(state.clone(), workers).await?;
 

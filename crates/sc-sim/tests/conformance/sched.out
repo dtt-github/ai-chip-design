@@ -1,0 +1,16 @@
+mon a=0 p1=0 p2=0 p3=0 c=0
+mon a=3 p1=0 p2=0 p3=0 c=0
+strobe t=20 a=3 d=0
+mon a=3 p1=3 p2=0 p3=0 c=4
+mon a=6 p1=3 p2=0 p3=0 c=4
+strobe t=40 a=6 d=0
+mon a=6 p1=6 p2=3 p3=0 c=7
+mon a=9 p1=6 p2=3 p3=0 c=7
+strobe t=60 a=9 d=0
+mon a=9 p1=9 p2=6 p3=3 c=10
+mon a=12 p1=9 p2=6 p3=3 c=10
+strobe t=80 a=12 d=0
+before d=0
+after d=77
+mon a=12 p1=12 p2=9 p3=6 c=13
+mon a=12 p1=12 p2=12 p3=9 c=13

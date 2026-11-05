@@ -1,0 +1,10 @@
+[package]
+name = "sc-sim"
+description = "Event-driven Verilog simulator for SiliconCommons (RTL + common testbench constructs, 2-state, ≤64-bit signals)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+thiserror.workspace = true

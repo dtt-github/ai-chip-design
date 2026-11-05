@@ -29,9 +29,12 @@ tower-http.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 uuid.workspace = true
+yrs = { version = "0.28", features = ["sync"] }
 dotenvy = "0.15"
 
 [dev-dependencies]
+sc-sim = { path = "../sc-sim" }
+reqwest = { workspace = true }
 sc-jobs = { path = "../sc-jobs" }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 tokio-tungstenite = "0.30"

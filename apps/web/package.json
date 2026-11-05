@@ -10,19 +10,24 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "wasm": "../../scripts/build-wasm.sh",
-    "predev": "test -f src/wasm/sc_gds.js || ../../scripts/build-wasm.sh",
-    "prebuild": "test -f src/wasm/sc_gds.js || ../../scripts/build-wasm.sh",
-    "pretypecheck": "test -f src/wasm/sc_gds.js || ../../scripts/build-wasm.sh"
+    "predev": "test -f src/wasm/sc_sim.js -a -f src/wasm/sc_gds.js || ../../scripts/build-wasm.sh",
+    "prebuild": "test -f src/wasm/sc_sim.js -a -f src/wasm/sc_gds.js || ../../scripts/build-wasm.sh",
+    "pretypecheck": "test -f src/wasm/sc_sim.js -a -f src/wasm/sc_gds.js || ../../scripts/build-wasm.sh"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "lib0": "^0.2.119",
     "monaco-editor": "^0.57.0",
     "oidc-client-ts": "^3.5.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-router": "^8.5.1"
+    "react-router": "^8.5.1",
+    "y-monaco": "^0.1.6",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.33"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.2.1",

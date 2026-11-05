@@ -1,0 +1,5 @@
+byte 0: sent 55, received 55  ok
+byte 1: sent a5, received a5  ok
+byte 2: sent 00, received 00  ok
+byte 3: sent ff, received ff  ok
+PASS: 4 bytes

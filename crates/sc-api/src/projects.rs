@@ -244,6 +244,35 @@ pub async fn tree(
 }
 
 #[derive(Debug, Serialize)]
+pub struct Snapshot {
+    pub commit: Option<String>,
+    /// Text files (UTF-8, up to 1 MiB) by path; binary and larger files are only in `tree`.
+    pub files: std::collections::HashMap<String, String>,
+}
+
+/// Every text file at a revision in one response (the base the working copy is compared to).
+pub async fn snapshot(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Query(q): Query<RevQuery>,
+) -> ApiResult<Json<Snapshot>> {
+    authorize(&state, &user, id, Role::Viewer).await?;
+    let commit = match q.rev {
+        Some(rev) => {
+            let repos = state.repos.clone();
+            Some(tokio::task::spawn_blocking(move || repos.open(&id.to_string())?.resolve(&rev)).await??)
+        }
+        None => crate::workspace::head(state.repos.clone(), id).await?,
+    };
+    let files = match &commit {
+        Some(c) => crate::workspace::text_files(state.repos.clone(), id, c.clone(), 1024 * 1024).await?,
+        None => Default::default(),
+    };
+    Ok(Json(Snapshot { commit, files }))
+}
+
+#[derive(Debug, Serialize)]
 pub struct FileView {
     pub path: String,
     /// Commit the content was read from.
@@ -334,6 +363,8 @@ pub async fn commit(
     let parent = req.parent;
     let info = with_repo(&state, id, move |r| r.commit(changes, &message, &author, parent.as_deref())).await?;
     sqlx::query("UPDATE projects SET updated_at = now() WHERE id = $1").bind(id).execute(&state.db).await?;
+    // Everyone with the project open moves to the new head.
+    state.collab.committed(&state, id, &info.id).await;
     Ok((StatusCode::CREATED, Json(info)))
 }
 

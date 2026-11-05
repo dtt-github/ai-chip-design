@@ -41,6 +41,13 @@ export interface CommitInfo {
   time: number;
 }
 
+export interface Member {
+  user_id: string;
+  email: string;
+  display_name: string;
+  role: Role;
+}
+
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "canceled";
 
 export interface JobSummary {
@@ -183,11 +190,19 @@ export const api = {
     request<Project>("POST", "/projects", body),
   getProject: (id: string) => request<Project>("GET", `/projects/${enc(id)}`),
   tree: (id: string) => request<Tree>("GET", `/projects/${enc(id)}/tree`),
+  snapshot: (id: string, rev?: string) =>
+    request<{ commit: string | null; files: Record<string, string> }>(
+      "GET",
+      `/projects/${enc(id)}/snapshot${rev ? `?rev=${enc(rev)}` : ""}`,
+    ),
   readFile: (id: string, path: string, rev?: string) =>
     request<FileView>("GET", `/projects/${enc(id)}/files/${filePath(path)}${rev ? `?rev=${enc(rev)}` : ""}`),
   log: (id: string) => request<CommitInfo[]>("GET", `/projects/${enc(id)}/commits`),
   commit: (id: string, body: { message: string; parent: string | null; changes: Change[] }) =>
     request<CommitInfo>("POST", `/projects/${enc(id)}/commits`, body),
+  members: (id: string) => request<Member[]>("GET", `/projects/${enc(id)}/members`),
+  addMember: (id: string, body: { email: string; role: "editor" | "viewer" }) =>
+    request<Member>("POST", `/projects/${enc(id)}/members`, body),
   createJob: (id: string, body: { commit?: string; config?: string } = {}) =>
     request<Job>("POST", `/projects/${enc(id)}/jobs`, body),
   listJobs: (id: string) => request<Job[]>("GET", `/projects/${enc(id)}/jobs`),

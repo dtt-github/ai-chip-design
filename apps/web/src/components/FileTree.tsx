@@ -23,6 +23,8 @@ interface Props {
   paths: string[];
   active: string | null;
   dirty: Set<string>;
+  /** Who else has each file open. */
+  peers?: Map<string, { clientId: number; name: string; color: string }[]>;
   onOpen: (path: string) => void;
   onDelete?: (path: string) => void;
 }
@@ -73,6 +75,9 @@ function DirNode({ dir, prefix, depth, ...props }: Props & { dir: Dir; prefix: s
             <span className="tree-icon" />
             {path.split("/").pop()}
             {props.dirty.has(path) && <span className="dot">●</span>}
+            {props.peers?.get(path)?.map((p) => (
+              <span key={p.clientId} className="peer-dot" style={{ background: p.color }} title={`${p.name} is here`} />
+            ))}
           </button>
           {props.onDelete && (
             <button className="tree-delete" aria-label={`Delete ${path}`} title="Delete" onClick={() => props.onDelete!(path)}>

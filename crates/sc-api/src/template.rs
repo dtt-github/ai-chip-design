@@ -9,7 +9,8 @@ pub fn starter_files(name: &str, slug: &str) -> Vec<(String, Vec<u8>)> {
         "# {name}\n\n\
          A SiliconCommons project targeting the IHP SG13G2 130 nm open PDK.\n\n\
          - `src/{top}.v` - top-level RTL\n\
-         - `config.json` - LibreLane flow configuration\n"
+         - `tb/tb_{top}.v` - self-checking testbench (Simulate runs it in your browser)\n\
+         - `config.json` - LibreLane flow configuration (RTL only; the testbench is not synthesized)\n"
     );
 
     let rtl = format!(
@@ -33,15 +34,54 @@ pub fn starter_files(name: &str, slug: &str) -> Vec<(String, Vec<u8>)> {
     .expect("static json")
         + "\n";
 
+    let tb = format!(
+        "// SPDX-License-Identifier: Apache-2.0\n\
+         `timescale 1ns/1ps\n\
+         \n\
+         module tb_{top};\n\
+         \x20   reg clk = 0, rst_n = 0, en = 0;\n\
+         \x20   wire [7:0] count;\n\
+         \n\
+         \x20   {top} dut (.clk(clk), .rst_n(rst_n), .en(en), .count(count));\n\
+         \n\
+         \x20   always #10 clk = ~clk;  // 50 MHz, matching CLOCK_PERIOD in config.json\n\
+         \n\
+         \x20   initial begin\n\
+         \x20       #25 rst_n = 1;\n\
+         \x20       en = 1;\n\
+         \x20       repeat (20) @(posedge clk);\n\
+         \x20       #1;\n\
+         \x20       if (count == 8'd20) $display(\"PASS: count = %0d after 20 cycles\", count);\n\
+         \x20       else $display(\"FAIL: count = %0d, expected 20\", count);\n\
+         \x20       $finish;\n\
+         \x20   end\n\
+         endmodule\n"
+    );
+
     vec![
         ("README.md".into(), readme.into_bytes()),
         (format!("src/{top}.v"), rtl.into_bytes()),
+        (format!("tb/tb_{top}.v"), tb.into_bytes()),
         ("config.json".into(), config.into_bytes()),
     ]
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn starter_testbench_passes() {
+        let files = super::starter_files("Demo", "demo");
+        let srcs: Vec<(String, String)> = files
+            .iter()
+            .filter(|(p, _)| p.ends_with(".v"))
+            .map(|(p, c)| (p.clone(), String::from_utf8(c.clone()).unwrap()))
+            .collect();
+        let refs: Vec<(&str, &str)> = srcs.iter().map(|(p, c)| (p.as_str(), c.as_str())).collect();
+        let r = sc_sim::simulate(&refs, None, sc_sim::Limits::default()).unwrap();
+        assert!(r.finished);
+        assert_eq!(r.log, vec!["PASS: count = 20 after 20 cycles"]);
+    }
+
     #[test]
     fn module_name_is_a_valid_identifier() {
         let files = super::starter_files("My Chip", "2-bit-alu");

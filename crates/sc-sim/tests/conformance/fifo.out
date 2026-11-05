@@ -1,0 +1,17 @@
+t=6 push=0 pop=0 din=0 dout=0 count=0 full=0 empty=1
+t=16 push=0 pop=0 din=0 dout=0 count=0 full=0 empty=1
+t=26 push=1 pop=0 din=10 dout=10 count=1 full=0 empty=0
+t=36 push=1 pop=0 din=11 dout=10 count=2 full=0 empty=0
+t=46 push=1 pop=0 din=12 dout=10 count=3 full=0 empty=0
+t=56 push=1 pop=0 din=13 dout=10 count=4 full=1 empty=0
+t=66 push=1 pop=0 din=14 dout=10 count=4 full=1 empty=0
+t=76 push=1 pop=0 din=15 dout=10 count=4 full=1 empty=0
+t=86 push=0 pop=0 din=15 dout=10 count=4 full=1 empty=0
+t=96 push=0 pop=1 din=15 dout=11 count=3 full=0 empty=0
+t=106 push=0 pop=1 din=15 dout=12 count=2 full=0 empty=0
+t=116 push=0 pop=1 din=15 dout=13 count=1 full=0 empty=0
+t=126 push=1 pop=1 din=99 dout=99 count=1 full=0 empty=0
+t=136 push=0 pop=0 din=99 dout=99 count=1 full=0 empty=0
+t=146 push=0 pop=1 din=99 dout=0 count=0 full=0 empty=1
+t=156 push=0 pop=1 din=99 dout=0 count=0 full=0 empty=1
+t=166 push=0 pop=0 din=99 dout=0 count=0 full=0 empty=1

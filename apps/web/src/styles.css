@@ -956,3 +956,144 @@ table.data th {
 .viewer-hud .muted {
   color: #aab3c0;
 }
+
+/* Waveforms */
+.waves {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.waves-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+select.small {
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.wave-picker {
+  border-bottom: 1px solid var(--border);
+  padding: 6px 8px;
+  max-height: 40%;
+  overflow: auto;
+}
+
+.wave-picker input[type="text"],
+.wave-picker > input {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.wave-picker ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+}
+
+.waves-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+}
+
+.wave-names {
+  flex: none;
+  border-right: 1px solid var(--border);
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+
+.wave-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.wave-name.header {
+  border-bottom: 1px solid var(--border);
+}
+
+.wave-val {
+  color: #f0b429;
+}
+
+.wave-canvas {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* Presence */
+.sidebar-head {
+  display: grid;
+  gap: 8px;
+}
+
+.peers {
+  display: flex;
+  gap: 4px;
+}
+
+.peer {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+}
+
+.peer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 4px;
+  flex: none;
+}
+
+.sim-button {
+  width: 100%;
+}
+
+.share-body ul {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  font-size: 12px;
+  display: grid;
+  gap: 2px;
+}
+
+.share-form {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 4px;
+}
+
+.share-form input {
+  min-width: 0;
+  font-size: 12px;
+  padding: 3px 6px;
+}

@@ -1,9 +1,12 @@
 # SiliconCommons
 
-Open, browser-based, physics-aware chip design platform. Design Verilog in the browser with a real
-language server, keep every project in Git, run it from RTL to GDS with LibreLane on the IHP SG13G2
-130 nm open PDK, and inspect the result in a WebGPU layout viewer with DRC markers and timing/area
-reports.
+Open, browser-based, physics-aware chip design platform. Edit Verilog together in real time with a
+real language server, simulate it in the browser, keep every project in Git, run it from RTL to GDS
+with LibreLane on the IHP SG13G2 130 nm open PDK, and inspect the result in a WebGPU layout viewer
+with DRC markers and timing/area reports.
+
+**Phase 0 gate passed:** a UART goes from an empty project to a sign-off-clean GDS in 4 min 30 s
+while two people co-edit ([docs/phase0-gate.md](docs/phase0-gate.md)).
 
 Licensed under [Apache-2.0](LICENSE).
 
@@ -16,6 +19,8 @@ crates/
   sc-jobs/     job backends: LibreLane in Docker, metrics summary, DRC/STA report parsing
   sc-gds/      GDSII reader: parse, flatten hierarchy, tessellate for the GPU (pure Rust)
   sc-gds-wasm/ WebAssembly bindings for sc-gds, used by the web viewer
+  sc-sim/      event-driven Verilog simulator (pure Rust), checked against Icarus Verilog
+  sc-sim-wasm/ WebAssembly bindings for sc-sim, run in a Web Worker
 apps/
   web/         React + TypeScript shell with the Monaco editor (Vite)
 deploy/
@@ -123,7 +128,9 @@ All `/api` routes need `Authorization: Bearer <access token>`.
 | POST   | `/api/projects/{id}/commits`       | `{message, parent?, changes:[{op,path,content?}]}` |
 | GET    | `/api/projects/{id}/members`       | Members and roles                                |
 | POST   | `/api/projects/{id}/members`       | `{email, role}` (owner only)                     |
+| GET    | `/api/projects/{id}/snapshot?rev=` | All text files at a revision (the working copy's base) |
 | GET    | `/api/projects/{id}/lsp`           | WebSocket to the Verilog language server         |
+| GET    | `/api/projects/{id}/collab`        | WebSocket for real-time co-editing (y-protocols) |
 | POST   | `/api/projects/{id}/jobs`          | Queue an RTL→GDS run `{commit?, config?}`        |
 | GET    | `/api/projects/{id}/jobs`          | Recent runs                                      |
 | GET    | `/api/jobs/{id}`                   | Run status, error excerpt, sign-off summary      |
@@ -136,6 +143,36 @@ All `/api` routes need `Authorization: Bearer <access token>`.
 
 Commits are optimistic: pass the `parent` you edited against and you get `409` if `main` moved.
 Roles are `owner` > `editor` > `viewer`; public projects are readable by any signed-in user.
+
+### Co-editing
+
+Everyone who opens a project edits one shared working copy, a Yjs document kept by the API
+(`yrs`, `sc-api/src/collab.rs`): `files` (path → `Y.Text`), staged `deleted` paths and `meta.head`,
+the commit it is based on. The WebSocket speaks the standard y-protocols sync and awareness messages
+after a first `{"token": ...}` message, so Monaco gets shared editing and remote cursors through
+`y-monaco`. Viewers receive updates but their edits are dropped by the server. Rooms are seeded from
+the branch tip, saved to `data/collab/<project>.ydoc` and reloaded on restart; after every commit
+the room is reconciled with Git (files nobody edited take the committed content, edited ones stay as
+changes). The Changes panel compares the shared copy with `GET /snapshot`; a commit sends whatever
+is in the shared copy, so it includes everyone's edits.
+
+### Browser simulation
+
+**▶ Simulate** runs the project's Verilog (the shared working copy, uncommitted edits included) in
+a Web Worker with `sc-sim` compiled to WebAssembly, picks the testbench as top (modules nothing
+instantiates, `tb*` names first), and shows the `$display` output and waveforms (zoom, pan,
+cursor values, radix, signal picker) with a VCD download.
+
+`sc-sim` is an event-driven simulator with Verilog's active/NBA/postponed regions. It supports
+modules, parameters and hierarchy, `wire`/`reg`/`logic`/`integer`, memories, continuous and
+procedural assignments, `if`/`case`/`casez`/loops/`wait`, `#` delays and `@` events,
+`$display`/`$write`/`$strobe`/`$monitor`/`$finish`, `$time`, `$signed`, `$clog2`. It is 2-state
+(x/z read as 0) and limited to 64-bit signals; functions, tasks and `generate` are not supported
+yet and are reported with file and line. Every testbench in `crates/sc-sim/tests/conformance/`
+must print exactly what Icarus Verilog prints (`scripts/gen-sim-expected.sh` regenerates the
+references). Natively it runs a 1M-cycle counter testbench in about 0.5 s
+(`cargo run -p sc-sim --release --example bench`); `cargo run -p sc-sim --example run -- *.v` is a
+command-line runner.
 
 ### Flow runs
 
@@ -199,6 +236,10 @@ URI. `SC_VERIBLE_LS` sets the binary (default `.tools/verible/bin/verible-verilo
 - **Results**: on local disk under `data/jobs/`, not object storage yet.
 - **Layout viewer**: flattens the whole layout in the browser, which is fine for blocks up to a few
   million triangles. Large SoCs will need tiling and per-cell instancing on the GPU.
+- **Simulator**: our own Rust simulator instead of a WASM build of Icarus Verilog or Verilator
+  (no trustworthy WASM builds exist, and both depend on dynamic loading). It covers RTL and common
+  testbench code, not full Verilog; heavier simulations can later run as a server job with
+  Icarus/Verilator from the LibreLane image.
 - **Language server transport**: a Rust WebSocket bridge (`sc-api/src/lsp.rs`) and a small
   client in `apps/web/src/lsp.ts`, instead of Monaco's bundled LSP client, which cannot be torn
   down when you switch projects.

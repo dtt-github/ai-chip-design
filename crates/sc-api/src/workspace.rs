@@ -37,3 +37,31 @@ pub async fn export(
     })
     .await?
 }
+
+/// The branch tip, or `None` for an empty repository.
+pub async fn head(repos: Arc<RepoStore>, project: Uuid) -> anyhow::Result<Option<String>> {
+    Ok(tokio::task::spawn_blocking(move || repos.open(&project.to_string())?.head()).await??)
+}
+
+/// UTF-8 files up to `max_bytes` at `rev`, by path. Binary and larger files are left out.
+pub async fn text_files(
+    repos: Arc<RepoStore>,
+    project: Uuid,
+    rev: String,
+    max_bytes: usize,
+) -> anyhow::Result<std::collections::HashMap<String, String>> {
+    tokio::task::spawn_blocking(move || {
+        let repo = repos.open(&project.to_string())?;
+        let mut out = std::collections::HashMap::new();
+        for f in repo.list_files(Some(&rev))?.into_iter().take(MAX_EXPORT_FILES) {
+            if f.size > max_bytes {
+                continue;
+            }
+            if let Ok(text) = String::from_utf8(repo.read_file(Some(&rev), &f.path)?) {
+                out.insert(f.path, text);
+            }
+        }
+        Ok(out)
+    })
+    .await?
+}
