@@ -1,0 +1,75 @@
+# Checks every push and pull request: Rust format, lint and tests (against Postgres, with the
+# Verible language server), and the web app's typecheck and production build (with its
+# WebAssembly modules). Tests that run LibreLane in Docker are opt-in (`--ignored`) and stay local.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: "1.99.1"
+
+jobs:
+  rust:
+    name: Rust (fmt, clippy, tests)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: sc
+          POSTGRES_PASSWORD: sc
+          POSTGRES_DB: siliconcommons
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sc -d siliconcommons"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      # sqlx::test creates a fresh database per test from this server.
+      DATABASE_URL: postgres://sc:sc@localhost:5432/siliconcommons
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Verible (language server tests)
+        run: scripts/fetch-verible.sh
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+
+  web:
+    name: Web (typecheck, build)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@0.2.130
+      - name: WebAssembly modules (simulator, GDS parser)
+        run: scripts/build-wasm.sh
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @siliconcommons/web typecheck
+      - run: pnpm --filter @siliconcommons/web build

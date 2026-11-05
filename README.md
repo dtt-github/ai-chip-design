@@ -98,6 +98,13 @@ The `siliconcommons-dev-cli` client allows the password grant (dev only), which 
 curl -s -X POST localhost:8180/auth/v1/oidc/token -d grant_type=password -d client_id=siliconcommons-dev-cli -d client_secret=scdevcliscdevcliscdevcliscdevcliscdevcliscdevcliscdevcliscdevcli -d username=dev@siliconcommons.dev -d password=SiliconCommons-dev-2026
 ```
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request: `cargo fmt`,
+`cargo clippy -D warnings`, the Rust tests against a Postgres service (with Verible for the
+language-server tests), and the web app's typecheck and production build including the
+WebAssembly modules. LibreLane tests (`cargo test -p sc-jobs --test docker -- --ignored`) stay local.
+
 ## Deploying a pilot
 
 `deploy/pilot/` runs everything on one host behind HTTPS (Caddy, the API, Postgres, Rauthy with a
