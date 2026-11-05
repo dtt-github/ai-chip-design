@@ -134,6 +134,11 @@ All `/api` routes need `Authorization: Bearer <access token>`.
 | GET    | `/api/projects/{id}/collab`        | WebSocket for real-time co-editing (y-protocols) |
 | POST   | `/api/projects/{id}/jobs`          | Queue an RTL→GDS run `{commit?, config?}`        |
 | GET    | `/api/projects/{id}/jobs`          | Recent runs                                      |
+| GET    | `/api/ip`                          | IP blocks you can see, with their versions       |
+| POST   | `/api/projects/{id}/ip`            | Publish this project as a block version (editor) |
+| GET    | `/api/projects/{id}/ip/check`      | Licence verdict and plan for an import           |
+| POST   | `/api/projects/{id}/ip/import`     | Import a block version, pinned (editor)          |
+| GET    | `/api/projects/{id}/ip/imports`    | `ip.lock.json` with licences re-checked          |
 | POST   | `/api/projects/{id}/agent`         | Ask the agent for a change `{request}` (editor)  |
 | GET    | `/api/projects/{id}/agent`         | Recent proposals                                 |
 | GET    | `/api/agent/{id}`                  | Proposal: files, base content, gate, evidence    |
@@ -150,6 +155,36 @@ All `/api` routes need `Authorization: Bearer <access token>`.
 
 Commits are optimistic: pass the `parent` you edited against and you get `409` if `main` moved.
 Roles are `owner` > `editor` > `viewer`; public projects are readable by any signed-in user.
+
+### IP registry
+
+The IP tab publishes a project as a reusable block and imports blocks from other projects
+(`sc-api/src/ip.rs`).
+
+- **Publish** (`POST /api/projects/{id}/ip {version, name?, description?, commit?, top?}`, editor):
+  takes the top module (`DESIGN_NAME` in `config.json`) and every module it instantiates, with
+  their files, at one commit (testbenches stay out). Every published file needs an
+  `SPDX-License-Identifier` header; they combine into the block's licence (`A AND B`). The
+  project's simulation gate must pass at that commit and is stored with the version, together
+  with the ports, parameters and each file's sha256. Versions are semver, immutable and must
+  increase; a block name belongs to the project that first published it. Blocks are visible to
+  whoever can see the source project.
+- **Import** (`POST /api/projects/{id}/ip/import {block, version, accept_licence?}`, editor;
+  `GET .../ip/check?block=&version=` shows the same plan without doing it): copies the files, after
+  checking them against their published hashes, to `ip/<block>/`, adds them to `VERILOG_FILES` in
+  the project's `config*.json` files, and pins block, version, source commit, licence and file
+  hashes in `ip.lock.json`, in one commit by the person importing. Importing another version
+  replaces the old files and pin. Module names that would clash with the project's are refused.
+- **Licence check** (`sc-api/src/licence.rs`): every project declares an SPDX licence (chosen at
+  creation, default Apache-2.0, written into the starter files). The block's SPDX expression is
+  judged against it: permissive licences are compatible (Apache-2.0 into GPL-2.0-only is not);
+  file-level copyleft (CERN-OHL-W, MPL, LGPL) is compatible with conditions; strong copyleft
+  (GPL, AGPL, CERN-OHL-S) only goes into a project under a licence that satisfies it. `OR` takes
+  the best option, `AND` the worst. Incompatible imports are refused; a licence the check doesn't
+  know can only be imported by a project owner who accepts it explicitly (recorded in the lock
+  file). The obligations (notices, keeping copyleft files under their licence) are listed before
+  importing and written into the commit message. It is an automated check over common licences,
+  not legal advice.
 
 ### AI agent with a simulation gate
 

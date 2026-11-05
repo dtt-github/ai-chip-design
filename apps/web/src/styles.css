@@ -1298,3 +1298,101 @@ select.small {
   height: auto;
   max-height: 180px;
 }
+
+/* IP registry panel */
+.ip h3 {
+  margin: 14px 0 6px;
+}
+
+.ip p {
+  margin: 2px 0 6px;
+}
+
+.ip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.ip-item {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  min-width: 0;
+}
+
+.ip-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ip-row.link-row {
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ip-detail {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ip-detail code,
+.ip-item code {
+  overflow-wrap: anywhere;
+}
+
+.ip-ports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.ip-check {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.ip-check ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.ip-check button {
+  justify-self: start;
+}
+
+.ip-field {
+  display: grid;
+  gap: 2px;
+}
+
+.ip-publish {
+  display: grid;
+  gap: 6px;
+}
+
+.ip-publish button {
+  justify-self: start;
+}
+
+.ip-accept {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}

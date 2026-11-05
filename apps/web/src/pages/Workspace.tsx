@@ -11,6 +11,7 @@ import { languageFor } from "../monaco";
 import { FileTree } from "../components/FileTree";
 import { VerilogLsp, type LspStatus } from "../lsp";
 import { RunsList, RunView } from "../components/Runs";
+import { IpPanel } from "../components/Ip";
 import { SimPanel, type SimFile } from "../components/SimPanel";
 import { ShareBox } from "../components/ShareBox";
 import { AgentList, AgentView } from "../components/Agent";
@@ -34,7 +35,7 @@ export function WorkspacePage() {
   const [history, setHistory] = useState<CommitInfo[]>([]);
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<{ kind: "error" | "info"; text: string } | null>(null);
-  const [panelTab, setPanelTab] = useState<"changes" | "runs" | "agent">("changes");
+  const [panelTab, setPanelTab] = useState<"changes" | "runs" | "agent" | "ip">("changes");
   const [bottom, setBottom] = useState<Bottom>(null);
   const [maximized, setMaximized] = useState(false);
   const [committing, setCommitting] = useState(false);
@@ -288,7 +289,7 @@ export function WorkspacePage() {
           <div>
             <div className="project-title">{project?.name ?? "…"}</div>
             <div className="muted small">
-              {project?.pdk} · {project?.visibility} · {project?.role ?? "read-only"}
+              {project?.pdk} · {project?.licence} · {project?.visibility} · {project?.role ?? "read-only"}
             </div>
           </div>
           {peers.length > 0 && (
@@ -439,8 +440,13 @@ export function WorkspacePage() {
           <button role="tab" aria-selected={panelTab === "agent"} className={panelTab === "agent" ? "active" : ""} onClick={() => setPanelTab("agent")}>
             Agent
           </button>
+          <button role="tab" aria-selected={panelTab === "ip"} className={panelTab === "ip" ? "active" : ""} onClick={() => setPanelTab("ip")}>
+            IP
+          </button>
         </div>
-        {panelTab === "agent" ? (
+        {panelTab === "ip" && project ? (
+          <IpPanel project={project} head={head} canEdit={!readOnly} dirty={changes.length > 0} />
+        ) : panelTab === "agent" ? (
           <AgentList
             projectId={id}
             canPropose={!readOnly}

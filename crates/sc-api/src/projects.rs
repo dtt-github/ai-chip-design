@@ -47,6 +47,8 @@ pub struct Project {
     pub description: String,
     pub pdk: String,
     pub visibility: String,
+    /// SPDX identifier the project's own files are released under.
+    pub licence: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -139,6 +141,8 @@ pub struct CreateProject {
     #[serde(default)]
     pub description: String,
     pub visibility: Option<String>,
+    /// SPDX identifier; defaults to Apache-2.0.
+    pub licence: Option<String>,
 }
 
 fn slugify(name: &str) -> String {
@@ -168,12 +172,19 @@ pub async fn create(
         return Err(ApiError::BadRequest("could not derive a slug from the name; pass one explicitly".into()));
     }
     let visibility = req.visibility.unwrap_or_else(|| "private".into());
+    let licence = req.licence.map(|l| l.trim().to_string()).unwrap_or_else(|| "Apache-2.0".into());
+    if !crate::licence::is_known(&licence) {
+        return Err(ApiError::BadRequest(format!(
+            "unsupported licence '{licence}'; use one of {}",
+            crate::licence::project_licences().join(", ")
+        )));
+    }
     let id = Uuid::new_v4();
 
     let mut tx = state.db.begin().await?;
     let project: Project = sqlx::query_as(
-        "INSERT INTO projects (id, owner_id, slug, name, description, visibility)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+        "INSERT INTO projects (id, owner_id, slug, name, description, visibility, licence)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
     )
     .bind(id)
     .bind(user.id)
@@ -181,6 +192,7 @@ pub async fn create(
     .bind(&name)
     .bind(req.description.trim())
     .bind(&visibility)
+    .bind(&licence)
     .fetch_one(&mut *tx)
     .await
     .map_err(|e| match ApiError::from(e) {
@@ -194,7 +206,7 @@ pub async fn create(
         .await?;
 
     let repos = state.repos.clone();
-    let files = template::starter_files(&name, &slug);
+    let files = template::starter_files(&name, &slug, &licence);
     let author = Author { name: user.display_name.clone(), email: user.email.clone() };
     let initial = tokio::task::spawn_blocking(move || repos.create(&id.to_string(), files, &author)).await??;
 

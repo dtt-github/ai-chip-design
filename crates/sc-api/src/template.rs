@@ -54,7 +54,7 @@ const RESERVED: &[&str] = &[
     "xor",
 ];
 
-pub fn starter_files(name: &str, slug: &str) -> Vec<(String, Vec<u8>)> {
+pub fn starter_files(name: &str, slug: &str, licence: &str) -> Vec<(String, Vec<u8>)> {
     let top = slug.replace('-', "_");
     // Module names must be identifiers, and not Verilog/SystemVerilog keywords.
     let top = if top.starts_with(|c: char| c.is_ascii_digit()) || RESERVED.contains(&top.as_str()) {
@@ -72,7 +72,7 @@ pub fn starter_files(name: &str, slug: &str) -> Vec<(String, Vec<u8>)> {
     );
 
     let rtl = format!(
-        "// SPDX-License-Identifier: Apache-2.0\n\
+        "// SPDX-License-Identifier: {licence}\n\
          `default_nettype none\n\
          \n\
          module {top} #(\n    parameter WIDTH = 8\n) (\n    input  wire             clk,\n    input  wire             rst_n,\n    input  wire             en,\n    output reg  [WIDTH-1:0] count\n);\n\
@@ -93,7 +93,7 @@ pub fn starter_files(name: &str, slug: &str) -> Vec<(String, Vec<u8>)> {
         + "\n";
 
     let tb = format!(
-        "// SPDX-License-Identifier: Apache-2.0\n\
+        "// SPDX-License-Identifier: {licence}\n\
          `timescale 1ns/1ps\n\
          \n\
          module tb_{top};\n\
@@ -128,7 +128,7 @@ pub fn starter_files(name: &str, slug: &str) -> Vec<(String, Vec<u8>)> {
 mod tests {
     #[test]
     fn starter_testbench_passes() {
-        let files = super::starter_files("Demo", "demo");
+        let files = super::starter_files("Demo", "demo", "Apache-2.0");
         let srcs: Vec<(String, String)> = files
             .iter()
             .filter(|(p, _)| p.ends_with(".v"))
@@ -142,9 +142,9 @@ mod tests {
 
     #[test]
     fn module_name_is_a_valid_identifier() {
-        let files = super::starter_files("My Chip", "2-bit-alu");
+        let files = super::starter_files("My Chip", "2-bit-alu", "Apache-2.0");
         assert_eq!(files[1].0, "src/top_2_bit_alu.v");
-        assert_eq!(super::starter_files("Logic", "logic")[1].0, "src/top_logic.v");
+        assert_eq!(super::starter_files("Logic", "logic", "Apache-2.0")[1].0, "src/top_logic.v");
         let rtl = String::from_utf8(files[1].1.clone()).unwrap();
         assert!(rtl.contains("module top_2_bit_alu #("));
         assert!(rtl.contains("count <= {WIDTH{1'b0}};"));

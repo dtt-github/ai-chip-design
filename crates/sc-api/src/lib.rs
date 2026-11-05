@@ -7,7 +7,9 @@ pub mod collab;
 pub mod error;
 pub mod gate;
 pub mod gls;
+pub mod ip;
 pub mod jobs;
+pub mod licence;
 pub mod lsp;
 pub mod projects;
 mod template;
@@ -53,6 +55,11 @@ pub fn router(state: AppState) -> Router {
         .route("/projects/{id}/collab", get(collab::handler))
         .route("/projects/{id}/jobs", get(jobs::list).post(jobs::create))
         .route("/projects/{id}/agent", get(agent::list).post(agent::create))
+        .route("/ip", get(ip::list))
+        .route("/projects/{id}/ip", post(ip::publish))
+        .route("/projects/{id}/ip/imports", get(ip::imports))
+        .route("/projects/{id}/ip/check", get(ip::check))
+        .route("/projects/{id}/ip/import", post(ip::import))
         .route("/agent/{id}", get(agent::get))
         .route("/agent/{id}/merge", post(agent::merge))
         .route("/agent/{id}/discard", post(agent::discard))

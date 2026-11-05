@@ -10,6 +10,8 @@ export interface Project {
   description: string;
   pdk: string;
   visibility: "private" | "public";
+  /** SPDX identifier of the project's own licence. */
+  licence: string;
   created_at: string;
   updated_at: string;
   role: Role | null;
@@ -146,6 +148,87 @@ export function flowConfigs(paths: string[]): string[] {
   const configs = paths.filter((p) => /^config[^/]*\.(json|ya?ml|tcl)$/i.test(p.split("/").pop() ?? ""));
   // The default first, then by path.
   return configs.sort((a, b) => Number(b === "config.json") - Number(a === "config.json") || a.localeCompare(b));
+}
+
+/** Licences offered when creating a project (the server accepts any it knows). */
+export const PROJECT_LICENCES = [
+  "Apache-2.0",
+  "MIT",
+  "BSD-3-Clause",
+  "SHL-2.1",
+  "CERN-OHL-P-2.0",
+  "CERN-OHL-W-2.0",
+  "CERN-OHL-S-2.0",
+  "LGPL-3.0-or-later",
+  "GPL-3.0-or-later",
+  "GPL-2.0-only",
+];
+
+export interface IpPort {
+  name: string;
+  dir: "input" | "output" | "inout" | "unknown";
+  width: number | null;
+}
+
+export interface IpVersion {
+  block: string;
+  version: string;
+  commit_id: string;
+  top: string;
+  licence: string;
+  files: Record<string, string>;
+  ports: IpPort[];
+  params: Record<string, number>;
+  gate: GateReport;
+  published_by: string;
+  published_at: string;
+}
+
+export interface IpBlock {
+  name: string;
+  description: string;
+  project_id: string;
+  project_name: string;
+  versions: IpVersion[];
+}
+
+export type LicenceStatus = "compatible" | "conditions" | "unknown" | "incompatible";
+
+export interface LicenceVerdict {
+  status: LicenceStatus;
+  block: string;
+  project: string;
+  reasons: string[];
+  obligations: string[];
+  note: string;
+}
+
+export interface ImportCheck {
+  block: string;
+  version: string;
+  source_project: string;
+  commit: string;
+  licence: LicenceVerdict;
+  allowed: boolean;
+  can_accept: boolean;
+  collisions: string[];
+  replaces: string | null;
+  files: string[];
+  configs: string[];
+  problems: string[];
+}
+
+export interface IpLockEntry {
+  version: string;
+  commit: string;
+  source_project: string;
+  source_name: string;
+  top: string;
+  licence: string;
+  licence_check: LicenceStatus;
+  licence_accepted_by?: string;
+  files: Record<string, string>;
+  licence_verdict: LicenceVerdict;
 }
 
 export interface JobSummary {
@@ -286,8 +369,16 @@ const filePath = (p: string) => p.split("/").map(enc).join("/");
 
 export const api = {
   listProjects: () => request<Project[]>("GET", "/projects"),
-  createProject: (body: { name: string; description?: string; visibility?: string }) =>
+  createProject: (body: { name: string; description?: string; visibility?: string; licence?: string }) =>
     request<Project>("POST", "/projects", body),
+  ipBlocks: () => request<IpBlock[]>("GET", "/ip"),
+  ipImports: (id: string) => request<{ blocks: Record<string, IpLockEntry> }>("GET", `/projects/${enc(id)}/ip/imports`),
+  ipCheck: (id: string, block: string, version: string) =>
+    request<ImportCheck>("GET", `/projects/${enc(id)}/ip/check?block=${enc(block)}&version=${enc(version)}`),
+  ipImport: (id: string, body: { block: string; version: string; accept_licence?: boolean }) =>
+    request<ImportCheck & { imported_commit: string }>("POST", `/projects/${enc(id)}/ip/import`, body),
+  ipPublish: (id: string, body: { version: string; name?: string; description?: string; commit?: string }) =>
+    request<IpVersion>("POST", `/projects/${enc(id)}/ip`, body),
   getProject: (id: string) => request<Project>("GET", `/projects/${enc(id)}`),
   tree: (id: string) => request<Tree>("GET", `/projects/${enc(id)}/tree`),
   snapshot: (id: string, rev?: string) =>
