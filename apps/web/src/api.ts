@@ -254,6 +254,28 @@ export interface Machine {
   reset: string | null;
 }
 
+/** A planted mistake no example noticed. */
+export interface SlippedMistake {
+  file: string;
+  line: number;
+  kind: string;
+  original: string;
+  mistake: string;
+  /** In words, code in backticks. */
+  text: string;
+  /** A starting point for an example that would catch it. */
+  suggestion: string;
+}
+
+/** "Would your examples catch a mistake?" */
+export interface MistakesReport {
+  caught: number;
+  tried: number;
+  sites: number;
+  slipped: SlippedMistake[];
+  elapsed_ms: number;
+}
+
 export interface SpecRun {
   commit: string;
   examples: ExampleResult[];
@@ -600,6 +622,7 @@ export const api = {
   saveSpec: (id: string, body: { spec: Spec; parent: string; message?: string }) =>
     request<{ commit: string; changed: boolean }>("PUT", `/projects/${enc(id)}/spec`, body),
   runSpec: (id: string) => request<SpecRun>("POST", `/projects/${enc(id)}/spec/run`),
+  plantMistakes: (id: string) => request<MistakesReport>("POST", `/projects/${enc(id)}/spec/mistakes`),
   exampleTestbench: (id: string, body: { spec: Spec; example: SpecExample }) =>
     request<{ path: string; top: string; source: string }>("POST", `/projects/${enc(id)}/spec/testbench`, body),
   draftSpec: (id: string, body: { instruction: string; spec?: Spec | null }) =>

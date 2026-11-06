@@ -8,6 +8,11 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **Would your examples catch a mistake?** Health can plant small mistakes in a copy of the design,
+  one at a time (comparisons turned round, constants one off, conditions and negations reversed,
+  `&&`/`||` and `+`/`-` swapped, assignments left out), run the examples against each, and list
+  those that slip through in plain words with **Add an example**. `POST /projects/{id}/spec/mistakes`
+  (mutation testing on the parsed design; files untouched; 40 mistakes, 30 s at most).
 - **How it works**: state machines are found in the design's Verilog (a `case` on a register
   whose arms set it, directly or through a next-state variable) and drawn in Health: states,
   numbered moves listed with when they happen, the reset state, and which moves the examples
