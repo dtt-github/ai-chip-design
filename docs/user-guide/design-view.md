@@ -58,7 +58,9 @@ you did is listed as plain steps ("set en to 1", "4 cycles pass", "check led is 
 and **Start over**. **Save as an example** turns it into an example with those steps; save the
 spec to keep it. Each change is simulated from reset with the testbench the example compiles to
 (`POST /spec/testbench`), so the saved example checks exactly what you saw. It is a quick way to
-close a gap Health shows ("Never tried: `en` = 0"): set the input, tick the outputs, save. It uses
+close a gap Health shows ("Never tried: `en` = 0"): set the input, tick the outputs, save. When
+the design has a state machine, its diagram is shown with the current state lit, so you can watch
+it move as you play. It uses
 the committed design and tests the design, not the whole chip.
 
 ### Chip examples
@@ -96,6 +98,12 @@ mean?** and the expert numbers underneath:
   try. **Add an example** opens Examples with the missing case written out as a new example's
   description; the file and line link opens the code. A `default` choice that no example reaches
   is shown but doesn't hold the project back, since it is often impossible by design.
+- **How it works**: each state machine found in the Verilog, drawn as states (boxes, with the one
+  after reset marked) and numbered moves between them, listed with when they happen ("state 0 →
+  state 1 when `rx` = 0"). Moves an example takes are solid; dashed red ones no example takes yet;
+  dotted ones can't be told apart (both sides of a `?:` choice). A machine is a `case` on a register
+  whose arms set that register, directly or through a next-state variable; named states come from
+  `localparam`s.
 - **Fast enough**: whether the clock target is met, and by how much ("could run about 4× faster").
 - **Can be manufactured**: layout rule checks, layout versus schematic, antenna checks.
 - **Size and power**: area, cell count, power, supply droop.

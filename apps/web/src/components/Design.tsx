@@ -13,6 +13,7 @@ import {
   type StepOp,
 } from "../api";
 import { extendTestbench, fmt as fmtValue, replay, targetSpec, type Replay } from "../lib/replay";
+import { StateMachine } from "./StateMachine";
 import { TryIt } from "./TryIt";
 import { SimClient } from "../sim/client";
 import { BlocksStep } from "./Blocks";
@@ -693,6 +694,7 @@ function Examples({
         <TryIt
           projectId={projectId}
           spec={spec}
+          machines={ran?.machines ?? []}
           canEdit={canEdit}
           onClose={() => setTrying(false)}
           onSave={(ex) => {
@@ -1302,6 +1304,22 @@ function Health({
           {cov.gaps.length > 10 && <li className="muted small">and {cov.gaps.length - 10} more</li>}
         </ul>
       ) : undefined,
+    });
+  }
+  for (const [i, m] of (run?.machines ?? []).entries()) {
+    const untested = m.transitions.filter((t) => t.covered === false).length;
+    cards.push({
+      id: `machine-${i}`,
+      ok: null,
+      title: `How it works: ${m.module} steps through ${m.states.length} states`,
+      plain:
+        `${m.transitions.length} ways to move between them` +
+        (untested ? `; your examples never take ${untested} of them (dashed red)` : "; your examples take every one that can be told") +
+        ".",
+      explain:
+        "The design remembers which step of its job it is on in a state register, and moves to another state when a condition holds. This diagram was found in the Verilog: each box is a state, each arrow a move, numbered and listed with when it happens.",
+      expert: `register ${m.state} in ${m.file} (module ${m.module}); states ${m.states.join(", ")}${m.reset ? `; reset to ${m.reset}` : ""}`,
+      extra: <StateMachine machine={m} />,
     });
   }
   if (s) {

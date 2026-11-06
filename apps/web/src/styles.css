@@ -2438,3 +2438,72 @@ select.small {
   max-height: 140px;
   overflow-y: auto;
 }
+
+/* State machine diagrams. */
+.sm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.sm-state rect {
+  fill: var(--surface-2);
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+
+.sm-state text {
+  fill: var(--text);
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
+.sm-state.now rect {
+  fill: color-mix(in srgb, var(--accent) 30%, var(--surface));
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.sm-edge path {
+  fill: none;
+  stroke-width: 1.6;
+}
+
+.sm-edge.tested path {
+  stroke: var(--accent);
+}
+
+.sm-edge.untested path {
+  stroke: var(--danger);
+  stroke-dasharray: 6 4;
+}
+
+.sm-edge.unknown path {
+  stroke: var(--muted);
+  stroke-dasharray: 2 3;
+}
+
+.sm-num,
+.sm-reset text {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.sm-reset path {
+  stroke: var(--muted);
+  fill: none;
+}
+
+.sm-arrowhead {
+  fill: var(--muted);
+}
+
+.sm-list {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.sm-list li.untested {
+  color: var(--danger);
+}

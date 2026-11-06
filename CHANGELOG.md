@@ -8,6 +8,10 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Added
 
+- **How it works**: state machines are found in the design's Verilog (a `case` on a register
+  whose arms set it, directly or through a next-state variable) and drawn in Health: states,
+  numbered moves listed with when they happen, the reset state, and which moves the examples
+  take. In Try it the current state is lit as you play. `POST /spec/run` returns `machines`.
 - **Try it**: in Examples, the design as a small board (switches, pulse buttons and number boxes
   for inputs, lights and values for outputs, a clock you step), simulated in the browser. What you
   do is recorded as steps and the outputs you tick as checks; **Save as an example** adds it to
@@ -42,6 +46,8 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Changed
 
+- Conditions in messages and coverage are printed with only the parentheses precedence needs
+  (`cnt == N / 2 - 1`).
 - The assistant counts example timing explicitly (cycle by cycle, with the reasoning), asks whether
   outside inputs need a synchronizer or debouncing, treats an example of the situation a question is
   about as depending on it, and always writes at least one example that holds whatever the answers

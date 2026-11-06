@@ -5,9 +5,10 @@
 // the example will check once saved.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type Spec, type SpecExample, type SpecPort, type SpecStep } from "../api";
+import { api, type Machine, type Spec, type SpecExample, type SpecPort, type SpecStep } from "../api";
 import { extendTestbench, replay, type Replay } from "../lib/replay";
 import { SimClient } from "../sim/client";
+import { StateMachine } from "./StateMachine";
 
 /** Cycles of history shown under the board. */
 const HISTORY = 40;
@@ -17,10 +18,13 @@ const step = (op: SpecStep["op"], signal = "", value = "", cycles = 0, note = ""
 export function TryIt({
   projectId,
   spec,
+  machines,
   canEdit,
   onSave,
   onClose,
 }: {
+  /** State machines of the design (from the last example run), shown with the current state lit. */
+  machines: Machine[];
   projectId: string;
   /** The spec being edited; its connections must match the committed design. */
   spec: Spec;
@@ -40,6 +44,8 @@ export function TryIt({
   const client = useRef<SimClient | null>(null);
   const latest = useRef(0);
 
+  // Machines in the design itself (the testbench names it `dut`), whose register can be read live.
+  const mine = useMemo(() => machines.filter((m) => m.module === spec.top), [machines, spec.top]);
   const inputs = spec.ports.filter((p) => p.dir === "in" && p.name !== spec.clock?.port && p.name !== spec.reset?.port);
   const outputs = spec.ports.filter((p) => p.dir === "out");
   const now = steps.reduce((c, s) => c + (s.op === "wait" ? Math.max(1, s.cycles) : 0), 0);
@@ -70,12 +76,12 @@ export function TryIt({
       const tb = await api.exampleTestbench(projectId, { spec, example: ex });
       const sim = await client.current!.run([...files.current, { name: tb.path, source: extendTestbench(tb.source, spec) }], tb.top);
       if (id !== latest.current) return;
-      setRep(replay(spec, ex, sim));
+      setRep(replay(spec, ex, sim, mine.map((m) => ({ name: `dut.${m.state}`, width: 64 }))));
       setError(null);
     })()
       .catch((e: Error) => id === latest.current && setError(e.message))
       .finally(() => id === latest.current && setRunning(false));
-  }, [projectId, spec, steps]);
+  }, [projectId, spec, steps, mine]);
 
   const value = (name: string, c = now): bigint | null => rep?.rows.find((r) => r.name === name)?.values[c] ?? null;
   const act = (...s: SpecStep[]) => setActions((a) => [...a, s]);
@@ -210,6 +216,12 @@ export function TryIt({
       </div>
 
       {error && <p className="error small">{error}</p>}
+
+      {mine.map((m) => {
+        const v = value(`dut.${m.state}`);
+        const i = v === null ? -1 : m.values.findIndex((x) => x !== null && BigInt(x) === v);
+        return <StateMachine key={m.state} machine={m} current={i >= 0 ? m.states[i] : null} />;
+      })}
 
       {rep && (
         <div className="tryit-history" aria-label={`The last ${now - from + 1} ${tick}s`}>
