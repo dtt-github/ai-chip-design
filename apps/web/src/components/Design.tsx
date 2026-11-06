@@ -1289,17 +1289,17 @@ function Health({
       ok: real.length === 0 ? true : null,
       title:
         cov.gaps.length === 0
-          ? "The examples try every decision in the design"
+          ? "The examples try every case the design tells apart"
           : real.length === 0
-            ? "The examples try every decision that can happen"
+            ? "The examples try every case that can happen"
             : `The examples don't try ${real.length} ${real.length === 1 ? "case" : "cases"} yet`,
       plain:
-        `Your examples try ${cov.covered} of ${cov.total} decisions the design makes (each if/else branch and case choice).` +
+        `Your examples try ${cov.covered} of ${cov.total} cases the design tells apart: each if/else branch and case choice, each part of a combined condition both ways, and both sides of each ?: choice.` +
         (real.length ? " Passing examples only show the cases they try:" : "") +
         (maybe ? ` ${maybe} ${maybe === 1 ? "choice is" : "choices are"} never reached, which may be impossible by design.` : ""),
       explain:
         "While your examples run, the simulator records which branches of the design they go through. A branch none of them takes could be wrong without any example noticing. Add an example for each case that matters.",
-      expert: `branch coverage ${cov.covered}/${cov.total} over the example testbenches (if/else, case arms; implicit defaults not counted)`,
+      expert: `coverage ${cov.covered}/${cov.total} over the example testbenches: branches (if/else, case arms; implicit defaults not counted), condition parts of &&/|| decisions both ways, ?: sides`,
       extra: cov.gaps.length ? (
         <ul className="coverage-gaps">
           {[...real, ...cov.gaps.filter((g) => g.kind === "default")].slice(0, 10).map((g) => (

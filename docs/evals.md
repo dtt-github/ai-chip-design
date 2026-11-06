@@ -138,6 +138,8 @@ costs about $14; larger tasks such as `uart_rx` and `fifo4` will likely cost mor
   sentence in the description saying glitches of half a bit or less are ignored. The planted-mistakes
   check showed its examples let 6 of 34 mistakes through; now only 2 do, both timing the
   description leaves open. Results below for `uart_rx` predate this.
+- 2026-11-06, `updown` and `fifo4`: one example each (neither button pressed; a read and a write in
+  the same cycle), found by the stricter coverage. Descriptions unchanged.
 
 ## Baseline results
 

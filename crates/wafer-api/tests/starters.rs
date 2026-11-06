@@ -163,12 +163,8 @@ async fn start_from_and_add_starters(db: PgPool) {
     assert_eq!(m["states"], json!(["0", "1", "2", "3"]));
     let ts = m["transitions"].as_array().unwrap();
     assert_eq!(ts.len(), 5, "{m}");
-    // Both sides of `state <= rx ? 0 : 2` are in one branch: whether each was taken can't be told.
-    let glitch = ts.iter().find(|t| t["from"] == "1" && t["to"] == "0").unwrap();
-    assert!(glitch["covered"].is_null(), "{glitch}");
-    let taken =
-        |from: &str, to: &str| ts.iter().find(|t| t["from"] == from && t["to"] == to).unwrap()["covered"].clone();
-    assert_eq!((taken("0", "1"), taken("2", "3"), taken("3", "0")), (json!(true), json!(true), json!(true)));
+    // Each side of `state <= rx ? 0 : 2` is counted on its own: the glitch example takes 1 → 0.
+    assert!(ts.iter().all(|t| t["covered"] == true), "every move is taken: {m}");
 
     // Planted mistakes: the receiver's examples miss a few; the blinker with one example misses none.
     let (s, m) = call(&app, Method::POST, &format!("/api/projects/{rid}/spec/mistakes"), &ada, None).await;

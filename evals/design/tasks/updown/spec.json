@@ -144,6 +144,50 @@
           "value": "0"
         }
       ]
+    },
+    {
+      "id": "neither_holds",
+      "title": "Neither button keeps the count",
+      "given": "count up to 3, then let go of up",
+      "expect": "the count stays 3",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "up",
+          "value": "1",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 3,
+          "note": ""
+        },
+        {
+          "op": "expect",
+          "signal": "count",
+          "value": "3",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "up",
+          "value": "0",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "expect_for",
+          "signal": "count",
+          "value": "3",
+          "cycles": 5,
+          "note": "neither pressed"
+        }
+      ]
     }
   ]
 }

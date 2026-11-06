@@ -130,13 +130,13 @@ export function StateMachine({ machine, current }: { machine: Machine; current?:
             </span>{" "}
             when {withCode(t.when)}
             {t.covered === false && <strong> · no example takes this</strong>}
-            {t.covered === null && <span className="muted"> · not measured (a ?: choice)</span>}
+            {t.covered === null && <span className="muted"> · not run yet</span>}
           </li>
         ))}
       </ol>
       <p className="muted small" style={{ margin: 0 }}>
         Solid arrows: an example takes them. {untested > 0 && "Dashed red: no example does yet. "}
-        {unknown > 0 && "Dotted: can't be told apart by the examples' coverage. "}
+        {unknown > 0 && "Dotted: the examples haven't run yet. "}
         Found in <code>{machine.file}</code>, register <code>{machine.state}</code>.
       </p>
     </div>

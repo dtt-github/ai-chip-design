@@ -121,7 +121,8 @@ pub enum CExpr {
     Repl(u32, Box<CExpr>),
     Unary(UOp, Box<CExpr>),
     Binary(BOp, Box<CExpr>, Box<CExpr>),
-    Ternary(Box<CExpr>, Box<CExpr>, Box<CExpr>),
+    /// `c ? t : f`, with the coverage point counting its `t` side (the `f` side is the next one).
+    Ternary(Box<CExpr>, Box<CExpr>, Box<CExpr>, Option<usize>),
     Time,
     Random(Option<usize>),
     Signed(Box<CExpr>),
@@ -157,7 +158,7 @@ impl CExpr {
                 BOp::Shl | BOp::Shr | BOp::AShr | BOp::Pow => a.width(d),
                 _ => 1,
             },
-            CExpr::Ternary(_, t, f) => t.width(d).max(f.width(d)),
+            CExpr::Ternary(_, t, f, _) => t.width(d).max(f.width(d)),
             CExpr::Time => 64,
             CExpr::Random(_) => 32,
             CExpr::Signed(a) | CExpr::Unsigned(a) => a.width(d),
@@ -175,7 +176,7 @@ impl CExpr {
                 b,
             ) => a.signed() && b.signed(),
             CExpr::Binary(BOp::Shl | BOp::Shr | BOp::AShr | BOp::Pow, a, _) => a.signed(),
-            CExpr::Ternary(_, t, f) => t.signed() && f.signed(),
+            CExpr::Ternary(_, t, f, _) => t.signed() && f.signed(),
             _ => false,
         }
     }
@@ -213,7 +214,7 @@ impl CExpr {
                 a.reads(out);
                 b.reads(out);
             }
-            CExpr::Ternary(c, t, f) => {
+            CExpr::Ternary(c, t, f, _) => {
                 c.reads(out);
                 t.reads(out);
                 f.reads(out);
@@ -299,6 +300,8 @@ pub enum Op {
     Halt,
     /// Counts one visit of coverage point `n` (`Design::cover`).
     Cover(usize),
+    /// Counts each part of a combined condition as true (its point) or false (the next point).
+    CoverParts(Vec<(CExpr, usize)>),
 }
 
 /// A decision in the design whose branches the simulation can take or not: each `if`/`else`
@@ -324,6 +327,11 @@ pub enum CoverKind {
     Arm { labels: String },
     /// The `default` arm, or no arm matching when there is none.
     Default { written: bool },
+    /// One part of a combined condition (`full` in `wr && !full`) was `value` when the decision was
+    /// made; `what` is the whole condition.
+    Part { atom: String, value: bool },
+    /// A `?:` choice took its true (`value`) or false side; `what` is its condition.
+    Side { value: bool },
 }
 
 #[derive(Debug, Clone)]
@@ -765,8 +773,13 @@ impl<'a> Elab<'a> {
 
     /// A new coverage point in `s`, and the op that counts it.
     fn cover(&mut self, s: &Scope, line: u32, kind: CoverKind, what: String) -> Op {
+        Op::Cover(self.cover_point(s, line, kind, what))
+    }
+
+    /// A new coverage point in `s`, by number.
+    fn cover_point(&mut self, s: &Scope, line: u32, kind: CoverKind, what: String) -> usize {
         self.d.cover.push(CoverPoint { file: s.module.file.clone(), line, scope: s.path.clone(), kind, what });
-        Op::Cover(self.d.cover.len() - 1)
+        self.d.cover.len() - 1
     }
 
     fn temp(&mut self, s: &Scope) -> usize {
@@ -1420,7 +1433,15 @@ impl<'a> Elab<'a> {
                 CExpr::Binary(op, a, b)
             }
             Expr::Ternary(c, t, f) => {
-                CExpr::Ternary(Box::new(self.expr(s, c)?), Box::new(self.expr(s, t)?), Box::new(self.expr(s, f)?))
+                let (line, what) = (c.line().unwrap_or(0), c.to_string());
+                let id = self.cover_point(s, line, CoverKind::Side { value: true }, what.clone());
+                self.cover_point(s, line, CoverKind::Side { value: false }, what);
+                CExpr::Ternary(
+                    Box::new(self.expr(s, c)?),
+                    Box::new(self.expr(s, t)?),
+                    Box::new(self.expr(s, f)?),
+                    Some(id),
+                )
             }
             Expr::Call(name, args, line) if !name.starts_with('$') => {
                 if self.hoist.is_none() {
@@ -1558,6 +1579,24 @@ impl<'a> Elab<'a> {
                 let line = cond.line().unwrap_or(0);
                 let what = cond.to_string();
                 let c = self.sexpr(s, cond, ops)?;
+                // A combined condition: count each part both ways at the moment of the decision.
+                let (mut ea, mut ca) = (Vec::new(), Vec::new());
+                ast_parts(cond, &mut ea);
+                c_parts(&c, &mut ca);
+                if ea.len() > 1 && ea.len() == ca.len() {
+                    let mut parts = Vec::new();
+                    for (e, ce) in ea.iter().zip(ca) {
+                        let id = self.cover_point(
+                            s,
+                            line,
+                            CoverKind::Part { atom: e.to_string(), value: true },
+                            what.clone(),
+                        );
+                        self.cover_point(s, line, CoverKind::Part { atom: e.to_string(), value: false }, what.clone());
+                        parts.push((ce, id));
+                    }
+                    ops.push(Op::CoverParts(parts));
+                }
                 let jz = ops.len();
                 ops.push(Op::Halt); // patched
                 let cov = self.cover(s, line, CoverKind::Then, what.clone());
@@ -1809,6 +1848,29 @@ fn op_reads(op: &Op, out: &mut BTreeSet<usize>) {
         Op::JumpIfZero(e, _) | Op::Delay(e) | Op::WaitCond(e, _) => e.reads(out),
         Op::Display { args, .. } => args.iter().for_each(|a| a.reads(out)),
         Op::Wait(items) => items.iter().for_each(|i| i.expr.reads(out)),
+        Op::CoverParts(parts) => parts.iter().for_each(|(e, _)| e.reads(out)),
         Op::Jump(_) | Op::Finish | Op::Halt | Op::Cover(_) => {}
+    }
+}
+
+/// The parts of a condition joined by `&&` and `||`.
+fn ast_parts<'e>(e: &'e Expr, out: &mut Vec<&'e Expr>) {
+    match e {
+        Expr::Binary("&&" | "||", a, b) => {
+            ast_parts(a, out);
+            ast_parts(b, out);
+        }
+        _ => out.push(e),
+    }
+}
+
+/// The same parts, compiled (`&&`/`||` compile one to one to `LAnd`/`LOr`).
+fn c_parts(e: &CExpr, out: &mut Vec<CExpr>) {
+    match e {
+        CExpr::Binary(BOp::LAnd | BOp::LOr, a, b) => {
+            c_parts(a, out);
+            c_parts(b, out);
+        }
+        _ => out.push(e.clone()),
     }
 }
