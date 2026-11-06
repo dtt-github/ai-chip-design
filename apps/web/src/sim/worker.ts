@@ -22,7 +22,7 @@ self.onmessage = async (ev: MessageEvent<SimRequest>) => {
       const ms = performance.now() - t0;
       const names = last.names;
       const widths = last.widths;
-      const signals = names.map((name, i) => ({ name, width: widths[i], times: last!.times(i), values: last!.values(i) }));
+      const signals = names.map((name, i) => ({ name, width: widths[i], times: last!.times(i), values: last!.values(i), by: last!.by(i) }));
       reply(
         {
           type: "result",
@@ -37,9 +37,10 @@ self.onmessage = async (ev: MessageEvent<SimRequest>) => {
             steps: last.steps,
             ms,
             signals,
+            origins: JSON.parse(last.origins()),
           },
         },
-        signals.flatMap((s) => [s.times.buffer, s.values.buffer]),
+        signals.flatMap((s) => [s.times.buffer, s.values.buffer, s.by.buffer]),
       );
     }
   } catch (e) {

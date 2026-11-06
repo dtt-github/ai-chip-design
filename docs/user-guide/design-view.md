@@ -83,7 +83,19 @@ Selecting an example simulates it in your browser and replays its steps against 
 by cycle: each connection's value, the example's checks laid over it (amber), any difference in red,
 and the inputs it sets. The first difference is explained in plain words, including when the
 expected value did appear ("it became 1 one cycle later, so the design may be one cycle slower
-than the example says"). Three buttons answer the one question to decide, **Which is wrong?**:
+than the example says").
+
+**Click any value in the timeline to see why it is what it is.** The simulator records which line of
+the design wrote every value, so the explanation says when the value appeared, the line that wrote
+it ("line 20 of blinker.v wrote it: `led <= ~led`"), why that line ran (each `if` and `case`
+around it and which way it went: "`cnt == N - 1` was true (cnt = 3)"), and the values it used.
+Every value mentioned can be clicked in turn, so you can follow a wrong output back, one step at
+a time, to the decision or the example input that caused it. Values passed through a port of a
+block are followed into the block; an input the example sets ends the chain ("set by step 1 of
+the example"). When you then ask the AI to fix the design or the assistant to correct the
+example, the explanation you followed goes with the request.
+
+Three buttons answer the one question to decide, **Which is wrong?**:
 
 - **The design: ask the AI to fix it**, with this explanation;
 - **The example: use what the design did**: rewrites the failing check from the simulation,

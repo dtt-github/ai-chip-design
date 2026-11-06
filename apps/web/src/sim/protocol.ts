@@ -5,6 +5,25 @@ export interface SimSignal {
   times: Float64Array;
   /** Value from each change time on. */
   values: BigUint64Array;
+  /** What wrote each value: an index into `origins`, or NO_ORIGIN (nothing in the design). */
+  by: Uint32Array;
+}
+
+/** `SimSignal.by` for a value nothing in the design wrote. */
+export const NO_ORIGIN = 0xffffffff;
+
+/** Where written values come from: an assignment (or port connection) in the design. */
+export interface SimOrigin {
+  file: string;
+  line: number;
+  /** The instance it is in, e.g. `tb.dut`. */
+  scope: string;
+  /** As written: `count <= count + 1`, `assign busy = state != 0`, `output led of tb.dut`. */
+  text: string;
+  /** Full names of the signals its value is computed from. */
+  reads: string[];
+  /** The `if`/`case` decisions it is inside, outermost first, and which way each went. */
+  conds: { line: number; text: string; reads: string[]; taken: string }[];
 }
 
 export interface SimResult {
@@ -17,6 +36,7 @@ export interface SimResult {
   steps: number;
   ms: number;
   signals: SimSignal[];
+  origins: SimOrigin[];
 }
 
 export type SimRequest =

@@ -18,7 +18,7 @@ pub mod vcd;
 
 use std::collections::{HashMap, HashSet};
 
-pub use sim::{Limits, SimResult, WaveSignal};
+pub use sim::{Limits, NO_ORIGIN, SimResult, WaveSignal};
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq)]
 pub enum Error {

@@ -41,7 +41,13 @@ pub struct WaveSignal {
     /// Change times (ascending) and the value from each time on.
     pub times: Vec<u64>,
     pub values: Vec<u64>,
+    /// What wrote each value: an index into [`SimResult::origins`], or [`NO_ORIGIN`] (a starting
+    /// value nothing wrote). A starting value is credited to the first assignment that writes it.
+    pub by: Vec<u32>,
 }
+
+/// [`WaveSignal::by`] for a value nothing in the design wrote.
+pub const NO_ORIGIN: u32 = u32::MAX;
 
 #[derive(Debug, Clone)]
 pub struct SimResult {
@@ -58,6 +64,8 @@ pub struct SimResult {
     pub steps: u64,
     /// Every branch coverage point of the design, with how often it was taken.
     pub coverage: Vec<(crate::elab::CoverPoint, u64)>,
+    /// Where written values come from ([`WaveSignal::by`]).
+    pub origins: Vec<crate::elab::Origin>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -76,6 +84,8 @@ struct Proc {
     wait_prev: Vec<u64>,
     /// Index of the `Wait`/`WaitCond` op the process is blocked on.
     wait_op: usize,
+    /// The origin of its next assignment (`Op::From`).
+    from: u32,
 }
 
 enum Scheduled {
@@ -90,6 +100,8 @@ struct Write {
     lo: u32,
     w: u32,
     value: u64,
+    /// The origin of the value.
+    by: u32,
 }
 
 pub struct Sim<'d> {
@@ -144,6 +156,7 @@ impl<'d> Sim<'d> {
                     width: s.width,
                     times: vec![0],
                     values: vec![0],
+                    by: vec![NO_ORIGIN],
                 })
             })
             .collect();
@@ -154,7 +167,14 @@ impl<'d> Sim<'d> {
             procs: d
                 .processes
                 .iter()
-                .map(|_| Proc { pc: 0, state: State::Ready, epoch: 0, wait_prev: Vec::new(), wait_op: 0 })
+                .map(|_| Proc {
+                    pc: 0,
+                    state: State::Ready,
+                    epoch: 0,
+                    wait_prev: Vec::new(),
+                    wait_op: 0,
+                    from: NO_ORIGIN,
+                })
                 .collect(),
             waiters: vec![Vec::new(); d.signals.len()],
             active: (0..d.processes.len()).collect(),
@@ -192,6 +212,7 @@ impl<'d> Sim<'d> {
             warnings: self.warnings,
             steps: self.steps,
             coverage: self.d.cover.iter().cloned().zip(self.cover_hits.iter().map(|c| c.get())).collect(),
+            origins: self.d.origins.clone(),
         })
     }
 
@@ -299,10 +320,11 @@ impl<'d> Sim<'d> {
             };
             self.procs[p].pc += 1;
             match op {
+                Op::From(n) => self.procs[p].from = *n,
                 Op::Assign(lv, e) => {
                     let w = lv.width(self.d);
                     let v = self.eval_ctx(e, w);
-                    let writes = self.resolve(lv, v);
+                    let writes = self.resolve(lv, v, self.procs[p].from);
                     for wr in &writes {
                         self.write(wr);
                     }
@@ -310,7 +332,7 @@ impl<'d> Sim<'d> {
                 Op::NbAssign(lv, e, delay) => {
                     let w = lv.width(self.d);
                     let v = self.eval_ctx(e, w);
-                    let writes = self.resolve(lv, v);
+                    let writes = self.resolve(lv, v, self.procs[p].from);
                     match delay {
                         Some(d) => {
                             let d = self.eval(d);
@@ -456,6 +478,13 @@ impl<'d> Sim<'d> {
         let m = mask(w.w) << w.lo;
         let new = ((old & !m) | ((w.value & mask(w.w)) << w.lo)) & mask(self.d.signals[w.sig].width);
         if new == old {
+            // A value the design confirms without changing (its starting value) is credited to
+            // the first assignment that writes it, so it can be explained too.
+            if let Some(wave) = self.waves[w.sig].as_mut()
+                && wave.by.last() == Some(&NO_ORIGIN)
+            {
+                *wave.by.last_mut().unwrap() = w.by;
+            }
             return;
         }
         self.vals[w.slot] = new;
@@ -464,9 +493,11 @@ impl<'d> Sim<'d> {
         {
             if wave.times.last() == Some(&self.now) {
                 *wave.values.last_mut().unwrap() = new;
+                *wave.by.last_mut().unwrap() = w.by;
             } else {
                 wave.times.push(self.now);
                 wave.values.push(new);
+                wave.by.push(w.by);
                 self.changes += 1;
                 if self.changes == self.limits.max_changes {
                     self.warnings.push(format!("waveform recording stopped after {} changes", self.changes));
@@ -495,38 +526,38 @@ impl<'d> Sim<'d> {
     }
 
     /// Turns an assignment of `v` to `lv` into slot writes, evaluating indices now.
-    fn resolve(&self, lv: &LVal, v: u64) -> Vec<Write> {
+    fn resolve(&self, lv: &LVal, v: u64, by: u32) -> Vec<Write> {
         let mut out = Vec::new();
-        self.resolve_into(lv, v, &mut out);
+        self.resolve_into(lv, v, by, &mut out);
         out
     }
 
-    fn resolve_into(&self, lv: &LVal, v: u64, out: &mut Vec<Write>) {
+    fn resolve_into(&self, lv: &LVal, v: u64, by: u32, out: &mut Vec<Write>) {
         match lv {
             LVal::Sig(sig) => {
                 let s = &self.d.signals[*sig];
-                out.push(Write { slot: s.slot, sig: *sig, lo: 0, w: s.width, value: v });
+                out.push(Write { slot: s.slot, sig: *sig, lo: 0, w: s.width, value: v, by });
             }
             LVal::Word { sig, idx } => {
                 if let Some(slot) = self.word_slot(*sig, Some(idx)) {
-                    out.push(Write { slot, sig: *sig, lo: 0, w: self.d.signals[*sig].width, value: v });
+                    out.push(Write { slot, sig: *sig, lo: 0, w: self.d.signals[*sig].width, value: v, by });
                 }
             }
             LVal::Bit { sig, word, idx } => {
                 let s = &self.d.signals[*sig];
                 let i = self.index(idx);
                 if let (Some(off), Some(slot)) = (s.offset(i), self.word_slot(*sig, word.as_ref())) {
-                    out.push(Write { slot, sig: *sig, lo: off, w: 1, value: v });
+                    out.push(Write { slot, sig: *sig, lo: off, w: 1, value: v, by });
                 }
             }
             LVal::Part { sig, word, lo, w } => {
                 if let Some(slot) = self.word_slot(*sig, word.as_ref()) {
-                    out.push(Write { slot, sig: *sig, lo: *lo, w: *w, value: v });
+                    out.push(Write { slot, sig: *sig, lo: *lo, w: *w, value: v, by });
                 }
             }
             LVal::IPart { sig, start, w, up } => {
                 if let Some(lo) = self.ipart_lo(*sig, start, *w, *up) {
-                    out.push(Write { slot: self.d.signals[*sig].slot, sig: *sig, lo, w: *w, value: v });
+                    out.push(Write { slot: self.d.signals[*sig].slot, sig: *sig, lo, w: *w, value: v, by });
                 }
             }
             LVal::Concat(parts) => {
@@ -534,7 +565,7 @@ impl<'d> Sim<'d> {
                 let mut shift = 0;
                 for part in parts.iter().rev() {
                     let w = part.width(self.d);
-                    self.resolve_into(part, if shift >= 64 { 0 } else { v >> shift }, out);
+                    self.resolve_into(part, if shift >= 64 { 0 } else { v >> shift }, by, out);
                     shift += w;
                 }
             }

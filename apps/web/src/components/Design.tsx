@@ -16,6 +16,7 @@ import {
 } from "../api";
 import { extendTestbench, fmt as fmtValue, replay, targetSpec, type Replay } from "../lib/replay";
 import { findFix, type Fix } from "../lib/fixexample";
+import { decided, why, whyText, type Because, type Read } from "../lib/why";
 import { StateMachine } from "./StateMachine";
 import { TryIt } from "./TryIt";
 import { SimClient } from "../sim/client";
@@ -973,6 +974,12 @@ function Happened({
   onReplaceSteps: (steps: SpecExample["steps"]) => void;
 }) {
   const [rep, setRep] = useState<Replay | null>(null);
+  // "Why is it this value?": the values clicked and asked about, each explained, in order.
+  const [trail, setTrail] = useState<Because[]>([]);
+  const ask = (full: string, t: number, after: number) => {
+    const b = rep && why(rep, full, t);
+    if (b) setTrail((tr) => [...tr.slice(0, after), b]);
+  };
   // "The design is right": a change to the example that makes it pass, worked out and re-checked.
   const [fix, setFix] = useState<Fix | "working" | "none" | null>(null);
   async function acceptDesign() {
@@ -998,6 +1005,7 @@ function Happened({
     }
   }
   const [error, setError] = useState<string | null>(null);
+  const [pickedCycle, setPickedCycle] = useState<number | null>(null);
   // Fit the cycles to the space available; long examples scroll.
   const box = useRef<HTMLDivElement>(null);
   const [room, setRoom] = useState(600);
@@ -1019,7 +1027,10 @@ function Happened({
         .filter(([p]) => /\.s?v$/.test(p))
         .map(([name, source]) => ({ name, source: name === `tb/examples/tb_ex_${ex.id}.v` ? extendTestbench(source, spec) : source }));
       const sim = await client.run(files, `tb_ex_${ex.id}`);
-      if (!cancelled) setRep(replay(spec, ex, sim));
+      if (!cancelled) {
+        setRep(replay(spec, ex, sim));
+        setTrail([]);
+      }
     })().catch((e: Error) => !cancelled && setError(e.message));
     return () => {
       cancelled = true;
@@ -1033,6 +1044,9 @@ function Happened({
   const width = rep.cycles * cell;
   const every = rep.cycles > 200 ? 50 : rep.cycles > 80 ? 20 : rep.cycles > 30 ? 10 : 5;
   const failing = rep.firstFail;
+  // The AI gets the explanation too, when someone followed one.
+  const story = trail.length ? `${rep.story} Why, traced in the simulation: ${trail.map(whyText).join(" ")}` : rep.story;
+  const picked = trail[0];
 
   return (
     <div className="happened">
@@ -1066,6 +1080,13 @@ function Happened({
                 after={after}
                 checks={checks}
                 sets={rep.sets.filter((s) => s.signal === r.name).map((s) => s.cycle)}
+                picked={picked?.name === r.name ? pickedCycle : null}
+                onPick={(c) => {
+                  const t = rep.at(c);
+                  if (t === undefined) return;
+                  setPickedCycle(c);
+                  ask(`${rep.top}.${r.name}`, t, 0);
+                }}
               />
             );
           })}
@@ -1073,18 +1094,28 @@ function Happened({
       </div>
       <p className="muted small" style={{ margin: 0 }}>
         Cycle by cycle, from the simulator. Amber: what the example checks; red: where it differs; blue marks: inputs the example sets;
-        shaded: the cycles after the example ends.
+        shaded: the cycles after the example ends. <strong>Click any value to see why it is what it is.</strong>
       </p>
+      {trail.length > 0 && (
+        <WhyPanel
+          trail={trail}
+          onAsk={(r, level) => r.t !== null && ask(r.full, r.t, level + 1)}
+          onClose={() => {
+            setTrail([]);
+            setPickedCycle(null);
+          }}
+        />
+      )}
       {failing && canEdit && (
         <div className="design-row">
           <span className="small">Which is wrong?</span>
-          <button className="primary" disabled={busy} onClick={() => onFixDesign(rep.story)}>
+          <button className="primary" disabled={busy} onClick={() => onFixDesign(story)}>
             The design: ask the AI to fix it
           </button>
           <button disabled={busy || fix === "working"} onClick={acceptDesign} title="Change the example to what the design did, without the AI">
             The example: use what the design did
           </button>
-          <button disabled={busy} onClick={() => onFixExample(rep.story)}>
+          <button disabled={busy} onClick={() => onFixExample(story)}>
             The example: ask the assistant to correct it
           </button>
         </div>
@@ -1133,6 +1164,8 @@ function HpRow({
   after,
   checks,
   sets,
+  picked,
+  onPick,
 }: {
   row: Replay["rows"][number];
   cell: number;
@@ -1141,6 +1174,9 @@ function HpRow({
   after: number;
   checks: Replay["checks"];
   sets: number[];
+  /** The cycle being explained, marked. */
+  picked: number | null;
+  onPick: (cycle: number) => void;
 }) {
   const H = 26;
   const hi = 5;
@@ -1184,15 +1220,85 @@ function HpRow({
   }
   for (const c of sets) parts.push(<path key={`s${c}`} d={`M${c * cell},0 l4,0 l-4,5 z`} className="hp-set" />);
   if (after > 0) parts.push(<rect key="after" x={width - after} y={0} width={after} height={H} className="hp-after" />);
+  if (picked !== null) parts.push(<rect key="picked" x={picked * cell} y={0} width={cell} height={H} className="hp-picked" />);
   return (
     <>
       <span className="mono small hp-label" title={row.dir === "in" ? "input" : "output"}>
         {row.name}
       </span>
-      <svg width={width} height={H} role="img" aria-label={`${row.name}: ${row.values.map((v) => fmtValue(v, row.width).split(" ")[0]).join(", ")}`}>
+      <svg
+        width={width}
+        height={H}
+        role="img"
+        className="hp-pick"
+        onClick={(e) => {
+          const c = Math.floor((e.clientX - e.currentTarget.getBoundingClientRect().left) / cell);
+          if (c >= 0 && c < row.values.length && row.values[c] !== null) onPick(c);
+        }}
+        aria-label={`${row.name}: ${row.values.map((v) => fmtValue(v, row.width).split(" ")[0]).join(", ")}`}
+      >
+        <title>Click a value to see why it is what it is</title>
         {parts}
       </svg>
     </>
+  );
+}
+
+/** "Why is it this value?": each value asked about, explained; the values an explanation mentions
+ * can be asked about in turn, building a chain back to the cause. */
+function WhyPanel({ trail, onAsk, onClose }: { trail: Because[]; onAsk: (r: Read, level: number) => void; onClose: () => void }) {
+  const chip = (r: Read, level: number) => (
+    <button key={r.full} className="link small mono" disabled={r.t === null} onClick={() => onAsk(r, level)} title={`Why is ${r.name} ${r.value}?`}>
+      {r.name} = {r.value}
+    </button>
+  );
+  return (
+    <div className="design-card why">
+      <div className="design-row" style={{ justifyContent: "space-between" }}>
+        <strong className="small">Why?</strong>
+        <button className="link small" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <ol className="why-chain">
+        {trail.map((b, level) => (
+          <li key={`${level}:${b.full}`} className="small">
+            <span className="mono">
+              {b.name} = {b.value}
+            </span>{" "}
+            from cycle {b.since}
+            {b.kind === "start" && <>: nothing has written it; it has had this value from the start.</>}
+            {b.kind === "input" && (
+              <>
+                : an input, {b.step ? <>set by step {b.step} of the example.</> : <>set by the testbench (<code>{b.code}</code>).</>}
+              </>
+            )}
+            {b.kind === "design" && (
+              <>
+                : line {b.line} of {b.file?.split("/").pop()} wrote it: <code>{b.code}</code>
+                {b.conds.length > 0 && (
+                  <div>
+                    It ran because{" "}
+                    {b.conds.map((c, k) => (
+                      <span key={k}>
+                        {k > 0 && ", and "}
+                        {withCode(decided(c))}
+                        {c.reads.length > 0 && <> ({c.reads.map((r, j) => [j > 0 && ", ", chip(r, level)])})</>}
+                      </span>
+                    ))}
+                    .
+                  </div>
+                )}
+                {b.reads.length > 0 && <div>It used {b.reads.map((r, j) => [j > 0 && ", ", chip(r, level)])}.</div>}
+              </>
+            )}
+          </li>
+        ))}
+      </ol>
+      <p className="muted small" style={{ margin: 0 }}>
+        Click a value to follow it back. When you ask the AI to fix something, this explanation goes with it.
+      </p>
+    </div>
   );
 }
 
