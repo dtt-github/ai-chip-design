@@ -2281,3 +2281,29 @@ select.small {
 .blocks-add {
   margin-left: auto;
 }
+
+/* Coverage gaps in Health. */
+.coverage-gaps {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.coverage-gaps li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 0;
+  border-top: 1px solid var(--border);
+}
+
+.coverage-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

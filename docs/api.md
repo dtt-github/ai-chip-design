@@ -47,7 +47,7 @@ shows how to get one locally). `GET /healthz` (outside `/api`) needs no token.
 |---|---|---|---|
 | GET | `/projects/{id}/spec` | viewer | `spec.json`, its problems, whether the example testbenches are in sync, the chip (if any), defaults for a new spec. |
 | PUT | `/projects/{id}/spec` | editor | `{spec, parent, message?}`: commits the spec and the regenerated `tb/examples/` testbenches. `400` lists the problems. |
-| POST | `/projects/{id}/spec/run` | editor | Runs every testbench at `main`; results per example (and the other testbenches). |
+| POST | `/projects/{id}/spec/run` | editor | Runs every testbench at `main`; results per example (and the other testbenches), and `coverage`: `{covered, total, gaps: [{file, line, kind, what, labels, text, suggestion}]}`, the design's branches the examples take (`null` without examples or branches). |
 | POST | `/projects/{id}/spec/draft` | editor | `{instruction, spec?}`: the assistant writes or revises the spec; nothing is saved. Returns `{spec, note, model, usage, usd, elapsed_ms}`; `usd` is priced for the model that served it and counts against the AI budget. |
 
 The spec format and the example step semantics are in [user-guide/design-view.md](user-guide/design-view.md).
@@ -56,7 +56,7 @@ The spec format and the example step semantics are in [user-guide/design-view.md
 
 | Method | Path | Role | Description |
 |---|---|---|---|
-| GET | `/starters` | | The starter designs: `{id, title, summary, category, top, ports, params, clock_mhz, clock, reset, examples}`. |
+| GET | `/starters` | | The starter designs: `{id, title, summary, category, top, ports, params, clock_mhz, clock, reset, examples, covered}`; `covered` is `[branches the examples take, all branches]`. |
 | POST | `/projects/{id}/starters/{starter}` | editor | Adds the design as `starters/<top>.v` and to every flow config's `VERILOG_FILES`, in one commit. `409` if it's there or its module name is taken. |
 
 ## Blocks: the chip

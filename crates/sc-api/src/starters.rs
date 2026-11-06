@@ -52,6 +52,8 @@ pub struct StarterView {
     pub clock: Option<String>,
     pub reset: Option<String>,
     pub examples: usize,
+    /// Branches of the design its examples take, e.g. 11 of 12.
+    pub covered: Option<(usize, usize)>,
 }
 
 /// Every starter, in the order the gallery shows them (by category, then title).
@@ -125,6 +127,26 @@ impl Starter {
         files
     }
 
+    /// What its examples exercise in the design (simulated once, then kept).
+    pub fn coverage(&self) -> Option<crate::coverage::Coverage> {
+        static ALL: OnceLock<BTreeMap<String, Option<crate::coverage::Coverage>>> = OnceLock::new();
+        let all = ALL.get_or_init(|| {
+            all()
+                .iter()
+                .map(|st| {
+                    let files: BTreeMap<String, String> = st
+                        .project_files(&st.title)
+                        .into_iter()
+                        .filter_map(|(p, c)| String::from_utf8(c).ok().map(|c| (p, c)))
+                        .collect();
+                    let report = crate::gate::run(&files);
+                    (st.id.clone(), crate::coverage::of(&report.runs.iter().collect::<Vec<_>>()))
+                })
+                .collect()
+        });
+        all.get(&self.id).cloned().flatten()
+    }
+
     fn config(&self) -> String {
         let mut cfg = json!({
             "DESIGN_NAME": self.top,
@@ -142,11 +164,16 @@ impl Starter {
 
 // ---- endpoints -----------------------------------------------------------------
 
-pub async fn list(_user: AuthUser) -> Json<Vec<StarterView>> {
-    Json(
+pub async fn list(_user: AuthUser) -> crate::error::ApiResult<Json<Vec<StarterView>>> {
+    // The first call simulates every starter's examples once (well under a second).
+    let covered: Vec<Option<(usize, usize)>> =
+        tokio::task::spawn_blocking(|| all().iter().map(|s| s.coverage().map(|c| (c.covered, c.total))).collect())
+            .await?;
+    Ok(Json(
         all()
             .iter()
-            .map(|s| StarterView {
+            .zip(covered)
+            .map(|(s, covered)| StarterView {
                 starter: s.clone(),
                 ports: s.spec.ports.clone(),
                 params: s.spec.params.clone(),
@@ -154,9 +181,10 @@ pub async fn list(_user: AuthUser) -> Json<Vec<StarterView>> {
                 clock: s.spec.clock.as_ref().map(|c| c.port.clone()),
                 reset: s.spec.reset.as_ref().map(|r| r.port.clone()),
                 examples: s.spec.examples.len(),
+                covered,
             })
             .collect(),
-    )
+    ))
 }
 
 /// Adds a starter's design to a project as `starters/<module>.v`, listed in every flow config's
@@ -250,6 +278,19 @@ mod tests {
             assert_eq!(cfg["CLOCK_PORT"].is_null(), st.spec.clock.is_none(), "{}", st.id);
             let r = crate::gate::run(&files);
             assert!(r.passed && r.runs.len() == st.spec.examples.len(), "{}: {}", st.id, r.summary);
+            // A design without if/case (the parity checker) has nothing to cover.
+            let Some(c) = st.coverage() else {
+                assert_eq!(st.id, "parity8");
+                continue;
+            };
+            assert!(c.total > 0 && c.covered > 0, "{}", st.id);
+            println!(
+                "{:<10} {:>2}/{:<2} {}",
+                st.id,
+                c.covered,
+                c.total,
+                c.gaps.iter().map(|g| format!("L{} {}", g.line, g.text)).collect::<Vec<_>>().join(" | ")
+            );
         }
     }
 }

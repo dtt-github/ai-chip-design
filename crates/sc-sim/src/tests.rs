@@ -345,3 +345,42 @@ module tb;
 endmodule"#);
     assert_eq!(l, vec!["10 11 2"]);
 }
+
+#[test]
+fn branch_coverage_counts_each_decision() {
+    let r = run(r#"
+module dut(input wire [1:0] sel, input wire go, output reg [3:0] y, output reg busy);
+    always @(*) begin
+        case (sel)
+            2'd0: y = 4'h1;
+            2'd1: y = 4'h2;
+            default: y = 4'h8;
+        endcase
+        if (go && sel != 2'd3) busy = 1;
+    end
+endmodule
+module tb;
+    reg [1:0] sel = 0;
+    reg go = 0;
+    wire [3:0] y;
+    wire busy;
+    dut d (.sel(sel), .go(go), .y(y), .busy(busy));
+    initial begin
+        #1 sel = 1;
+        #1 go = 1;
+        #1 $finish;
+    end
+endmodule"#);
+    let hits: Vec<(String, String, u64)> = r
+        .coverage
+        .iter()
+        .filter(|(p, _)| p.scope == "tb.d")
+        .map(|(p, n)| (format!("{:?}", p.kind), p.what.clone(), *n))
+        .collect();
+    let taken = |k: &str| hits.iter().find(|(kind, _, _)| kind.starts_with(k)).map(|h| h.2).unwrap();
+    assert_eq!(hits.len(), 5, "{hits:?}");
+    assert!(taken("Arm { labels: \"0\"") > 0 && taken("Arm { labels: \"1\"") > 0, "{hits:?}");
+    assert_eq!(taken("Default { written: true }"), 0, "sel was never 2 or 3: {hits:?}");
+    assert!(taken("Then") > 0 && taken("Else { written: false }") > 0, "{hits:?}");
+    assert_eq!(hits.iter().find(|h| h.0 == "Then").unwrap().1, "go && (sel != 3)");
+}

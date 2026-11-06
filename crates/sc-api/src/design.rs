@@ -166,6 +166,8 @@ pub struct RunResult {
     pub examples: Vec<ExampleResult>,
     /// The project's other testbenches, run alongside.
     pub others: Vec<TestbenchRun>,
+    /// What the examples exercise in the design; `None` without examples or branches.
+    pub coverage: Option<crate::coverage::Coverage>,
     pub engine: String,
 }
 
@@ -179,6 +181,9 @@ pub async fn run(State(state): State<AppState>, user: AuthUser, Path(id): Path<U
         None => return Err(ApiError::NotFound("this project has no spec yet".into())),
     };
     let report = tokio::task::spawn_blocking(move || gate::run(&files)).await?;
+    let example_tops: Vec<String> = spec.examples.iter().map(|e| spec::tb_name(&e.id)).collect();
+    let coverage =
+        crate::coverage::of(&report.runs.iter().filter(|r| example_tops.contains(&r.top)).collect::<Vec<_>>());
     let mut runs: BTreeMap<String, TestbenchRun> = report.runs.into_iter().map(|r| (r.top.clone(), r)).collect();
     let examples = spec
         .examples
@@ -204,7 +209,7 @@ pub async fn run(State(state): State<AppState>, user: AuthUser, Path(id): Path<U
             },
         })
         .collect();
-    Ok(Json(RunResult { commit, examples, others: runs.into_values().collect(), engine: report.engine }))
+    Ok(Json(RunResult { commit, examples, others: runs.into_values().collect(), coverage, engine: report.engine }))
 }
 
 // ---- drafting with the assistant -----------------------------------------------
