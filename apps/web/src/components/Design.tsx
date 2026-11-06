@@ -1455,6 +1455,9 @@ function Health({
             )}
           </p>
         </div>
+        <a className="button" href={`/p/${projectId}/report`} target="_blank" rel="noreferrer" title="One page for a reviewer: what it is, how it's tested, how it works, whether it's ready">
+          Review report
+        </a>
         {canEdit && (
           <button className="primary" onClick={build} disabled={!!active || !head}>
             {active ? "Building…" : job ? "Build again" : "Build and check"}

@@ -3,6 +3,7 @@ import { BrowserRouter, Link, Route, Routes, useNavigate } from "react-router";
 import type { User } from "oidc-client-ts";
 import { currentUser, displayName, login, logout, userManager } from "./auth";
 import { ProjectsPage } from "./pages/Projects";
+import { ReportPage } from "./pages/Report";
 import { WorkspacePage } from "./pages/Workspace";
 
 export function App() {
@@ -81,6 +82,7 @@ function SignedIn() {
       <Routes>
         <Route path="/" element={<ProjectsPage />} />
         <Route path="/p/:id" element={<WorkspacePage />} />
+        <Route path="/p/:id/report" element={<ReportPage />} />
         <Route path="*" element={<p className="pad">Not found.</p>} />
       </Routes>
     </div>

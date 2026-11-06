@@ -127,6 +127,24 @@ It also lists what still needs an expert before a real chip run (I/O pads, manuf
 power-up behaviour, timing with real gate delays, the final go/no-go). **Build again** starts a new
 run.
 
+### Review report
+
+**Review report** (in Health) opens one page to hand to a reviewer, an expert or a manager, and
+**Print or save as PDF** turns it into a document. At the project's latest commit it gives:
+
+1. **What it is**: the description, connections with their meaning, settings, decisions, and any
+   questions still open.
+2. **How it is tested**: every example as a sentence ("After reset: rx is set to 1; 2 clock cycles
+   pass; rx takes the values 0, 0, 0, 1, 1, 1, 1, 0, 0, 4 clock cycles each (start bit to bit 7);
+   ...") with whether it passes, what the examples try, and the planted-mistakes check.
+3. **How it works**: the state machines.
+4. **Is it ready?**: the latest build (timing, layout checks, gate-level simulation, size and power)
+   and what still needs an expert.
+5. **Where it came from**: the AI's merged changes and the commit history.
+
+Running the examples and planting mistakes takes an editor; for viewers the report says so and
+shows the rest.
+
 ## The spec file
 
 `spec.json` at the project root, written by the Design view (and readable by hand):
