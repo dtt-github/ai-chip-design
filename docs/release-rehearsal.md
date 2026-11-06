@@ -53,6 +53,26 @@ it is checkable without knowing Verilog.
   pane that was hidden, where the page's per-frame updates don't run. A page someone is looking
   at updates at once.
 
+## Fresh-start check
+
+Step 3 of the plan, on 6 Nov 2026: the repository cloned into an empty folder and
+[Getting started](getting-started.md) followed as written, with nothing else.
+
+| Step | Result |
+| --- | --- |
+| Prerequisites (Rust, Node 22 with pnpm, Docker, the wasm target, wasm-bindgen 0.2.130) | all present at the versions named |
+| `./scripts/fetch-verible.sh` | Verible installed into `.tools/verible/` |
+| `./scripts/fetch-pdk.sh` | PDK enabled in the `wafersmith_pdk` volume (image already pulled) |
+| `docker compose ... up -d` | Postgres and Rauthy running |
+| `cp .env.example .env` and `cargo run -p wafer-api` | built and listening on 8090 with the example settings unchanged; the AI off, as described, without a key |
+| `pnpm install && pnpm dev:web` | the WebAssembly built on first start; the app served |
+| Sign in, a project from the LED blinker starter, examples, planted mistakes, build | "Ready for expert review" |
+| `cargo test --workspace` and the web typecheck | all pass |
+
+No step was missing or wrong, so the guide is unchanged. Not checked: pulling the 7.5 GB
+LibreLane image over the network (it was already present), and a machine without Rust or Node
+installed.
+
 ## Not covered
 
 - **A change made with the AI.** The starters were used as they come; changing a design in words

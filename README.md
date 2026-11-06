@@ -27,6 +27,33 @@ which started the project and leads its development.
 | **AI agent** | Proposes changes that can only be merged when the simulation gate passes, with an evidence log. |
 | **IP registry** | Publish blocks, import them pinned to a commit, with licence compatibility checks. |
 
+## What works, and what doesn't yet
+
+**Works today**, checked end to end in the [release rehearsal](docs/release-rehearsal.md):
+
+- Small designs (counters, a UART, a FIFO, a debouncer and the like) from the start page to a
+  layout that passes DRC, LVS and timing on IHP SG13G2, without typing Verilog or testbench code.
+- Examples as tests, coverage of every branch, planted mistakes, and searches that find the
+  examples still missing. A failing example can be explained value by value ("why is it this
+  value?", "why wasn't it the expected one?") and often repaired by a small fix, all without AI.
+- Two people editing the same project live; Git history for everything.
+- Running it all on one machine, from a clean clone, by following
+  [Getting started](docs/getting-started.md).
+
+**Not yet**, or only partly:
+
+- **Larger designs.** Everything has been tested at starter size (up to a few hundred cells).
+  The simulator covers the synthesisable Verilog these designs use plus functions, tasks and
+  generate blocks, not all of Verilog or SystemVerilog.
+- **What only an expert can sign off**: I/O pads and pin placement, manufacturing test (scan),
+  behaviour at power-up, timing with real gate delays in simulation, analog parts, and the final
+  go/no-go for a real chip run. Health says so on every project.
+- **AI features need a key and cost money.** Describing a change in words, the assistant and the
+  agent use Claude (or OpenRouter) and count against a daily budget; without a key they are off and
+  everything else works. Their quality is measured by the [design evals](docs/evals.md).
+- **Tested on one setup**: Linux on aarch64, with Docker. Other platforms should work but have
+  not been checked.
+
 ## Quick start (local development)
 
 You need Rust, Node 22 with pnpm, and Docker. Full instructions, including the WebAssembly
