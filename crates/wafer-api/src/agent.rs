@@ -333,6 +333,21 @@ async fn run_gate(tree: BTreeMap<String, String>) -> ApiResult<GateReport> {
     Ok(tokio::task::spawn_blocking(move || gate::run(&tree)).await?)
 }
 
+/// What the proposal does to how well the design is tested: examples passing, coverage and state
+/// machines, at its base commit and with its changes (editors: it runs the gate twice).
+pub async fn compare(State(state): State<AppState>, user: AuthUser, Path(id): Path<Uuid>) -> ApiResult<Json<Value>> {
+    let p = load(&state, &user, id, Role::Editor).await?;
+    let before: BTreeMap<String, String> =
+        crate::workspace::text_files(state.repos.clone(), p.project_id, p.base_commit.clone(), MAX_FILES_TEXT)
+            .await?
+            .into_iter()
+            .collect();
+    let after = proposed_tree(&state, &p).await?;
+    let (b, a) =
+        tokio::task::spawn_blocking(move || (crate::design::quality(&before), crate::design::quality(&after))).await?;
+    Ok(Json(json!({ "before": b, "after": a })))
+}
+
 /// Re-runs the gate on the proposal's exact inputs and says whether it reproduces.
 pub async fn regate(State(state): State<AppState>, user: AuthUser, Path(id): Path<Uuid>) -> ApiResult<Json<Value>> {
     let p = load(&state, &user, id, Role::Editor).await?;

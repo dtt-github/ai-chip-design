@@ -16,6 +16,18 @@ through five tools:
 - `run_simulation`, with the same simulator as the browser;
 - `submit_proposal`, to finish with a commit title and a summary for the reviewer.
 
+## What the change does
+
+A proposal opens on **behaviour**: **Compare behaviour** runs every example on the project as it
+was and with the change, and compares every output cycle by cycle, including the cycles after
+each example ends. It says which examples behave differently and how, in words: "`led` now changes
+1 cycle earlier", or "`busy` at cycle 40 was 1, now 0 (different in 3 cycles)". When nothing
+differs, the change only affects cases the examples don't try (or nothing at all).
+
+Underneath, for editors, it compares how well each version is tested: examples passing, the cases
+the examples try (coverage), and each state machine's moves added or removed
+(`POST /agent/{id}/compare`). **Changes** still shows the code diff.
+
 ## The simulation gate
 
 When the agent finishes, the server runs every testbench on the files the proposal would produce

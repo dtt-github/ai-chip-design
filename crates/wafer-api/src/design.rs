@@ -223,6 +223,34 @@ pub async fn run(State(state): State<AppState>, user: AuthUser, Path(id): Path<U
     }))
 }
 
+/// How well a set of files is tested: examples passing, coverage, state machines (moves marked).
+#[derive(Debug, Serialize)]
+pub struct Quality {
+    pub examples: usize,
+    pub passing: usize,
+    pub coverage: Option<crate::coverage::Coverage>,
+    pub machines: Vec<crate::fsm::Machine>,
+}
+
+/// [`Quality`] of `files` (spec, design and example testbenches). Blocks; runs the gate.
+pub(crate) fn quality(files: &BTreeMap<String, String>) -> Quality {
+    let tops: Vec<String> = files
+        .get(SPEC_FILE)
+        .and_then(|t| serde_json::from_str::<Spec>(t).ok())
+        .map(|s| s.examples.iter().map(|e| spec::tb_name(&e.id)).collect())
+        .unwrap_or_default();
+    let mut machines = machines_in(files);
+    let report = gate::run(files);
+    let runs: Vec<&TestbenchRun> = report.runs.iter().filter(|r| tops.contains(&r.top)).collect();
+    crate::fsm::mark(&mut machines, &runs);
+    Quality {
+        examples: tops.len(),
+        passing: runs.iter().filter(|r| r.verdict == "pass").count(),
+        coverage: crate::coverage::of(&runs),
+        machines,
+    }
+}
+
 /// The design's state machines (`crate::fsm`), or none if the design doesn't parse.
 fn machines_in(files: &BTreeMap<String, String>) -> Vec<crate::fsm::Machine> {
     let hdl: Vec<(&str, &str)> = files

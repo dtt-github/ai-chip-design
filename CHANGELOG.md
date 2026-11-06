@@ -8,6 +8,10 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **What a proposal does**: agent proposals open on a behaviour tab. **Compare behaviour** runs
+  every example before and after the change (in the browser) and describes each output that
+  behaves differently ("`led` now changes 1 cycle earlier"), and compares examples passing,
+  coverage and state-machine moves (`POST /agent/{id}/compare`).
 - **Review report**: one printable page per project (Health → Review report): what the design is,
   its examples as plain sentences with their results, coverage and planted mistakes, its state
   machines, the latest build and what still needs an expert, and where it came from (the AI's

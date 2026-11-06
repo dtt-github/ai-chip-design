@@ -92,6 +92,7 @@ The spec format and the example step semantics are in [user-guide/design-view.md
 | GET | `/projects/{id}/agent` | viewer | Recent proposals. |
 | GET | `/agent/{id}` | viewer | Proposal: changed files, their base content, gate report, evidence log. |
 | POST | `/agent/{id}/merge` | editor | Merge; the gate runs again and must pass, and the base must still be `main`. |
+| POST | `/agent/{id}/compare` | editor | How well the design is tested at the proposal's base commit and with its changes: `{before, after}`, each `{examples, passing, coverage, machines}`. |
 | POST | `/agent/{id}/regate` | editor | Re-run the gate on the recorded inputs and say whether it reproduces. |
 | POST | `/agent/{id}/discard` | editor | Discard a finished proposal. |
 

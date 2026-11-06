@@ -210,6 +210,22 @@ async fn proposal_gate_evidence_and_merge(db: PgPool) {
         call(&e.addr, &ada, reqwest::Method::POST, &format!("/agent/{}/regate", a["id"].as_str().unwrap()), None).await;
     assert_eq!(rg["reproduced"], true, "{rg}");
 
+    // Before and after the proposal: this project has no spec, so no examples or coverage, and
+    // neither version has a state machine.
+    let (s, cmp) =
+        call(&e.addr, &ada, reqwest::Method::POST, &format!("/agent/{}/compare", a["id"].as_str().unwrap()), None)
+            .await;
+    assert_eq!(s, 200, "{cmp}");
+    for side in ["before", "after"] {
+        assert_eq!(cmp[side]["examples"], 0, "{cmp}");
+        assert!(cmp[side]["coverage"].is_null() && cmp[side]["machines"] == json!([]), "{cmp}");
+    }
+    let bob = token("bob", "bob@example.org");
+    let (s, _) =
+        call(&e.addr, &bob, reqwest::Method::POST, &format!("/agent/{}/compare", a["id"].as_str().unwrap()), None)
+            .await;
+    assert_eq!(s, 404, "only members can compare");
+
     // A second proposal on the same base, to be made stale by merging the first.
     let b = propose(&e, &ada, &project, "Add a parity generator (again)").await;
     assert_eq!(b["status"], "ready");

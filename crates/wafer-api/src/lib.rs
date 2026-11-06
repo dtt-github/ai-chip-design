@@ -85,6 +85,7 @@ pub fn router(state: AppState) -> Router {
         .route("/agent/{id}/merge", post(agent::merge))
         .route("/agent/{id}/discard", post(agent::discard))
         .route("/agent/{id}/regate", post(agent::regate))
+        .route("/agent/{id}/compare", post(agent::compare))
         .route("/jobs/{id}", get(jobs::get))
         .route("/jobs/{id}/log", get(jobs::log))
         .route("/jobs/{id}/cancel", post(jobs::cancel))

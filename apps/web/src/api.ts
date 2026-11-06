@@ -276,6 +276,14 @@ export interface MistakesReport {
   elapsed_ms: number;
 }
 
+/** How well a version of the design is tested (`POST /agent/{id}/compare`). */
+export interface Quality {
+  examples: number;
+  passing: number;
+  coverage: Coverage | null;
+  machines: Machine[];
+}
+
 export interface SpecRun {
   commit: string;
   examples: ExampleResult[];
@@ -656,6 +664,7 @@ export const api = {
   mergeProposal: (pid: string) => request<Proposal>("POST", `/agent/${enc(pid)}/merge`),
   discardProposal: (pid: string) => request<Proposal>("POST", `/agent/${enc(pid)}/discard`),
   regate: (pid: string) => request<{ report: GateReport; reproduced: boolean }>("POST", `/agent/${enc(pid)}/regate`),
+  compareProposal: (pid: string) => request<{ before: Quality; after: Quality }>("POST", `/agent/${enc(pid)}/compare`),
   createJob: (id: string, body: { commit?: string; config?: string } = {}) =>
     request<Job>("POST", `/projects/${enc(id)}/jobs`, body),
   listJobs: (id: string) => request<Job[]>("GET", `/projects/${enc(id)}/jobs`),
