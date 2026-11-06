@@ -49,6 +49,9 @@ export function ProjectsPage() {
             placeholder="Project name, e.g. UART transmitter"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            // A name suggested from a starter is selected on click, so typing replaces it.
+            onFocus={(e) => starter && name === starter.title && e.target.select()}
+            onMouseUp={(e) => starter && name === starter.title && e.preventDefault()}
             autoFocus
           />
           <select aria-label="Visibility" value={visibility} onChange={(e) => setVisibility(e.target.value as "private" | "public")}>

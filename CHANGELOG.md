@@ -8,6 +8,9 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **Release rehearsal** ([docs/release-rehearsal.md](docs/release-rehearsal.md)): the counter, UART
+  receiver and FIFO starters taken to a clean layout in the browser, timed, with no code typed and
+  no AI: 1 to 4 minutes each, every case tried and every planted mistake caught.
 - **Find examples for everything**: Health searches for examples for every untried case and every
   planted mistake that slipped through at once. Each example found is checked against the targets
   still open, so one example covers several (on the up/down counter with one example, 2 examples
@@ -149,6 +152,11 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Fixed
 
+- The sign-in no longer runs out after 30 minutes: the web app renews its access token with the
+  refresh token before it expires, without leaving the page. Before, the first request after
+  expiry reloaded the page through the sign-in server and lost what was on screen.
+- Choosing a starter suggests its title as the project name; clicking into the name now selects
+  it, so typing replaces it instead of adding to it.
 - The Blocks step no longer throws away an unsaved chip when the project changes underneath it
   (a commit by someone else, or adding a block).
 - The spec check refuses an example that runs longer than the simulator's 50 µs limit (it could
