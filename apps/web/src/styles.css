@@ -2507,3 +2507,128 @@ select.small {
 .sm-list li.untested {
   color: var(--danger);
 }
+
+/* A link that looks like a button. */
+a.button {
+  display: inline-block;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* Design review report: a readable page on screen, plain black on white in print. */
+.report {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px 24px 48px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.report-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.report-head h1 {
+  margin: 2px 0 4px;
+}
+
+.report-section {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 18px;
+  break-inside: avoid-page;
+}
+
+.report-section h2 {
+  font-size: 1.15rem;
+}
+
+.report-section h3 {
+  font-size: 1rem;
+  margin: 14px 0 4px;
+}
+
+.report-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.report-table th,
+.report-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.report-examples li {
+  margin-bottom: 8px;
+}
+
+.report-verdict {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+}
+
+.report-verdict.ok {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.report-verdict.bad {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.report-warn {
+  border-left: 3px solid var(--warn);
+  padding-left: 8px;
+}
+
+.report-machine {
+  break-inside: avoid;
+}
+
+@media print {
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f2f3f5;
+    --border: #c9ced6;
+    --text: #000000;
+    --muted: #444c56;
+    --accent: #1f6feb;
+    color-scheme: light;
+  }
+
+  body,
+  .shell {
+    background: #fff !important;
+    color: #000;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .topbar,
+  .no-print {
+    display: none !important;
+  }
+
+  .report {
+    max-width: none;
+    padding: 0;
+    height: auto;
+    overflow: visible;
+  }
+}

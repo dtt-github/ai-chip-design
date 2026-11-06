@@ -8,6 +8,10 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **Review report**: one printable page per project (Health → Review report): what the design is,
+  its examples as plain sentences with their results, coverage and planted mistakes, its state
+  machines, the latest build and what still needs an expert, and where it came from (the AI's
+  merged changes, the commit history). Print or save as PDF.
 - **Try it on the whole chip**: once the Blocks step has built a chip, Try it can switch from the
   design to the chip, driving the chip's pins, showing each block's state machine live (read
   through the chip's hierarchy), and saving the session as a chip example.
