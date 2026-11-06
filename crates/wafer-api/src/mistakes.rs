@@ -104,6 +104,35 @@ pub fn check(
     Ok(Report { caught, tried, sites: sites.len(), slipped, elapsed_ms: started.elapsed().as_millis() as u64 })
 }
 
+/// The design with one planted mistake in it: the one at `file`/`line` that turns `original` into
+/// `mistake`, as [`check`] reported it. None if the design no longer has it.
+pub(crate) fn planted(
+    modules: &[Module],
+    files: &BTreeMap<String, String>,
+    file: &str,
+    line: u32,
+    original: &str,
+    mistake: &str,
+) -> Option<Vec<Module>> {
+    let mine =
+        |m: &Module| !m.file.starts_with("tb/") && files.get(&m.file).is_some_and(|c| !crate::blocks::is_generated(c));
+    let mut probe = modules.to_vec();
+    let mut w = Walker::new(None);
+    for m in probe.iter_mut().filter(|m| mine(m)) {
+        w.module(m);
+    }
+    let i = w
+        .sites
+        .iter()
+        .position(|s| s.file == file && s.line == line && s.original == original && s.mistake == mistake)?;
+    let mut ms = modules.to_vec();
+    let mut w = Walker::new(Some(i));
+    for m in ms.iter_mut().filter(|m| mine(m)) {
+        w.module(m);
+    }
+    Some(ms)
+}
+
 /// Walks the design in a fixed order, numbering every place a mistake could go. Without a target
 /// it lists them; with one it plants that mistake and leaves the rest as they are.
 struct Walker {

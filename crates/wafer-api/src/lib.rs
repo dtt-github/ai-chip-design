@@ -18,6 +18,7 @@ pub mod licence;
 pub mod lsp;
 pub mod mistakes;
 pub mod projects;
+pub mod search;
 pub mod spec;
 pub mod spend;
 pub mod starters;
@@ -73,6 +74,7 @@ pub fn router(state: AppState) -> Router {
         .route("/projects/{id}/spec/run", post(design::run))
         .route("/projects/{id}/spec/testbench", post(design::testbench))
         .route("/projects/{id}/spec/mistakes", post(design::mistakes))
+        .route("/projects/{id}/spec/find-example", post(design::find_example))
         .route("/projects/{id}/spec/draft", post(design::draft))
         .route("/starters", get(starters::list))
         .route("/projects/{id}/starters/{starter}", post(starters::add))

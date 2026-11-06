@@ -215,7 +215,7 @@ export interface ExampleResult {
 export interface CoverageGap {
   file: string;
   line: number;
-  kind: "then" | "else" | "arm" | "default";
+  kind: "then" | "else" | "arm" | "default" | "part" | "side";
   what: string;
   labels: string | null;
   /** In words, with the condition in backticks: "`full` is never true in the examples". */
@@ -274,6 +274,19 @@ export interface MistakesReport {
   sites: number;
   slipped: SlippedMistake[];
   elapsed_ms: number;
+}
+
+/** What "Find an example" searches for: a coverage gap or a planted mistake that slipped through. */
+export type FindTarget =
+  | { for: "gap"; file: string; line: number; text: string }
+  | { for: "mistake"; file: string; line: number; kind: string; original: string; mistake: string };
+
+/** A draft example the search found (not added to the spec), or why there is none. */
+export interface FoundExample {
+  example: SpecExample | null;
+  tried: number;
+  elapsed_ms: number;
+  message: string | null;
 }
 
 /** How well a version of the design is tested (`POST /agent/{id}/compare`). */
@@ -631,6 +644,7 @@ export const api = {
     request<{ commit: string; changed: boolean }>("PUT", `/projects/${enc(id)}/spec`, body),
   runSpec: (id: string) => request<SpecRun>("POST", `/projects/${enc(id)}/spec/run`),
   plantMistakes: (id: string) => request<MistakesReport>("POST", `/projects/${enc(id)}/spec/mistakes`),
+  findExample: (id: string, target: FindTarget) => request<FoundExample>("POST", `/projects/${enc(id)}/spec/find-example`, target),
   exampleTestbench: (id: string, body: { spec: Spec; example: SpecExample }) =>
     request<{ path: string; top: string; source: string }>("POST", `/projects/${enc(id)}/spec/testbench`, body),
   draftSpec: (id: string, body: { instruction: string; spec?: Spec | null }) =>

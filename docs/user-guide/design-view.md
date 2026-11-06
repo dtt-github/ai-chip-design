@@ -111,17 +111,30 @@ mean?** and the expert numbers underneath:
   (in `wr && !full`, `full` both 0 and 1 when it is decided), and both sides of each `?:` choice.
   Each one they never try is shown in plain terms ("Never tried: `en` = 0", "Never tried: `state`
   = 2", "Never tried: `full` ≠ 0 while deciding `wr && !full`"). Passing examples only vouch for the cases they
-  try. **Add an example** opens Examples with the missing case written out as a new example's
-  description; the file and line link opens the code. A `default` choice that no example reaches
+  try. **Find an example** searches for one (see below); **Add in words** opens Examples with the
+  missing case written out as a new example's description; the file and line link opens the code. A `default` choice that no example reaches
   is shown but doesn't hold the project back, since it is often impossible by design.
 - **Would your examples catch a mistake?**: **Plant mistakes and check** makes small, typical
   mistakes in a copy of the design, one at a time (a comparison turned round, a number one off, a
   condition reversed, a `!` left out, `+` for `-`, an assignment left out), and runs every example
   against each. It reports how many some example caught, and each one that slipped through ("If
-  `cnt == N - 1` were `cnt == N` (one off, line 15), every example would still pass"), with **Add
-  an example** and a link to the line. Your files aren't changed. A few planted mistakes change
-  nothing at all and can't be caught. Up to 40 mistakes, spread over the design, in at most 30
-  seconds.
+  `cnt == N - 1` were `cnt == N` (one off, line 15), every example would still pass"), with **Find
+  an example**, **Add in words** and a link to the line. Your files aren't changed. A few planted
+  mistakes change nothing at all and can't be caught. Up to 40 mistakes, spread over the design,
+  in at most 30 seconds.
+
+  **Find an example**, for a case no example tries or a mistake that slipped through, has the
+  simulator search the design's inputs (no AI, nothing to pay). It tries your examples' inputs,
+  as they are and with changes, and fresh sequences of values the design uses (0, 1, all ones,
+  the numbers in its code), held for a cycle or many. The first sequence that reaches the case,
+  or makes the mistaken copy behave differently at an output, is cut to the shortest that still
+  does and stripped of every input change it doesn't need. It ends with checks of the outputs
+  (for a mistake, the ones that tell the two apart), holding what the design did. The example
+  opens in Examples, unsaved, titled "Tries …" or "Notices if …": **check that what it expects
+  is what the design should do**. If it isn't, you have found a bug. Save the spec to keep it.
+  The search takes at most about 30 seconds, and the same design and spec always give the same
+  example. If nothing is found, it says why: the case may be impossible by design, or the mistake
+  may change nothing that can be seen.
 - **How it works**: each state machine found in the Verilog, drawn as states (boxes, with the one
   after reset marked) and numbered moves between them, listed with when they happen ("state 0 →
   state 1 when `rx` = 0"). Moves an example takes are solid; dashed red ones no example takes yet;

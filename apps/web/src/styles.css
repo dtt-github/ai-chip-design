@@ -2304,8 +2304,16 @@ select.small {
 
 .coverage-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
+}
+
+/* Why "Find an example" found nothing, under its buttons. */
+.coverage-actions .find-note {
+  flex-basis: 100%;
+  text-align: right;
 }
 
 /* Try it: the design as a small board. */

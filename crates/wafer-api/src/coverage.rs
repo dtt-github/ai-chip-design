@@ -58,6 +58,11 @@ pub fn of(runs: &[&TestbenchRun]) -> Option<Coverage> {
     Some(Coverage { covered: hits.values().filter(|n| **n > 0).count(), total: hits.len(), gaps })
 }
 
+/// The gap `p` would be, in words (the `text` of [`Gap`]).
+pub(crate) fn text_of(p: &CoverPoint) -> String {
+    gap(&p.file, p.line, &p.kind, &p.what).text
+}
+
 fn counts(p: &CoverPoint) -> bool {
     !p.file.starts_with("tb/") && !matches!(p.kind, CoverKind::Default { written: false })
 }
