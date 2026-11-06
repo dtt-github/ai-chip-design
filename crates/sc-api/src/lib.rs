@@ -69,6 +69,7 @@ pub fn router(state: AppState) -> Router {
         .route("/projects/{id}/blocks/review", post(chip::review))
         .route("/projects/{id}/spec", get(design::get).put(design::save))
         .route("/projects/{id}/spec/run", post(design::run))
+        .route("/projects/{id}/spec/testbench", post(design::testbench))
         .route("/projects/{id}/spec/draft", post(design::draft))
         .route("/starters", get(starters::list))
         .route("/projects/{id}/starters/{starter}", post(starters::add))

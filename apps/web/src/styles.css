@@ -2307,3 +2307,134 @@ select.small {
   align-items: center;
   gap: 8px;
 }
+
+/* Try it: the design as a small board. */
+.tryit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tryit-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .tryit-board {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tryit-side,
+.tryit-clock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.tryit-clock {
+  align-items: center;
+  min-width: 140px;
+}
+
+.tryit-io {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tryit-switch {
+  min-height: 36px;
+  min-width: 80px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tryit-switch.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.tryit-led {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 15%, transparent);
+  border: 1px solid var(--border);
+}
+
+.tryit-led.on {
+  background: #f5c542;
+  box-shadow: 0 0 8px #f5c542;
+  border-color: #f5c542;
+}
+
+.tryit-history {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-x: auto;
+}
+
+.tryit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tryit-name {
+  width: 72px;
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tryit-cells {
+  display: flex;
+}
+
+.tryit-cell {
+  width: 14px;
+  height: 16px;
+  flex: none;
+  font-size: 10px;
+  line-height: 16px;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.tryit-cell.hi {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.tryit-cell.lo {
+  border-bottom: 2px solid color-mix(in srgb, var(--text) 25%, transparent);
+}
+
+.tryit-cell.bus {
+  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+}
+
+.tryit-cell.now {
+  outline: 1px solid var(--accent);
+}
+
+.tryit-steps ol {
+  margin: 4px 0;
+  padding-left: 22px;
+  max-height: 140px;
+  overflow-y: auto;
+}
