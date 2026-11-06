@@ -8,6 +8,12 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **Find an example**: for a case no example tries, or a planted mistake that slipped through,
+  Health can have the simulator search the design's inputs for an example that reaches it. The
+  example found is cut to the shortest and simplest, ends with checks of what the design did, and
+  opens in Examples unsaved, for a person to check. No AI and no cost; repeatable.
+  `POST /projects/{id}/spec/find-example`. On the starter designs with only their first example,
+  it found every untried case and 33 of 34 slipped mistakes (the last changes nothing visible).
 - **The example: use what the design did**: when an example fails and the design is right, one
   click rewrites the failing check from the simulation (moved a few cycles, a longer wait-until, a
   shorter hold, or the value the design gave), re-simulates until it passes, and lists the changes

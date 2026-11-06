@@ -289,6 +289,32 @@ pub async fn mistakes(
     report.map(Json).map_err(ApiError::Conflict)
 }
 
+/// How long a search for an example may take (shrinking the one found may take half again).
+const FIND_BUDGET: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// "Find an example" (`crate::search`) for a coverage gap or a planted mistake that slipped
+/// through, at the branch tip. Returns a draft example; nothing is saved. Editors: it costs server
+/// time.
+pub async fn find_example(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(target): Json<crate::search::Target>,
+) -> ApiResult<Json<crate::search::Found>> {
+    authorize(&state, &user, id, Role::Editor).await?;
+    let commit = head(&state, id).await?;
+    let files = files_at(&state, id, &commit).await?;
+    let spec = match files.get(SPEC_FILE) {
+        Some(t) => parse_spec(t)?,
+        None => return Err(ApiError::NotFound("this project has no spec yet".into())),
+    };
+    let found = tokio::task::spawn_blocking(move || {
+        gate::with_slot(|| wafer_sim::on_big_stack(|| crate::search::find(&spec, &files, &target, FIND_BUDGET)))
+    })
+    .await?;
+    found.map(Json).map_err(ApiError::Conflict)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct TestbenchReq {
     /// The spec being edited (unsaved edits included).

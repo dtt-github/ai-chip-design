@@ -4,6 +4,7 @@ import {
   isFinished,
   type Blocks,
   type ExampleResult,
+  type FindTarget,
   type Job,
   type MistakesReport,
   type Spec,
@@ -85,8 +86,8 @@ export function DesignFlow({ projectId, startIntent, onWide, head, canEdit, onOp
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [run, setRun] = useState<SpecRun | null>(null);
-  // Text for "Add an example in words", from a coverage gap in Health.
-  const [exampleSeed, setExampleSeed] = useState<{ text: string } | null>(null);
+  // From Health: text for "Add an example in words", or a found example to select.
+  const [exampleSeed, setExampleSeed] = useState<{ text?: string; select?: string } | null>(null);
   const [budget, setBudget] = useState<{ today_usd: number; limit_usd: number | null } | null>(null);
   const refreshBudget = useCallback(() => {
     api.aiUsage().then(setBudget, () => setBudget(null));
@@ -290,6 +291,16 @@ export function DesignFlow({ projectId, startIntent, onWide, head, canEdit, onOp
             onOpenFile={onOpenFile}
             onAddExample={(text) => {
               setExampleSeed({ text });
+              setStep("examples");
+            }}
+            onFoundExample={(ex) => {
+              if (!draft) return;
+              // Unsaved found examples may already use the id the server picked.
+              const ids = new Set(draft.examples.map((e) => e.id));
+              let id = ex.id;
+              for (let n = 1; ids.has(id); n++) id = `found_${n}`;
+              update({ examples: [...draft.examples, { ...ex, id }] });
+              setExampleSeed({ select: id });
               setStep("examples");
             }}
           />
@@ -621,8 +632,8 @@ function Examples({
   fixExample,
   seed,
 }: {
-  /** Text to start "Add an example in words" with (a new object each time). */
-  seed: { text: string } | null;
+  /** Text to start "Add an example in words" with, or an example to select (a new object each time). */
+  seed: { text?: string; select?: string } | null;
   projectId: string;
   head: string;
   /** The chip from the Blocks view, which examples can target. */
@@ -647,7 +658,11 @@ function Examples({
   const [tried, setTried] = useState<string | null>(null);
   useEffect(() => {
     if (!seed) return;
-    setWords(seed.text);
+    if (seed.select) {
+      setSelId(seed.select);
+      return;
+    }
+    setWords(seed.text ?? "");
     window.setTimeout(() => {
       const box = document.getElementById("words") as HTMLTextAreaElement | null;
       box?.scrollIntoView({ block: "center" });
@@ -1250,10 +1265,13 @@ function Health({
   onShowRun,
   onOpenFile,
   onAddExample,
+  onFoundExample,
 }: {
   onOpenFile: (path: string) => void;
   /** Opens Examples with "Add an example in words" filled in. */
   onAddExample: (text: string) => void;
+  /** Adds an example "Find an example" found to the spec (unsaved) and opens it. */
+  onFoundExample: (ex: SpecExample) => void;
   projectId: string;
   head: string | null;
   /** From the spec, else the flow config's CLOCK_PERIOD. */
@@ -1377,9 +1395,12 @@ function Health({
               <span className="small">{withCode(g.text)}</span>
               <span className="coverage-actions">
                 {canEdit && g.kind !== "default" && (
-                  <button className="small" onClick={() => onAddExample(g.suggestion)}>
-                    Add an example
-                  </button>
+                  <>
+                    <FindExample projectId={projectId} target={{ for: "gap", file: g.file, line: g.line, text: g.text }} onFound={onFoundExample} />
+                    <button className="small" onClick={() => onAddExample(g.suggestion)} title="Describe an example in words for the assistant to write">
+                      Add in words
+                    </button>
+                  </>
                 )}
                 <button className="link small" onClick={() => onOpenFile(g.file)} title={`${g.file}, line ${g.line}`}>
                   {g.file.split("/").pop()}:{g.line}
@@ -1423,9 +1444,16 @@ function Health({
                   <span className="small">{withCode(g.text)}</span>
                   <span className="coverage-actions">
                     {canEdit && (
-                      <button className="small" onClick={() => onAddExample(g.suggestion)}>
-                        Add an example
-                      </button>
+                      <>
+                        <FindExample
+                          projectId={projectId}
+                          target={{ for: "mistake", file: g.file, line: g.line, kind: g.kind, original: g.original, mistake: g.mistake }}
+                          onFound={onFoundExample}
+                        />
+                        <button className="small" onClick={() => onAddExample(g.suggestion)} title="Describe an example in words for the assistant to write">
+                          Add in words
+                        </button>
+                      </>
                     )}
                     <button className="link small" onClick={() => onOpenFile(g.file)} title={`${g.file}, line ${g.line}`}>
                       {g.file.split("/").pop()}:{g.line}
@@ -1573,4 +1601,37 @@ const fmt = (v: unknown) => (typeof v === "number" ? Number(v.toPrecision(4)).to
 /** Text with `backticked` parts shown as code. */
 function withCode(text: string) {
   return text.split("`").map((part, i) => (i % 2 ? <code key={i}>{part}</code> : <span key={i}>{part}</span>));
+}
+
+/** "Find an example": the simulator searches the design's inputs for an example that reaches the
+ * target, which then opens in Examples as an unsaved draft. */
+function FindExample({ projectId, target, onFound }: { projectId: string; target: FindTarget; onFound: (ex: SpecExample) => void }) {
+  const [state, setState] = useState<"idle" | "searching" | string>("idle");
+  async function search() {
+    setState("searching");
+    try {
+      const r = await api.findExample(projectId, target);
+      if (r.example) {
+        setState("idle");
+        onFound(r.example);
+      } else {
+        setState(r.message ?? "Nothing found.");
+      }
+    } catch (e) {
+      setState((e as Error).message);
+    }
+  }
+  return (
+    <>
+      <button
+        className="small primary"
+        onClick={search}
+        disabled={state === "searching"}
+        title="The simulator tries the design's inputs until it finds an example for this, which you then check"
+      >
+        {state === "searching" ? "Searching…" : "Find an example"}
+      </button>
+      {state !== "idle" && state !== "searching" && <span className="muted small find-note">{state}</span>}
+    </>
+  );
 }

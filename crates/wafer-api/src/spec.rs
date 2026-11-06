@@ -381,7 +381,7 @@ impl Spec {
     }
 
     /// Half a clock period in whole picoseconds (5 ns without a clock), so any frequency works.
-    fn half_ps(&self) -> u64 {
+    pub(crate) fn half_ps(&self) -> u64 {
         self.clock.as_ref().map(|c| (500_000.0 / c.mhz).round().max(1.0) as u64).unwrap_or(5_000)
     }
 
