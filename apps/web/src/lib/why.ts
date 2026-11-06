@@ -2,7 +2,7 @@
 // that led to it and the values it read, from the simulator's record of what wrote each change.
 // Port connections are followed through; the example's own inputs end the chain.
 
-import { NO_ORIGIN, type SimSignal } from "../sim/protocol";
+import { NO_ORIGIN, type SimOrigin, type SimSignal } from "../sim/protocol";
 import type { Replay } from "./replay";
 
 /** A value an explanation mentions, which can be explained in turn. */
@@ -126,4 +126,171 @@ export function whyText(b: Because): string {
     (b.reads.length ? `; it read ${vals(b.reads)}` : "") +
     "."
   );
+}
+
+/** A line of the design that could have given a signal the value an example expected, and what
+ * happened to it the last time it could have run. */
+export interface Candidate {
+  file: string;
+  line: number;
+  code: string;
+  /** `blocked`: a decision went another way; `ran`: it ran (and computed something else, or a
+   * later line changed the value again); `never`: nothing had decided it yet. */
+  verdict: "blocked" | "ran" | "never";
+  /** The cycle that last decision is seen at. */
+  cycle?: number;
+  /** The decisions that went its way, outermost first, then (for `blocked`) the one that didn't. */
+  passed: Because["conds"];
+  blocked?: Because["conds"][number];
+  /** For `ran`: the values it computed from. */
+  reads: Read[];
+}
+
+export interface WhyNot {
+  name: string;
+  full: string;
+  expected: string;
+  actual: string;
+  cycle: number;
+  /** The lines that write the signal and could have written the expected value. */
+  candidates: Candidate[];
+  /** Lines that write the signal but only another constant (`valid <= 0` when 1 was expected). */
+  others: number;
+  /** The run made too many decisions to record them all, and this moment is past the record. */
+  unrecorded: boolean;
+}
+
+/** A Verilog number (`1`, `4'hf`, `8'd12`), or null for anything else. */
+function constant(s: string): bigint | null {
+  const v = s.trim().replace(/_/g, "").toLowerCase();
+  try {
+    const m = v.match(/^\d*'s?([hbod])([0-9a-f]+)$/);
+    if (m) return BigInt({ h: "0x", b: "0b", o: "0o", d: "" }[m[1] as "h"] + m[2]);
+    return /^\d+$/.test(v) ? BigInt(v) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Why `full` wasn't `expected` at a cycle's check point: each line that could have written that
+ * value, and the decision that kept it from running (or that it did run). */
+export function whyNot(rep: Replay, full: string, cycle: number, expected: bigint): WhyNot | null {
+  const t = rep.at(cycle);
+  if (t === undefined) return null;
+  const signals = new Map(rep.sim.signals.map((s) => [s.name, s]));
+  const name = (f: string) => {
+    const rest = f.startsWith(`${rep.top}.`) ? f.slice(rep.top.length + 1) : f;
+    return rest.startsWith("dut.") ? rest.slice(4) : rest;
+  };
+  const read = (f: string, at: number): Read => {
+    const s = signals.get(f);
+    const i = s ? changeAt(s, at) : -1;
+    return { name: name(f), full: f, value: s && i >= 0 ? s.values[i].toString() : "?", t: s && i >= 0 ? at : null };
+  };
+  // Through port connections to the signal the design writes.
+  let cur = full;
+  for (let hop = 0; hop < 32; hop++) {
+    const s = signals.get(cur);
+    const i = s ? changeAt(s, t) : -1;
+    if (!s || i < 0 || s.by[i] === NO_ORIGIN) break;
+    const o = rep.sim.origins[s.by[i]];
+    if (!/^(input|output) \S+ of /.test(o.text) || o.reads.length !== 1) break;
+    cur = o.reads[0];
+  }
+  const shown = signals.get(full);
+  const at = shown ? changeAt(shown, t) : -1;
+  const out: WhyNot = {
+    name: name(full),
+    full,
+    expected: expected.toString(),
+    actual: shown && at >= 0 ? shown.values[at].toString() : "?",
+    cycle,
+    candidates: [],
+    others: 0,
+    unrecorded: false,
+  };
+
+  const { times, branches, decisionOf, cut } = rep.sim.decisions;
+  out.unrecorded = cut && (times.length === 0 || times[times.length - 1] < t);
+  // The last decision `d` made at or before `t` (or, from `from` on, at time `at` exactly).
+  const lastBefore = (d: number) => {
+    let lo = 0;
+    let hi = times.length - 1;
+    let end = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (times[mid] <= t) {
+        end = mid;
+        lo = mid + 1;
+      } else hi = mid - 1;
+    }
+    for (let j = end; j >= 0; j--) if (decisionOf[branches[j]] === d) return j;
+    return -1;
+  };
+  const nextAt = (d: number, from: number) => {
+    for (let j = from + 1; j < times.length && times[j] === times[from]; j++) if (decisionOf[branches[j]] === d) return j;
+    return -1;
+  };
+
+  const seen = new Set<string>();
+  for (const o of rep.sim.origins) {
+    if (o.writes !== cur || /^(input|output) \S+ of /.test(o.text) || o.text.endsWith("(its starting value)")) continue;
+    const key = `${o.file}:${o.line}:${o.text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    // A line that only ever writes another constant can't be the one.
+    const m = o.text.match(/<?=/);
+    const k = m?.index === undefined ? null : constant(o.text.slice(m.index + m[0].length));
+    if (k !== null && k !== expected) {
+      out.others++;
+      continue;
+    }
+    const nb = nonblocking(o.text);
+    const valuesAt = (tm: number) => (nb ? Math.max(0, tm - 1) : tm);
+    const cond = (c: SimOrigin["conds"][number], tm: number) => ({ line: c.line, code: c.text, taken: c.taken, reads: c.reads.map((r) => read(r, valuesAt(tm))) });
+    const cand: Candidate = { file: o.file, line: o.line, code: o.text, verdict: "ran", passed: [], reads: [] };
+    if (o.conds.length) {
+      let j = lastBefore(decisionOf[o.conds[0].point]);
+      if (j < 0) cand.verdict = "never";
+      else {
+        cand.cycle = rep.cycleAt(times[j]);
+        for (let n = 0; n < o.conds.length; n++) {
+          const c = o.conds[n];
+          if (n > 0) j = nextAt(decisionOf[c.point], j);
+          if (j < 0) break;
+          if (branches[j] !== c.point) {
+            cand.verdict = "blocked";
+            cand.blocked = cond(c, times[j]);
+            break;
+          }
+          cand.passed.push(cond(c, times[j]));
+        }
+        if (cand.verdict === "ran") cand.reads = o.reads.map((r) => read(r, valuesAt(times[j])));
+      }
+    } else cand.reads = o.reads.map((r) => read(r, valuesAt(t)));
+    out.candidates.push(cand);
+  }
+  return out;
+}
+
+/** How a decision went the other way: "`state == STOP` was false", "`state` wasn't DONE". */
+export function missed(c: Because["conds"][number]): string {
+  if (c.taken === "true") return `\`${c.code}\` was false`;
+  if (c.taken === "false") return `\`${c.code}\` was true`;
+  if (c.taken === "default") return `\`${c.code}\` matched one of the listed values`;
+  return `\`${c.code}\` wasn't ${c.taken.replace(/, /g, " or ")}`;
+}
+
+/** The answer as one paragraph, for the AI. */
+export function whyNotText(w: WhyNot): string {
+  const vals = (rs: Read[]) => rs.map((r) => `${r.name} = ${r.value}`).join(", ");
+  const parts = w.candidates.map((c) => {
+    const head = `line ${c.line} of ${c.file}, \`${c.code}\``;
+    if (c.verdict === "never") return `${head}, had never run by then`;
+    if (c.verdict === "blocked" && c.blocked)
+      return `${head}, didn't run for cycle ${c.cycle} because ${missed(c.blocked)}${c.blocked.reads.length ? ` (${vals(c.blocked.reads)})` : ""}`;
+    return `${head}, ran${c.cycle !== undefined ? ` for cycle ${c.cycle}` : ""}${c.reads.length ? ` with ${vals(c.reads)}` : ""}`;
+  });
+  const head = `Why ${w.name} wasn't ${w.expected} at cycle ${w.cycle} (it was ${w.actual}):`;
+  return parts.length ? `${head} ${parts.join("; ")}.` : `${head} no line of the design writes ${w.expected} to it.`;
 }

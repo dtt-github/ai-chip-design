@@ -16,7 +16,7 @@ import {
 } from "../api";
 import { extendTestbench, fmt as fmtValue, replay, targetSpec, type Replay } from "../lib/replay";
 import { findFix, type Fix } from "../lib/fixexample";
-import { decided, why, whyText, type Because, type Read } from "../lib/why";
+import { decided, missed, why, whyNot, whyNotText, whyText, type Because, type Read, type WhyNot } from "../lib/why";
 import { StateMachine } from "./StateMachine";
 import { TryIt } from "./TryIt";
 import { SimClient } from "../sim/client";
@@ -980,6 +980,8 @@ function Happened({
     const b = rep && why(rep, full, t);
     if (b) setTrail((tr) => [...tr.slice(0, after), b]);
   };
+  // "Why not?": why the first failing check didn't see the value the example expected.
+  const [notWhy, setNotWhy] = useState<WhyNot | null>(null);
   // "The design is right": a change to the example that makes it pass, worked out and re-checked.
   const [fix, setFix] = useState<Fix | "working" | "none" | null>(null);
   async function acceptDesign() {
@@ -1030,6 +1032,7 @@ function Happened({
       if (!cancelled) {
         setRep(replay(spec, ex, sim));
         setTrail([]);
+        setNotWhy(null);
       }
     })().catch((e: Error) => !cancelled && setError(e.message));
     return () => {
@@ -1045,7 +1048,8 @@ function Happened({
   const every = rep.cycles > 200 ? 50 : rep.cycles > 80 ? 20 : rep.cycles > 30 ? 10 : 5;
   const failing = rep.firstFail;
   // The AI gets the explanation too, when someone followed one.
-  const story = trail.length ? `${rep.story} Why, traced in the simulation: ${trail.map(whyText).join(" ")}` : rep.story;
+  const traced = [notWhy && whyNotText(notWhy), ...trail.map(whyText)].filter(Boolean);
+  const story = traced.length ? `${rep.story} Why, traced in the simulation: ${traced.join(" ")}` : rep.story;
   const picked = trail[0];
 
   return (
@@ -1055,8 +1059,27 @@ function Happened({
         <span className={`status ${failing ? "status-failed" : "status-succeeded"}`}>{failing ? "differs from the example" : "matches the example"}</span>
       </div>
       <p className={`small ${failing ? "" : "muted"}`} style={{ margin: 0 }}>
-        {rep.story}
+        {rep.story}{" "}
+        {failing && failing.failCycle !== undefined && !notWhy && (
+          <button
+            className="link small"
+            onClick={() => setNotWhy(whyNot(rep, `${rep.top}.${failing.signal}`, failing.failCycle!, failing.expected))}
+          >
+            Why wasn't it {failing.expected.toString()}?
+          </button>
+        )}
       </p>
+      {notWhy && (
+        <WhyNotPanel
+          w={notWhy}
+          onAsk={(r) => {
+            if (r.t === null) return;
+            setPickedCycle(null);
+            ask(r.full, r.t, 0);
+          }}
+          onClose={() => setNotWhy(null)}
+        />
+      )}
       {rep.problem && <p className="warn small">Note: {rep.problem}.</p>}
       <div className="design-scroll" ref={box}>
         <div className="hp-grid" style={{ gridTemplateColumns: `72px ${width}px` }}>
@@ -1241,6 +1264,76 @@ function HpRow({
         {parts}
       </svg>
     </>
+  );
+}
+
+/** "Why not?": the lines that could have written the value the example expected, and what kept
+ * each from doing so; its values can be asked about like any other. */
+function WhyNotPanel({ w, onAsk, onClose }: { w: WhyNot; onAsk: (r: Read) => void; onClose: () => void }) {
+  const chip = (r: Read) => (
+    <button key={r.full} className="link small mono" disabled={r.t === null} onClick={() => onAsk(r)} title={`Why is ${r.name} ${r.value}?`}>
+      {r.name} = {r.value}
+    </button>
+  );
+  const chips = (rs: Read[]) => rs.map((r, j) => [j > 0 && ", ", chip(r)]);
+  return (
+    <div className="design-card why">
+      <div className="design-row" style={{ justifyContent: "space-between" }}>
+        <strong className="small">
+          Why wasn't <span className="mono">{w.name}</span> {w.expected} at cycle {w.cycle}?
+        </strong>
+        <button className="link small" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      {w.unrecorded && <p className="warn small">The run is too long to have recorded every decision up to this cycle.</p>}
+      {w.candidates.length === 0 ? (
+        <p className="small" style={{ margin: 0 }}>
+          No line of the design can write {w.expected} to <span className="mono">{w.name}</span>
+          {w.others > 0 && <> (the {w.others === 1 ? "line that writes it only writes" : `${w.others} lines that write it only write`} other values)</>}. The design
+          needs a line that does.
+        </p>
+      ) : (
+        <ol className="why-chain">
+          {w.candidates.map((c, k) => (
+            <li key={k} className="small">
+              Line {c.line} of {c.file.split("/").pop()}: <code>{c.code}</code>
+              {c.verdict === "never" && <div>It hadn't run yet: nothing had reached its decisions by cycle {w.cycle}.</div>}
+              {c.verdict === "blocked" && c.blocked && (
+                <div>
+                  Didn't run for cycle {c.cycle}
+                  {c.passed.length > 0 && (
+                    <>
+                      {" "}
+                      (
+                      {c.passed.map((p, j) => (
+                        <span key={j}>
+                          {j > 0 && ", "}
+                          {withCode(decided(p))}
+                        </span>
+                      ))}
+                      )
+                    </>
+                  )}{" "}
+                  because <strong>{withCode(missed(c.blocked))}</strong>
+                  {c.blocked.reads.length > 0 && <> ({chips(c.blocked.reads)})</>}.
+                </div>
+              )}
+              {c.verdict === "ran" && (
+                <div>
+                  It ran{c.cycle !== undefined && <> for cycle {c.cycle}</>}
+                  {c.reads.length > 0 && <>, with {chips(c.reads)}</>}, and gave {w.name} another value (or a later line changed it).
+                </div>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+      <p className="muted small" style={{ margin: 0 }}>
+        {w.candidates.length > 0 && w.others > 0 && <>Not listed: {w.others} line{w.others === 1 ? "" : "s"} writing other constants. </>}
+        Click a value to see why it was that. When you ask the AI to fix something, this goes with it.
+      </p>
+    </div>
   );
 }
 

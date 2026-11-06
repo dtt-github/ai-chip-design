@@ -22,8 +22,22 @@ export interface SimOrigin {
   text: string;
   /** Full names of the signals its value is computed from. */
   reads: string[];
-  /** The `if`/`case` decisions it is inside, outermost first, and which way each went. */
-  conds: { line: number; text: string; reads: string[]; taken: string }[];
+  /** Full name of the signal it writes; empty when it writes several. */
+  writes: string;
+  /** The `if`/`case` decisions it is inside, outermost first, and which way each went for it to
+   * run; `point` is that branch, as in `SimDecisions`. */
+  conds: { line: number; text: string; reads: string[]; taken: string; point: number }[];
+}
+
+/** Every `if`/`case` decision the run made, in order. */
+export interface SimDecisions {
+  times: Float64Array;
+  /** The branch taken (a coverage point number). */
+  branches: Uint32Array;
+  /** For each coverage point: the decision it is a branch of, or NO_ORIGIN for one that isn't. */
+  decisionOf: Uint32Array;
+  /** The run made more decisions than were recorded (only the first are). */
+  cut: boolean;
 }
 
 export interface SimResult {
@@ -37,6 +51,7 @@ export interface SimResult {
   ms: number;
   signals: SimSignal[];
   origins: SimOrigin[];
+  decisions: SimDecisions;
 }
 
 export type SimRequest =

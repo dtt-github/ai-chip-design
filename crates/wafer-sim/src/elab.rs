@@ -349,6 +349,8 @@ pub struct Origin {
     pub text: String,
     /// The signals its value is computed from (full names, e.g. `tb.dut.count`).
     pub reads: Vec<String>,
+    /// The signal it writes (full name), or empty when it writes several (`{a, b} = ...`).
+    pub writes: String,
     /// The `if` and `case` decisions it is inside, outermost first.
     pub conds: Vec<Cond>,
 }
@@ -362,6 +364,9 @@ pub struct Cond {
     pub reads: Vec<String>,
     /// `true` or `false` for an `if`; the arm's labels for a `case`, or `default`.
     pub taken: String,
+    /// The coverage point of this branch: the simulation records when each was taken
+    /// ([`crate::SimResult::decisions`]).
+    pub point: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -386,7 +391,13 @@ pub struct Design {
     pub cover: Vec<CoverPoint>,
     /// Where assignments come from, numbered by `Op::From`.
     pub origins: Vec<Origin>,
+    /// For each coverage point that is a branch of an `if` or `case`: the decision it belongs to
+    /// (numbered from 0); [`NO_DECISION`] for the others.
+    pub cover_decision: Vec<u32>,
 }
+
+/// [`Design::cover_decision`] of a coverage point that isn't a branch.
+pub const NO_DECISION: u32 = u32::MAX;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct InstanceInfo {
@@ -421,6 +432,7 @@ pub fn elaborate_with(modules: &[Module], top: &str, overrides: &HashMap<String,
         made: BTreeSet::new(),
         const_depth: std::cell::Cell::new(0),
         conds: Vec::new(),
+        decisions: 0,
     };
     if let Some(name) = overrides
         .keys()
@@ -453,6 +465,8 @@ struct Elab<'a> {
     hoist: Option<Vec<Op>>,
     /// The `if`/`case` decisions around the statement being compiled.
     conds: Vec<Cond>,
+    /// Decisions numbered so far.
+    decisions: u32,
     /// Functions and tasks being compiled: return variable, and `return` jumps to patch.
     rets: Vec<(Option<usize>, Vec<usize>)>,
     /// Function and task calls being expanded (`inst.name`), to refuse recursion.
@@ -620,7 +634,8 @@ impl<'a> Elab<'a> {
                     } else {
                         let mut ops = Vec::new();
                         let rhs = self.sexpr(ds, init, &mut ops)?;
-                        let from = self.origin(ds, dl.line, format!("{} = {init} (its starting value)", n.name), &rhs);
+                        let from =
+                            self.origin(ds, dl.line, format!("{} = {init} (its starting value)", n.name), &lv, &rhs);
                         ops.push(from);
                         ops.push(Op::Assign(lv, rhs));
                         ops.push(Op::Halt);
@@ -809,26 +824,39 @@ impl<'a> Elab<'a> {
     }
 
     /// A new coverage point in `s`, and the op that counts it.
-    fn cover(&mut self, s: &Scope, line: u32, kind: CoverKind, what: String) -> Op {
-        Op::Cover(self.cover_point(s, line, kind, what))
-    }
-
     /// A new coverage point in `s`, by number.
     fn cover_point(&mut self, s: &Scope, line: u32, kind: CoverKind, what: String) -> usize {
         self.d.cover.push(CoverPoint { file: s.module.file.clone(), line, scope: s.path.clone(), kind, what });
+        self.d.cover_decision.push(NO_DECISION);
         self.d.cover.len() - 1
+    }
+
+    /// A branch of decision `d`: its coverage point, marked as part of `d`.
+    fn branch(&mut self, s: &Scope, line: u32, kind: CoverKind, what: String, d: u32) -> usize {
+        let n = self.cover_point(s, line, kind, what);
+        self.d.cover_decision[n] = d;
+        n
     }
 
     /// A new origin in `s` for an assignment written `text` computing `from`, inside the current
     /// decisions; returns the op that marks it.
-    fn origin(&mut self, s: &Scope, line: u32, text: String, from: &CExpr) -> Op {
+    fn origin(&mut self, s: &Scope, line: u32, text: String, lv: &LVal, from: &CExpr) -> Op {
         let reads = self.read_names(from);
+        let writes = match lv {
+            LVal::Concat(_) => String::new(),
+            LVal::Sig(sig)
+            | LVal::Word { sig, .. }
+            | LVal::Bit { sig, .. }
+            | LVal::Part { sig, .. }
+            | LVal::IPart { sig, .. } => self.d.signals[*sig].name.clone(),
+        };
         self.d.origins.push(Origin {
             file: s.module.file.clone(),
             line,
             scope: s.path.clone(),
             text,
             reads,
+            writes,
             conds: self.conds.clone(),
         });
         Op::From((self.d.origins.len() - 1) as u32)
@@ -853,7 +881,7 @@ impl<'a> Elab<'a> {
         let mut ops = Vec::new();
         let rhs = self.sexpr(s, rhs, &mut ops)?;
         let saved = std::mem::take(&mut self.conds);
-        let from = self.origin(s, line, text, &rhs);
+        let from = self.origin(s, line, text, &lv, &rhs);
         self.conds = saved;
         ops.push(from);
         ops.push(Op::Assign(lv, rhs));
@@ -995,7 +1023,7 @@ impl<'a> Elab<'a> {
                     let rhs = CExpr::Sig { sig: port_sig, w: pw, signed: ps };
                     let mut reads = BTreeSet::new();
                     reads.insert(port_sig);
-                    let from = self.origin(s, line, format!("output {port} of {path}"), &rhs);
+                    let from = self.origin(s, line, format!("output {port} of {path}"), &lv, &rhs);
                     let ops = vec![from, Op::Assign(lv, rhs), Op::Wait(self.any_change(&reads)), Op::Jump(0)];
                     self.d.processes.push(Process { ops, scope: s.path.clone(), file: s.module.file.clone(), line });
                 }
@@ -1631,14 +1659,14 @@ impl<'a> Elab<'a> {
             Stmt::Blocking { lhs, rhs: r, line } => {
                 let lv = self.lval(s, lhs)?;
                 let rhs = self.sexpr(s, r, ops)?;
-                let from = self.origin(s, *line, format!("{lhs} = {r}"), &rhs);
+                let from = self.origin(s, *line, format!("{lhs} = {r}"), &lv, &rhs);
                 ops.push(from);
                 ops.push(Op::Assign(lv, rhs));
             }
             Stmt::NonBlocking { lhs, rhs: r, delay, line } => {
                 let lv = self.lval(s, lhs)?;
                 let rhs = self.sexpr(s, r, ops)?;
-                let from = self.origin(s, *line, format!("{lhs} <= {r}"), &rhs);
+                let from = self.origin(s, *line, format!("{lhs} <= {r}"), &lv, &rhs);
                 ops.push(from);
                 let delay = match delay {
                     Some(d) => Some(self.sexpr(s, d, ops)?),
@@ -1670,10 +1698,18 @@ impl<'a> Elab<'a> {
                 }
                 let jz = ops.len();
                 ops.push(Op::Halt); // patched
-                let cov = self.cover(s, line, CoverKind::Then, what.clone());
-                ops.push(cov);
+                let d = self.decisions;
+                self.decisions += 1;
+                let then = self.branch(s, line, CoverKind::Then, what.clone(), d);
+                ops.push(Op::Cover(then));
                 let reads = self.read_names(&c);
-                self.conds.push(Cond { line, text: what.clone(), reads: reads.clone(), taken: "true".into() });
+                self.conds.push(Cond {
+                    line,
+                    text: what.clone(),
+                    reads: reads.clone(),
+                    taken: "true".into(),
+                    point: then,
+                });
                 let r = self.stmt(s, t, ops);
                 self.conds.pop();
                 r?;
@@ -1681,10 +1717,10 @@ impl<'a> Elab<'a> {
                 let jend = ops.len();
                 ops.push(Op::Halt);
                 ops[jz] = Op::JumpIfZero(c, ops.len());
-                let cov = self.cover(s, line, CoverKind::Else { written: f.is_some() }, what.clone());
-                ops.push(cov);
+                let other = self.branch(s, line, CoverKind::Else { written: f.is_some() }, what.clone(), d);
+                ops.push(Op::Cover(other));
                 if let Some(f) = f {
-                    self.conds.push(Cond { line, text: what, reads, taken: "false".into() });
+                    self.conds.push(Cond { line, text: what, reads, taken: "false".into(), point: other });
                     let r = self.stmt(s, f, ops);
                     self.conds.pop();
                     r?;
@@ -1703,6 +1739,8 @@ impl<'a> Elab<'a> {
                     .collect::<Result<Vec<_>>>()?;
                 let w = label_w.into_iter().fold(sel_w, u32::max);
                 let sel_reads = self.read_names(&sel_c);
+                let d = self.decisions;
+                self.decisions += 1;
                 // Store at the comparison width; width of the temp is 64 so no truncation.
                 ops.push(Op::Assign(LVal::Sig(tmp), sel_c));
                 let tmp_e = || CExpr::Sig { sig: tmp, w, signed: false };
@@ -1735,13 +1773,14 @@ impl<'a> Elab<'a> {
                     let jz = ops.len();
                     ops.push(Op::Halt);
                     let labels = labels.iter().map(|l| l.to_string()).collect::<Vec<_>>().join(", ");
-                    let cov = self.cover(s, *line, CoverKind::Arm { labels: labels.clone() }, sel.to_string());
-                    ops.push(cov);
+                    let arm = self.branch(s, *line, CoverKind::Arm { labels: labels.clone() }, sel.to_string(), d);
+                    ops.push(Op::Cover(arm));
                     self.conds.push(Cond {
                         line: *line,
                         text: sel.to_string(),
                         reads: sel_reads.clone(),
                         taken: labels,
+                        point: arm,
                     });
                     let r = self.stmt(s, body, ops);
                     self.conds.pop();
@@ -1750,16 +1789,18 @@ impl<'a> Elab<'a> {
                     ops.push(Op::Halt);
                     ops[jz] = Op::JumpIfZero(cond.expect("case item has labels"), ops.len());
                 }
-                let cov = self.cover(s, *line, CoverKind::Default { written: default.is_some() }, sel.to_string());
-                ops.push(cov);
-                if let Some(d) = default {
+                let other =
+                    self.branch(s, *line, CoverKind::Default { written: default.is_some() }, sel.to_string(), d);
+                ops.push(Op::Cover(other));
+                if let Some(body) = default {
                     self.conds.push(Cond {
                         line: *line,
                         text: sel.to_string(),
                         reads: sel_reads,
                         taken: "default".into(),
+                        point: other,
                     });
-                    let r = self.stmt(s, d, ops);
+                    let r = self.stmt(s, body, ops);
                     self.conds.pop();
                     r?;
                 }
