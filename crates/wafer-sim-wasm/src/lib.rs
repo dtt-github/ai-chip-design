@@ -90,7 +90,78 @@ impl Simulation {
         self.r.signals.get(i).map(|s| s.values.clone()).unwrap_or_default()
     }
 
+    /// What wrote each value of signal `i`: indexes into `origins`, 0xFFFFFFFF for nothing.
+    pub fn by(&self, i: usize) -> Vec<u32> {
+        self.r.signals.get(i).map(|s| s.by.clone()).unwrap_or_default()
+    }
+
+    /// Where written values come from, as JSON: `[{file, line, scope, text, reads, conds: [{line,
+    /// text, reads, taken}]}]`.
+    pub fn origins(&self) -> String {
+        let list: Vec<String> = self
+            .r
+            .origins
+            .iter()
+            .map(|o| {
+                let conds: Vec<String> = o
+                    .conds
+                    .iter()
+                    .map(|c| {
+                        format!(
+                            r#"{{"line":{},"text":{},"reads":{},"taken":{}}}"#,
+                            c.line,
+                            json(&c.text),
+                            strings(&c.reads),
+                            json(&c.taken)
+                        )
+                    })
+                    .collect();
+                format!(
+                    r#"{{"file":{},"line":{},"scope":{},"text":{},"reads":{},"conds":[{}]}}"#,
+                    json(&o.file),
+                    o.line,
+                    json(&o.scope),
+                    json(&o.text),
+                    strings(&o.reads),
+                    conds.join(",")
+                )
+            })
+            .collect();
+        format!("[{}]", list.join(","))
+    }
+
     pub fn vcd(&self) -> String {
         wafer_sim::vcd::to_vcd(&self.r)
+    }
+}
+
+/// A JSON string.
+fn json(s: &str) -> String {
+    let mut o = String::with_capacity(s.len() + 2);
+    o.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => o.push_str("\\\""),
+            '\\' => o.push_str("\\\\"),
+            c if (c as u32) < 0x20 => o.push_str(&format!("\\u{:04x}", c as u32)),
+            c => o.push(c),
+        }
+    }
+    o.push('"');
+    o
+}
+
+fn strings(v: &[String]) -> String {
+    format!("[{}]", v.iter().map(|s| json(s)).collect::<Vec<_>>().join(","))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn json_strings_are_escaped() {
+        assert_eq!(json("a \"b\" \\ c\n"), r#""a \"b\" \\ c\u000a""#);
+        assert_eq!(strings(&["x".into(), "y".into()]), r#"["x","y"]"#);
     }
 }

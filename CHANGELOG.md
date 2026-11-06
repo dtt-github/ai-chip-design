@@ -8,6 +8,13 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **Why is it this value?**: click any value in an example's "What actually happened" timeline to
+  see the line of the design that wrote it, why that line ran (each `if`/`case` around it and
+  which way it went, with the values decided on) and the values it used; each of those can be
+  clicked in turn, back through blocks' ports to the example step that set an input. The
+  explanation followed goes with a request to the AI to fix the design or the example. The
+  simulator now records, for every value change, which assignment made it (`WaveSignal::by`,
+  `SimResult::origins`). Runs in the browser; no AI and no cost.
 - **Find an example**: for a case no example tries, or a planted mistake that slipped through,
   Health can have the simulator search the design's inputs for an example that reaches it. The
   example found is cut to the shortest and simplest, ends with checks of what the design did, and

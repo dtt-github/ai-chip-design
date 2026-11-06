@@ -300,6 +300,8 @@ pub enum Op {
     Halt,
     /// Counts one visit of coverage point `n` (`Design::cover`).
     Cover(usize),
+    /// The assignments that follow come from `Design::origins[n]` (until the next `From`).
+    From(u32),
     /// Counts each part of a combined condition as true (its point) or false (the next point).
     CoverParts(Vec<(CExpr, usize)>),
 }
@@ -334,6 +336,34 @@ pub enum CoverKind {
     Side { value: bool },
 }
 
+/// Where a value written in the simulation came from: an assignment in the design (or a port
+/// connection), with what it reads and the decisions that led to it, so a value can be explained.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Origin {
+    pub file: String,
+    pub line: u32,
+    /// The instance it is in, e.g. `tb.dut`.
+    pub scope: String,
+    /// As written: `count <= count + 1`, `assign busy = state != 0`, or a port connection
+    /// (`output led of tb.dut`).
+    pub text: String,
+    /// The signals its value is computed from (full names, e.g. `tb.dut.count`).
+    pub reads: Vec<String>,
+    /// The `if` and `case` decisions it is inside, outermost first.
+    pub conds: Vec<Cond>,
+}
+
+/// A decision an assignment is inside, and which way it went for the assignment to run.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Cond {
+    pub line: u32,
+    /// The condition or `case` selector, as written.
+    pub text: String,
+    pub reads: Vec<String>,
+    /// `true` or `false` for an `if`; the arm's labels for a `case`, or `default`.
+    pub taken: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct Process {
     pub ops: Vec<Op>,
@@ -354,6 +384,8 @@ pub struct Design {
     pub instances: Vec<InstanceInfo>,
     /// Branch coverage points, numbered by `Op::Cover`.
     pub cover: Vec<CoverPoint>,
+    /// Where assignments come from, numbered by `Op::From`.
+    pub origins: Vec<Origin>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -388,6 +420,7 @@ pub fn elaborate_with(modules: &[Module], top: &str, overrides: &HashMap<String,
         calling: Vec::new(),
         made: BTreeSet::new(),
         const_depth: std::cell::Cell::new(0),
+        conds: Vec::new(),
     };
     if let Some(name) = overrides
         .keys()
@@ -418,6 +451,8 @@ struct Elab<'a> {
     tmp: usize,
     /// While compiling an expression in a statement: the operations its function calls need first.
     hoist: Option<Vec<Op>>,
+    /// The `if`/`case` decisions around the statement being compiled.
+    conds: Vec<Cond>,
     /// Functions and tasks being compiled: return variable, and `return` jumps to patch.
     rets: Vec<(Option<usize>, Vec<usize>)>,
     /// Function and task calls being expanded (`inst.name`), to refuse recursion.
@@ -581,10 +616,12 @@ impl<'a> Elab<'a> {
                 if let Some(init) = &n.init {
                     let lv = self.lval(ds, &Expr::Ident(n.name.clone(), dl.line))?;
                     if dl.kind == Some(Kind::Wire) {
-                        self.continuous(ds, lv, init, dl.line)?;
+                        self.continuous(ds, lv, init, dl.line, format!("wire {} = {init}", n.name))?;
                     } else {
                         let mut ops = Vec::new();
                         let rhs = self.sexpr(ds, init, &mut ops)?;
+                        let from = self.origin(ds, dl.line, format!("{} = {init} (its starting value)", n.name), &rhs);
+                        ops.push(from);
                         ops.push(Op::Assign(lv, rhs));
                         ops.push(Op::Halt);
                         self.d.processes.push(Process {
@@ -602,7 +639,7 @@ impl<'a> Elab<'a> {
             match item {
                 Item::Assign { lhs, rhs, line } => {
                     let lv = self.lval(ds, lhs)?;
-                    self.continuous(ds, lv, rhs, *line)?;
+                    self.continuous(ds, lv, rhs, *line, format!("assign {lhs} = {rhs}"))?;
                 }
                 Item::Initial { body, line } => {
                     let mut ops = Vec::new();
@@ -782,16 +819,43 @@ impl<'a> Elab<'a> {
         self.d.cover.len() - 1
     }
 
+    /// A new origin in `s` for an assignment written `text` computing `from`, inside the current
+    /// decisions; returns the op that marks it.
+    fn origin(&mut self, s: &Scope, line: u32, text: String, from: &CExpr) -> Op {
+        let reads = self.read_names(from);
+        self.d.origins.push(Origin {
+            file: s.module.file.clone(),
+            line,
+            scope: s.path.clone(),
+            text,
+            reads,
+            conds: self.conds.clone(),
+        });
+        Op::From((self.d.origins.len() - 1) as u32)
+    }
+
+    /// The names of the (visible) signals `e` reads.
+    fn read_names(&self, e: &CExpr) -> Vec<String> {
+        let mut sigs = BTreeSet::new();
+        e.reads(&mut sigs);
+        sigs.into_iter().filter(|&i| !self.d.signals[i].hidden).map(|i| self.d.signals[i].name.clone()).collect()
+    }
+
     fn temp(&mut self, s: &Scope) -> usize {
         self.tmp += 1;
         self.add_signal(format!("{}.$tmp{}", s.path, self.tmp), 64, false, 63, 0, None, true)
     }
 
-    /// `assign lhs = rhs` → loop { lhs = rhs; wait for any input change }.
-    fn continuous(&mut self, s: &Scope, lv: LVal, rhs: &Expr, line: u32) -> Result<()> {
+    /// `assign lhs = rhs` → loop { lhs = rhs; wait for any input change }. `text` says what it is
+    /// for explanations (`assign busy = state != 0`).
+    fn continuous(&mut self, s: &Scope, lv: LVal, rhs: &Expr, line: u32, text: String) -> Result<()> {
         // Function calls in the expression run first, every time it is recomputed.
         let mut ops = Vec::new();
         let rhs = self.sexpr(s, rhs, &mut ops)?;
+        let saved = std::mem::take(&mut self.conds);
+        let from = self.origin(s, line, text, &rhs);
+        self.conds = saved;
+        ops.push(from);
         ops.push(Op::Assign(lv, rhs));
         let mut reads = BTreeSet::new();
         for op in &ops {
@@ -917,7 +981,9 @@ impl<'a> Elab<'a> {
                 .unwrap_or(Dir::Input);
             let port_sig = self.d.names[&format!("{path}.{port}")];
             match dir {
-                Dir::Input => self.continuous_into(LVal::Sig(port_sig), s, expr, line)?,
+                Dir::Input => {
+                    self.continuous_into(LVal::Sig(port_sig), s, expr, line, format!("input {port} of {path}"))?
+                }
                 Dir::Output => {
                     let lv = self.lval(s, expr).map_err(|_| Error::Elab {
                         file: s.module.file.clone(),
@@ -929,7 +995,8 @@ impl<'a> Elab<'a> {
                     let rhs = CExpr::Sig { sig: port_sig, w: pw, signed: ps };
                     let mut reads = BTreeSet::new();
                     reads.insert(port_sig);
-                    let ops = vec![Op::Assign(lv, rhs), Op::Wait(self.any_change(&reads)), Op::Jump(0)];
+                    let from = self.origin(s, line, format!("output {port} of {path}"), &rhs);
+                    let ops = vec![from, Op::Assign(lv, rhs), Op::Wait(self.any_change(&reads)), Op::Jump(0)];
                     self.d.processes.push(Process { ops, scope: s.path.clone(), file: s.module.file.clone(), line });
                 }
                 Dir::Inout => return self.err(&cs, line, format!("inout port '{port}' is not supported")),
@@ -938,8 +1005,8 @@ impl<'a> Elab<'a> {
         Ok(())
     }
 
-    fn continuous_into(&mut self, lv: LVal, s: &Scope, rhs: &Expr, line: u32) -> Result<()> {
-        self.continuous(s, lv, rhs, line)
+    fn continuous_into(&mut self, lv: LVal, s: &Scope, rhs: &Expr, line: u32, text: String) -> Result<()> {
+        self.continuous(s, lv, rhs, line, text)
     }
 
     // ---- name resolution ----
@@ -1561,14 +1628,18 @@ impl<'a> Elab<'a> {
                     self.stmt(s, x, ops)?;
                 }
             }
-            Stmt::Blocking { lhs, rhs, .. } => {
+            Stmt::Blocking { lhs, rhs: r, line } => {
                 let lv = self.lval(s, lhs)?;
-                let rhs = self.sexpr(s, rhs, ops)?;
+                let rhs = self.sexpr(s, r, ops)?;
+                let from = self.origin(s, *line, format!("{lhs} = {r}"), &rhs);
+                ops.push(from);
                 ops.push(Op::Assign(lv, rhs));
             }
-            Stmt::NonBlocking { lhs, rhs, delay, .. } => {
+            Stmt::NonBlocking { lhs, rhs: r, delay, line } => {
                 let lv = self.lval(s, lhs)?;
-                let rhs = self.sexpr(s, rhs, ops)?;
+                let rhs = self.sexpr(s, r, ops)?;
+                let from = self.origin(s, *line, format!("{lhs} <= {r}"), &rhs);
+                ops.push(from);
                 let delay = match delay {
                     Some(d) => Some(self.sexpr(s, d, ops)?),
                     None => None,
@@ -1601,15 +1672,22 @@ impl<'a> Elab<'a> {
                 ops.push(Op::Halt); // patched
                 let cov = self.cover(s, line, CoverKind::Then, what.clone());
                 ops.push(cov);
-                self.stmt(s, t, ops)?;
+                let reads = self.read_names(&c);
+                self.conds.push(Cond { line, text: what.clone(), reads: reads.clone(), taken: "true".into() });
+                let r = self.stmt(s, t, ops);
+                self.conds.pop();
+                r?;
                 // An implicit else is a branch too: "the condition was never false".
                 let jend = ops.len();
                 ops.push(Op::Halt);
                 ops[jz] = Op::JumpIfZero(c, ops.len());
-                let cov = self.cover(s, line, CoverKind::Else { written: f.is_some() }, what);
+                let cov = self.cover(s, line, CoverKind::Else { written: f.is_some() }, what.clone());
                 ops.push(cov);
                 if let Some(f) = f {
-                    self.stmt(s, f, ops)?;
+                    self.conds.push(Cond { line, text: what, reads, taken: "false".into() });
+                    let r = self.stmt(s, f, ops);
+                    self.conds.pop();
+                    r?;
                 }
                 ops[jend] = Op::Jump(ops.len());
             }
@@ -1624,6 +1702,7 @@ impl<'a> Elab<'a> {
                     .map(|l| self.expr(s, l).map(|c| c.width(&self.d)))
                     .collect::<Result<Vec<_>>>()?;
                 let w = label_w.into_iter().fold(sel_w, u32::max);
+                let sel_reads = self.read_names(&sel_c);
                 // Store at the comparison width; width of the temp is 64 so no truncation.
                 ops.push(Op::Assign(LVal::Sig(tmp), sel_c));
                 let tmp_e = || CExpr::Sig { sig: tmp, w, signed: false };
@@ -1656,9 +1735,17 @@ impl<'a> Elab<'a> {
                     let jz = ops.len();
                     ops.push(Op::Halt);
                     let labels = labels.iter().map(|l| l.to_string()).collect::<Vec<_>>().join(", ");
-                    let cov = self.cover(s, *line, CoverKind::Arm { labels }, sel.to_string());
+                    let cov = self.cover(s, *line, CoverKind::Arm { labels: labels.clone() }, sel.to_string());
                     ops.push(cov);
-                    self.stmt(s, body, ops)?;
+                    self.conds.push(Cond {
+                        line: *line,
+                        text: sel.to_string(),
+                        reads: sel_reads.clone(),
+                        taken: labels,
+                    });
+                    let r = self.stmt(s, body, ops);
+                    self.conds.pop();
+                    r?;
                     end_jumps.push(ops.len());
                     ops.push(Op::Halt);
                     ops[jz] = Op::JumpIfZero(cond.expect("case item has labels"), ops.len());
@@ -1666,7 +1753,15 @@ impl<'a> Elab<'a> {
                 let cov = self.cover(s, *line, CoverKind::Default { written: default.is_some() }, sel.to_string());
                 ops.push(cov);
                 if let Some(d) = default {
-                    self.stmt(s, d, ops)?;
+                    self.conds.push(Cond {
+                        line: *line,
+                        text: sel.to_string(),
+                        reads: sel_reads,
+                        taken: "default".into(),
+                    });
+                    let r = self.stmt(s, d, ops);
+                    self.conds.pop();
+                    r?;
                 }
                 let end = ops.len();
                 for j in end_jumps {
@@ -1849,7 +1944,7 @@ fn op_reads(op: &Op, out: &mut BTreeSet<usize>) {
         Op::Display { args, .. } => args.iter().for_each(|a| a.reads(out)),
         Op::Wait(items) => items.iter().for_each(|i| i.expr.reads(out)),
         Op::CoverParts(parts) => parts.iter().for_each(|(e, _)| e.reads(out)),
-        Op::Jump(_) | Op::Finish | Op::Halt | Op::Cover(_) => {}
+        Op::Jump(_) | Op::Finish | Op::Halt | Op::Cover(_) | Op::From(_) => {}
     }
 }
 

@@ -417,3 +417,73 @@ endmodule"#);
     assert!(count("Side { value: false }") > 0);
     assert_eq!(count("Side { value: true }"), 0, "full was always 0");
 }
+
+#[test]
+fn every_change_says_what_wrote_it() {
+    let src = r#"
+module updown (input wire clk, input wire rst_n, input wire up, input wire down, output reg [3:0] count, output wire top);
+    assign top = count == 4'd15;
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) count <= 4'd0;
+        else if (up && !down) count <= count + 1;
+        else case (down)
+            1'b1: count <= count - 1;
+            default: ;
+        endcase
+    end
+endmodule
+
+module tb;
+    reg clk = 0, rst_n = 0, up = 0, down = 0;
+    wire [3:0] count;
+    wire top;
+    updown dut (.clk(clk), .rst_n(rst_n), .up(up), .down(down), .count(count), .top(top));
+    always #5 clk = ~clk;
+    initial begin
+        #12 rst_n = 1;
+        up = 1;
+        repeat (2) @(posedge clk);
+        #1 up = 0; down = 1;
+        @(posedge clk);
+        #1 $finish;
+    end
+endmodule
+"#;
+    let r = run(src);
+    let wave = |n: &str| r.signals.iter().find(|s| s.name == n).unwrap_or_else(|| panic!("{n}"));
+    let origin = |n: &str, i: usize| &r.origins[wave(n).by[i] as usize];
+    let count = wave("tb.dut.count");
+    assert_eq!(count.values, [0, 1, 2, 1]);
+    assert_eq!(
+        origin("tb.dut.count", 0).text,
+        "count <= 0",
+        "reset confirms the starting value (numbers as the AST prints them)"
+    );
+    assert_eq!(wave("tb.clk").by[0], 0, "clk = 0 from its declaration");
+    assert_eq!(r.origins[0].text, "clk = 0 (its starting value)");
+
+    let up = origin("tb.dut.count", 1);
+    assert_eq!((up.text.as_str(), up.line, up.scope.as_str()), ("count <= count + 1", 6, "tb.dut"));
+    assert_eq!(up.reads, ["tb.dut.count"]);
+    let conds: Vec<(&str, &str)> = up.conds.iter().map(|c| (c.text.as_str(), c.taken.as_str())).collect();
+    assert_eq!(conds, [("!rst_n", "false"), ("up && !down", "true")]);
+    assert_eq!(up.conds[1].reads, ["tb.dut.up", "tb.dut.down"], "in declaration order");
+
+    let down = origin("tb.dut.count", 3);
+    assert_eq!(down.text, "count <= count - 1");
+    assert_eq!(
+        down.conds.last().map(|c| (c.text.as_str(), c.taken.as_str())),
+        Some(("down", "1")),
+        "labels as the coverage prints them"
+    );
+
+    // Through the port to the testbench, and from the testbench's own assignments.
+    let port = origin("tb.count", 1);
+    assert_eq!(
+        (port.text.as_str(), port.reads.as_slice()),
+        ("output count of tb.dut", &["tb.dut.count".to_string()][..])
+    );
+    assert_eq!(origin("tb.dut.up", 1).text, "input up of tb.dut");
+    assert_eq!(origin("tb.up", 1).text, "up = 1");
+    assert_eq!(origin("tb.dut.top", 0).text, "assign top = count == 4'hf", "computed at time 0");
+}

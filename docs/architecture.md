@@ -30,7 +30,7 @@
 | `crates/wafer-api` | The only server process: HTTP and WebSocket API, background workers for flow runs and agent proposals, database migrations (`migrations/`). |
 | `crates/wafer-git` | Bare Git repositories via libgit2: commits without a worktree, optimistic parents, path normalisation. |
 | `crates/wafer-jobs` | The `Backend` trait for flow runs and its Docker implementation; LibreLane metrics and report parsing; safe reading of run outputs. |
-| `crates/wafer-sim` | Event-driven Verilog simulator (pure Rust), checked line by line against Icarus Verilog (`tests/conformance`). |
+| `crates/wafer-sim` | Event-driven Verilog simulator (pure Rust), checked line by line against Icarus Verilog (`tests/conformance`). Besides waveforms it records branch coverage and, for every value change, the assignment that made it (`origins`: line, text, the signals read and the `if`/`case` decisions around it), which the web app uses to explain values. |
 | `crates/wafer-gds` | GDSII reader: parse, flatten hierarchy, tessellate for the GPU. |
 | `crates/wafer-sim-wasm`, `crates/wafer-gds-wasm` | WebAssembly bindings used by the web app. |
 | `apps/web` | React + TypeScript app (Vite): Design view, Code view (Monaco), runs, layout viewer, agent, IP. |

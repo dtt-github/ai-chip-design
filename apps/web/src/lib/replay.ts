@@ -38,8 +38,8 @@ export interface Replay {
   exampleCycles: number;
   rows: Row[];
   checks: Check[];
-  /** Inputs the example sets: cycle and connection. */
-  sets: { cycle: number; signal: string; value: bigint }[];
+  /** Inputs the example sets: cycle, connection and step number. */
+  sets: { cycle: number; signal: string; value: bigint; step: number }[];
   firstFail: Check | null;
   /** Plain-language account of the first difference (or of the pass). */
   story: string;
@@ -47,6 +47,13 @@ export interface Replay {
   problem: string | null;
   /** A connection's value at a cycle's check point, including the cycles after the example. */
   read: (port: string, cycle: number) => bigint | null;
+  /** The simulation replayed, and its testbench module (signals are named `<top>.<port>`). */
+  sim: SimResult;
+  top: string;
+  /** The simulation time of a cycle's check point. */
+  at: (cycle: number) => number | undefined;
+  /** The first cycle whose check point sees a change at time `t` (0 for anything before the example). */
+  cycleAt: (t: number) => number;
 }
 
 const MAX_CYCLES = 4000;
@@ -131,7 +138,7 @@ export function replay(spec: Spec, ex: SpecExample, sim: SimResult, internal: { 
     if (problem) return;
     const n = i + 1;
     const expected = parse(st.value) ?? 0n;
-    if (st.op === "set") sets.push({ cycle: c, signal: st.signal, value: expected });
+    if (st.op === "set") sets.push({ cycle: c, signal: st.signal, value: expected, step: n });
     else if (st.op === "wait") c += Math.max(1, st.cycles);
     else if (st.op === "expect") {
       const actual = read(st.signal, c);
@@ -175,7 +182,29 @@ export function replay(spec: Spec, ex: SpecExample, sim: SimResult, internal: { 
     ...internal.map((p): Row => ({ name: p.name, dir: "internal", width: p.width, values: Array.from({ length: cycles }, (_, k) => read(p.name, k)) })),
   ];
   const firstFail = checks.find((ch) => !ch.ok) ?? null;
-  return { cycles, exampleCycles, rows, checks, sets, firstFail, story: explain(spec, read, firstFail, checks.length), problem, read };
+  const at = (k: number) => {
+    const t = timeOf(k);
+    return t === undefined ? undefined : t + eps;
+  };
+  const cycleAt = (t: number) => {
+    for (let k = 0; k < cycles; k++) if ((at(k) ?? Infinity) >= t) return k;
+    return cycles;
+  };
+  return {
+    cycles,
+    exampleCycles,
+    rows,
+    checks,
+    sets,
+    firstFail,
+    story: explain(spec, read, firstFail, checks.length),
+    problem,
+    read,
+    sim,
+    top,
+    at,
+    cycleAt,
+  };
 }
 
 function explain(spec: Spec, read: (port: string, c: number) => bigint | null, f: Check | null, total: number): string {
