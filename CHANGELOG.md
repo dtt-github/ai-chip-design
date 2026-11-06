@@ -8,6 +8,9 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **What works, and what doesn't yet** in the README, and the fresh-start check in the
+  [release rehearsal](docs/release-rehearsal.md): a clean clone runs by following Getting started
+  with no step missing.
 - **Release rehearsal** ([docs/release-rehearsal.md](docs/release-rehearsal.md)): the counter, UART
   receiver and FIFO starters taken to a clean layout in the browser, timed, with no code typed and
   no AI: 1 to 4 minutes each, every case tried and every planted mistake caught.
