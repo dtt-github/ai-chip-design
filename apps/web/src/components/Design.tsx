@@ -5,6 +5,7 @@ import {
   type Blocks,
   type ExampleResult,
   type Job,
+  type MistakesReport,
   type Spec,
   type SpecExample,
   type SpecRun,
@@ -1195,6 +1196,21 @@ function Health({
 }) {
   const [jobs, setJobs] = useState<Job[] | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  // Planted mistakes: checked on request, for the commit it was checked at.
+  const [mistakes, setMistakes] = useState<{ head: string | null; report: MistakesReport } | null>(null);
+  const [planting, setPlanting] = useState(false);
+  const [plantError, setPlantError] = useState<string | null>(null);
+  async function plant() {
+    setPlanting(true);
+    setPlantError(null);
+    try {
+      setMistakes({ head, report: await api.plantMistakes(projectId) });
+    } catch (e) {
+      setPlantError((e as Error).message);
+    } finally {
+      setPlanting(false);
+    }
+  }
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
@@ -1304,6 +1320,62 @@ function Health({
           {cov.gaps.length > 10 && <li className="muted small">and {cov.gaps.length - 10} more</li>}
         </ul>
       ) : undefined,
+    });
+  }
+  if (exTotal > 0) {
+    const r = mistakes && mistakes.head === head ? mistakes.report : null;
+    cards.push({
+      id: "mistakes",
+      ok: r ? r.slipped.length === 0 : null,
+      title: !r
+        ? "Would your examples catch a mistake?"
+        : r.tried === 0
+          ? "No place to plant a mistake in this design"
+          : r.slipped.length === 0
+            ? `Your examples catch all ${r.tried} planted mistakes`
+            : `Your examples catch ${r.caught} of ${r.tried} planted mistakes`,
+      plain: !r
+        ? "Wafersmith can make small mistakes in a copy of the design, one at a time (a comparison turned round, a number one off, a step left out), and see whether any example notices. It takes a few seconds."
+        : r.slipped.length === 0
+          ? "Every small mistake planted in a copy of the design made at least one example fail."
+          : "These slipped through: every example still passed with the mistake in. An example for each one that matters makes the design safer to change. (A few planted mistakes change nothing at all; those can't be caught.)",
+      explain:
+        "This is mutation testing: each mistake is planted in a copy of the design (your files aren't changed), and all the examples are run against it. A mistake some example notices is caught. One that slips through shows a behaviour no example pins down.",
+      expert: r
+        ? `${r.caught}/${r.tried} mutants killed (${r.sites} sites${r.tried < r.sites ? ", a spread sample" : ""}) in ${r.elapsed_ms} ms; operators: relational and logical swaps, off-by-one constants, reversed conditions and negations, +/-, dropped assignments`
+        : "mutation testing over the example testbenches",
+      extra: (
+        <div className="design-col" style={{ gap: 6 }}>
+          {r && r.slipped.length > 0 && (
+            <ul className="coverage-gaps">
+              {r.slipped.slice(0, 12).map((g, k) => (
+                <li key={k}>
+                  <span className="small">{withCode(g.text)}</span>
+                  <span className="coverage-actions">
+                    {canEdit && (
+                      <button className="small" onClick={() => onAddExample(g.suggestion)}>
+                        Add an example
+                      </button>
+                    )}
+                    <button className="link small" onClick={() => onOpenFile(g.file)} title={`${g.file}, line ${g.line}`}>
+                      {g.file.split("/").pop()}:{g.line}
+                    </button>
+                  </span>
+                </li>
+              ))}
+              {r.slipped.length > 12 && <li className="muted small">and {r.slipped.length - 12} more</li>}
+            </ul>
+          )}
+          {canEdit && (
+            <div className="design-row">
+              <button className="small" onClick={plant} disabled={planting || !head}>
+                {planting ? "Planting mistakes…" : r ? "Check again" : "Plant mistakes and check"}
+              </button>
+              {plantError && <span className="error small">{plantError}</span>}
+            </div>
+          )}
+        </div>
+      ),
     });
   }
   for (const [i, m] of (run?.machines ?? []).entries()) {
