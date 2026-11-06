@@ -9,6 +9,7 @@ pub mod collab;
 pub mod coverage;
 pub mod design;
 pub mod error;
+pub mod fixes;
 pub mod fsm;
 pub mod gate;
 pub mod gls;
@@ -75,6 +76,7 @@ pub fn router(state: AppState) -> Router {
         .route("/projects/{id}/spec/testbench", post(design::testbench))
         .route("/projects/{id}/spec/mistakes", post(design::mistakes))
         .route("/projects/{id}/spec/find-example", post(design::find_example))
+        .route("/projects/{id}/spec/small-fix", post(design::small_fix))
         .route("/projects/{id}/spec/draft", post(design::draft))
         .route("/starters", get(starters::list))
         .route("/projects/{id}/starters/{starter}", post(starters::add))

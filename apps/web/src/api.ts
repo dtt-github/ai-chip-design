@@ -289,6 +289,30 @@ export interface FoundExample {
   message: string | null;
 }
 
+/** "Try a small fix": small repairs after which every example passes (`POST .../spec/small-fix`). */
+export interface SmallFixes {
+  fixes: SmallFix[];
+  tried: number;
+  sites: number;
+  /** The examples failing before any repair. */
+  failing: string[];
+  elapsed_ms: number;
+  message: string;
+}
+
+export interface SmallFix {
+  file: string;
+  line: number;
+  kind: string;
+  original: string;
+  replacement: string;
+  /** "Line 18 of blinker.v: `cnt == N - 1` → `cnt == N`; all 3 examples pass." */
+  text: string;
+  /** The line as it is and as it would be, and the whole file changed; null if the change can't
+   * be placed in the text. */
+  edit: { before: string; after: string; content: string } | null;
+}
+
 /** How well a version of the design is tested (`POST /agent/{id}/compare`). */
 export interface Quality {
   examples: number;
@@ -644,6 +668,8 @@ export const api = {
     request<{ commit: string; changed: boolean }>("PUT", `/projects/${enc(id)}/spec`, body),
   runSpec: (id: string) => request<SpecRun>("POST", `/projects/${enc(id)}/spec/run`),
   plantMistakes: (id: string) => request<MistakesReport>("POST", `/projects/${enc(id)}/spec/mistakes`),
+  smallFix: (id: string, focus: { file: string; line: number }[]) =>
+    request<SmallFixes>("POST", `/projects/${enc(id)}/spec/small-fix`, { focus }),
   findExample: (id: string, target: FindTarget) => request<FoundExample>("POST", `/projects/${enc(id)}/spec/find-example`, target),
   exampleTestbench: (id: string, body: { spec: Spec; example: SpecExample }) =>
     request<{ path: string; top: string; source: string }>("POST", `/projects/${enc(id)}/spec/testbench`, body),

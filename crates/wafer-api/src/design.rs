@@ -315,6 +315,40 @@ pub async fn find_example(
     found.map(Json).map_err(ApiError::Conflict)
 }
 
+/// How long "Try a small fix" may search.
+const FIX_BUDGET: std::time::Duration = std::time::Duration::from_secs(20);
+
+#[derive(Debug, Deserialize, Default)]
+pub struct SmallFixReq {
+    /// Lines to try first (those "Why not?" pointed at).
+    #[serde(default)]
+    pub focus: Vec<crate::fixes::Focus>,
+}
+
+/// "Try a small fix" (`crate::fixes`) at the branch tip: small repairs after which every example
+/// passes, each with the edit to make. Nothing is saved. Editors: it costs server time.
+pub async fn small_fix(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(req): Json<SmallFixReq>,
+) -> ApiResult<Json<crate::fixes::Fixes>> {
+    authorize(&state, &user, id, Role::Editor).await?;
+    let commit = head(&state, id).await?;
+    let files = files_at(&state, id, &commit).await?;
+    let spec = match files.get(SPEC_FILE) {
+        Some(t) => parse_spec(t)?,
+        None => return Err(ApiError::NotFound("this project has no spec yet".into())),
+    };
+    let tops: Vec<String> = spec.examples.iter().map(|e| spec::tb_name(&e.id)).collect();
+    let focus: Vec<crate::fixes::Focus> = req.focus.into_iter().take(64).collect();
+    let found = tokio::task::spawn_blocking(move || {
+        gate::with_slot(|| wafer_sim::on_big_stack(|| crate::fixes::find(&files, &tops, &focus, FIX_BUDGET)))
+    })
+    .await?;
+    found.map(Json).map_err(ApiError::Conflict)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct TestbenchReq {
     /// The spec being edited (unsaved edits included).

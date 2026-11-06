@@ -135,16 +135,23 @@ pub(crate) fn planted(
 
 /// Walks the design in a fixed order, numbering every place a mistake could go. Without a target
 /// it lists them; with one it plants that mistake and leaves the rest as they are.
-struct Walker {
+pub(crate) struct Walker {
     target: Option<usize>,
     next: usize,
     file: String,
-    sites: Vec<Slipped>,
+    pub(crate) sites: Vec<Slipped>,
+    /// Looking for repairs rather than mistakes (`crate::fixes`): constants are tried one off in
+    /// both directions, assigned constants changed too, and nothing is left out.
+    fix: bool,
 }
 
 impl Walker {
-    fn new(target: Option<usize>) -> Self {
-        Walker { target, next: 0, file: String::new(), sites: Vec::new() }
+    pub(crate) fn new(target: Option<usize>) -> Self {
+        Walker { target, next: 0, file: String::new(), sites: Vec::new(), fix: false }
+    }
+
+    pub(crate) fn repairs(target: Option<usize>) -> Self {
+        Walker { fix: true, ..Walker::new(target) }
     }
 
     /// Numbers one possible mistake; true if it is the one to plant.
@@ -175,7 +182,7 @@ impl Walker {
         self.target == Some(i)
     }
 
-    fn module(&mut self, m: &mut Module) {
+    pub(crate) fn module(&mut self, m: &mut Module) {
         self.file = m.file.clone();
         for item in &mut m.items {
             match item {
@@ -193,8 +200,13 @@ impl Walker {
             Stmt::Block(v) => v.iter_mut().for_each(|x| self.stmt(x)),
             Stmt::If(c, t, e) => {
                 let line = c.line().unwrap_or(0);
-                if self.site(line, "reverse", c.to_string(), format!("!({c})")) {
-                    *c = Expr::Unary("!", Box::new(c.clone()));
+                let flipped = Expr::Unary("!", Box::new(c.clone()));
+                // A repair writes it as one would (`!rst_n`) and leaves a `!` already there to the
+                // repair that takes it out.
+                let mistake = if self.fix { flipped.to_string() } else { format!("!({c})") };
+                if !(self.fix && matches!(c, Expr::Unary("!", _))) && self.site(line, "reverse", c.to_string(), mistake)
+                {
+                    *c = flipped;
                 }
                 self.expr(c, line);
                 self.stmt(t);
@@ -214,7 +226,37 @@ impl Walker {
                 // after reset); leaving it out would mostly report mistakes that change nothing.
                 let zero = matches!(rhs, Expr::Num(n) if n.value == 0);
                 let text = format!("{lhs} {arrow} {rhs}");
-                if !zero && self.site(line, "forget", text, String::new()) {
+                if self.fix {
+                    // A signal assigned as it is that should have been inverted (`led <= ~led`).
+                    if let Expr::Ident(..) = rhs {
+                        let inv = Expr::Unary("~", Box::new(rhs.clone()));
+                        if self.site(line, "reverse_value", text.clone(), format!("{lhs} {arrow} {inv}")) {
+                            *rhs = inv;
+                            return;
+                        }
+                    }
+                    // The value assigned, one off (for one bit: the other value).
+                    if let Expr::Num(n) = rhs {
+                        let n = *n;
+                        let wide = n.width.is_none_or(|w| w > 1);
+                        let mut tries = vec![n.value.wrapping_add(1)];
+                        if n.value > 0 {
+                            tries.insert(0, n.value - 1);
+                        }
+                        for v in tries {
+                            if !wide && v > 1 {
+                                continue;
+                            }
+                            let mut m = n;
+                            m.value = v;
+                            let to = format!("{lhs} {arrow} {}", Expr::Num(m));
+                            if self.site(line, "value", text.clone(), to) {
+                                *rhs = Expr::Num(m);
+                                return;
+                            }
+                        }
+                    }
+                } else if !zero && self.site(line, "forget", text, String::new()) {
                     *s = Stmt::Null;
                     return;
                 }
@@ -252,22 +294,68 @@ impl Walker {
                     return;
                 }
             }
+            // A repair: a `!` missing from one side of `&&` / `||` (`up && down` → `up && !down`).
+            if self.fix && matches!(*op, "&&" | "||") {
+                for right in [false, true] {
+                    let side: Box<Expr> = if right { b.clone() } else { a.clone() };
+                    if !matches!(side.as_ref(), Expr::Ident(..)) {
+                        continue;
+                    }
+                    let not = Box::new(Expr::Unary("!", side));
+                    let (na, nb) = if right { (a.clone(), not.clone()) } else { (not.clone(), b.clone()) };
+                    if self.site(line, "reverse_value", original.clone(), Expr::Binary(op, na, nb).to_string()) {
+                        if right {
+                            *b = not;
+                        } else {
+                            *a = not;
+                        }
+                        return;
+                    }
+                }
+            }
             if matches!(*op, "==" | "!=" | "<" | "<=" | ">" | ">=") {
                 // The constant compared with, one off: `cnt == 7` → `cnt == 8`, `cnt == N - 1` → `cnt == N`.
-                let one_off = match b.as_ref() {
+                let one = |v: u64| {
+                    Box::new(Expr::Num(wafer_sim::lexer::Num {
+                        value: v,
+                        xz: 0,
+                        width: None,
+                        signed: false,
+                        fill: false,
+                        real: false,
+                    }))
+                };
+                let mut one_off = Vec::new();
+                match b.as_ref() {
                     Expr::Num(n) => {
                         let mut m = *n;
                         m.value = m.value.wrapping_add(1);
-                        Some(Expr::Num(m))
+                        one_off.push(Expr::Num(m));
+                        if self.fix && n.value > 0 {
+                            m.value = n.value - 1;
+                            one_off.push(Expr::Num(m));
+                        }
                     }
-                    Expr::Binary("-", x, one) if matches!(one.as_ref(), Expr::Num(n) if n.value == 1) => {
-                        Some(x.as_ref().clone())
+                    Expr::Binary(pm @ ("-" | "+"), x, k) if matches!(k.as_ref(), Expr::Num(n) if n.value == 1) => {
+                        if *pm == "-" || self.fix {
+                            one_off.push(x.as_ref().clone());
+                        }
                     }
-                    _ => None,
-                };
-                if let Some(nb) = one_off {
+                    Expr::Ident(..) if self.fix => {
+                        one_off.push(Expr::Binary("-", b.clone(), one(1)));
+                        one_off.push(Expr::Binary("+", b.clone(), one(1)));
+                    }
+                    _ => {}
+                }
+                if self.fix
+                    && let Expr::Binary("-", x, k) = b.as_ref()
+                    && matches!(k.as_ref(), Expr::Num(n) if n.value == 1)
+                {
+                    one_off.push(Expr::Binary("-", x.clone(), one(2)));
+                }
+                for nb in one_off {
                     let mistake = Expr::Binary(op, a.clone(), Box::new(nb.clone())).to_string();
-                    if self.site(line, "off_by_one", original, mistake) {
+                    if self.site(line, "off_by_one", original.clone(), mistake) {
                         **b = nb;
                         return;
                     }

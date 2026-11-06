@@ -7,6 +7,8 @@ import {
   type FindTarget,
   type Job,
   type MistakesReport,
+  type SmallFix,
+  type SmallFixes,
   type Spec,
   type SpecExample,
   type SpecRun,
@@ -20,6 +22,7 @@ import { decided, missed, why, whyNot, whyNotText, whyText, type Because, type R
 import { StateMachine } from "./StateMachine";
 import { TryIt } from "./TryIt";
 import { SimClient } from "../sim/client";
+import { compareExamples } from "../lib/compare";
 import { BlocksStep } from "./Blocks";
 
 type Step = "describe" | "examples" | "blocks" | "health";
@@ -982,6 +985,57 @@ function Happened({
   };
   // "Why not?": why the first failing check didn't see the value the example expected.
   const [notWhy, setNotWhy] = useState<WhyNot | null>(null);
+  // "Try a small fix": repairs the server found, what each does to the outputs, and the commit
+  // they apply to.
+  const [small, setSmall] = useState<{ result: SmallFixes; effects: string[][]; parent: string | null } | "working" | null>(null);
+  const [smallError, setSmallError] = useState<string | null>(null);
+  async function trySmallFix() {
+    if (!rep) return;
+    setSmall("working");
+    setSmallError(null);
+    try {
+      // The lines "Why not?" and "Why?" point at are tried first.
+      const f = rep.firstFail;
+      const w = notWhy ?? (f && f.failCycle !== undefined ? whyNot(rep, `${rep.top}.${f.signal}`, f.failCycle, f.expected) : null);
+      const focus = [
+        ...(w?.candidates ?? []).flatMap((c) => [c.line, ...c.passed.map((p) => p.line), ...(c.blocked ? [c.blocked.line] : [])].map((line) => ({ file: c.file, line }))),
+        ...trail.flatMap((b) => (b.file && b.line ? [b.line, ...b.conds.map((c) => c.line)].map((line) => ({ file: b.file!, line })) : [])),
+      ];
+      const result = await api.smallFix(projectId, focus);
+      const snap = await api.snapshot(projectId);
+      const client = new SimClient();
+      const effects: string[][] = [];
+      try {
+        for (const fx of result.fixes) {
+          if (!fx.edit) {
+            effects.push([]);
+            continue;
+          }
+          const changes = await compareExamples(client, baseSpec, null, snap.files, { ...snap.files, [fx.file]: fx.edit.content });
+          effects.push(changes.flatMap((c) => c.differences.map((d) => `${c.title}: ${d}`)));
+        }
+      } finally {
+        client.dispose();
+      }
+      setSmall({ result, effects, parent: snap.commit });
+    } catch (e) {
+      setSmallError((e as Error).message);
+      setSmall(null);
+    }
+  }
+  async function applySmallFix(fx: SmallFix, parent: string | null) {
+    if (!fx.edit) return;
+    try {
+      await api.commit(projectId, {
+        message: `Small fix: line ${fx.line} of ${fx.file.split("/").pop()}, ${fx.original} → ${fx.replacement}`,
+        parent,
+        changes: [{ op: "write", path: fx.file, content: fx.edit.content }],
+      });
+      setSmall(null);
+    } catch (e) {
+      setSmallError((e as Error).message);
+    }
+  }
   // "The design is right": a change to the example that makes it pass, worked out and re-checked.
   const [fix, setFix] = useState<Fix | "working" | "none" | null>(null);
   async function acceptDesign() {
@@ -1048,7 +1102,11 @@ function Happened({
   const every = rep.cycles > 200 ? 50 : rep.cycles > 80 ? 20 : rep.cycles > 30 ? 10 : 5;
   const failing = rep.firstFail;
   // The AI gets the explanation too, when someone followed one.
-  const traced = [notWhy && whyNotText(notWhy), ...trail.map(whyText)].filter(Boolean);
+  const traced = [
+    notWhy && whyNotText(notWhy),
+    ...trail.map(whyText),
+    small && typeof small === "object" && !small.result.fixes.length && `Small changes tried without the AI: ${small.result.message}`,
+  ].filter(Boolean);
   const story = traced.length ? `${rep.story} Why, traced in the simulation: ${traced.join(" ")}` : rep.story;
   const picked = trail[0];
 
@@ -1141,6 +1199,57 @@ function Happened({
           <button disabled={busy} onClick={() => onFixExample(story)}>
             The example: ask the assistant to correct it
           </button>
+          <button
+            disabled={busy || small === "working"}
+            onClick={trySmallFix}
+            title="Try small changes to the design (a comparison, a constant one off, a condition the other way), checking every example after each; no AI"
+          >
+            The design: try a small fix
+          </button>
+        </div>
+      )}
+      {small === "working" && <p className="muted small">Trying small changes to the design, running every example after each…</p>}
+      {smallError && <p className="error small">Couldn't try small fixes: {smallError}</p>}
+      {small && typeof small === "object" && (
+        <div className="design-card fix-preview">
+          <div className="design-row" style={{ justifyContent: "space-between" }}>
+            <strong className="small">{small.result.fixes.length ? "Small changes to the design that make every example pass" : "No small fix"}</strong>
+            <button className="link small" onClick={() => setSmall(null)}>
+              Close
+            </button>
+          </div>
+          <p className="muted small" style={{ margin: 0 }}>
+            {small.result.message}
+            {!small.result.fixes.length && " Ask the AI to fix the design; it is told what was tried."}
+          </p>
+          {small.result.fixes.map((fx, i) => (
+            <div key={i} className="small-fix">
+              <div className="small">{withCode(fx.text)}</div>
+              {fx.edit && (
+                <pre className="small-fix-diff mono">
+                  <span className="del">- {fx.edit.before.trim()}</span>
+                  {"\n"}
+                  <span className="add">+ {fx.edit.after.trim()}</span>
+                </pre>
+              )}
+              {small.effects[i]?.length > 0 && <span className="muted small">What it changes in the examples:</span>}
+              {small.effects[i]?.length > 0 && (
+                <ul className="small">
+                  {small.effects[i].map((d) => (
+                    <li key={d}>{withCode(d)}</li>
+                  ))}
+                </ul>
+              )}
+              <button
+                className={i === 0 ? "primary small" : "small"}
+                disabled={!fx.edit || busy}
+                title={fx.edit ? undefined : "This change spans lines or is written differently; make it in the code"}
+                onClick={() => applySmallFix(fx, small.parent)}
+              >
+                Use this change
+              </button>
+            </div>
+          ))}
         </div>
       )}
       {fix === "working" && <p className="muted small">Working out the change and checking it…</p>}

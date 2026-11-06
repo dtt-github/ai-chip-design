@@ -8,6 +8,15 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **Try a small fix**: a failing example offers "The design: try a small fix". Without AI, the
+  server tries the small repairs that undo the most common mistakes (a comparison turned around, a
+  limit one off in either direction, a condition reversed, a missing or extra `!`/`~`, `&&` for
+  `||`, `-` for `+`, an assigned value one off), the lines "Why not?" points at first, and keeps
+  those after which every example passes. Each is shown as a one-line diff that keeps the line as
+  written (sized numbers too), with what it changes in the examples' outputs, and **Use this
+  change** commits it. Every mistake "Would your examples catch a mistake?" plants in the starters
+  and an example notices is repaired back to the exact original line (tested).
+  `POST /api/projects/{id}/spec/small-fix`.
 - **Why wasn't it the expected value?**: a failing example's account ends with a link that lists
   every line of the design that could have written the value the example expected, and for each
   the decision that kept it from running ("`cnt == N - 1` was false (cnt = 2)"), or that it ran and
