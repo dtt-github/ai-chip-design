@@ -6,7 +6,7 @@
     "fsm"
   ],
   "top": "uart_rx",
-  "description": "A UART receiver. Module `uart_rx` with a parameter CLKS_PER_BIT (default 4), inputs clk, rst_n (active-low reset) and rx, and outputs data (8 bits) and valid. rx idles at 1 and is already synchronous to clk. A frame is a start bit (0), 8 data bits least significant first and a stop bit (1), each CLKS_PER_BIT cycles long; sample each bit near its middle. After a frame whose stop bit is 1, valid is 1 for exactly one clock cycle, no later than one bit time after the stop bit ends, and data holds the byte during that cycle. A frame whose stop bit is 0 is discarded (no valid). Reset makes it idle with valid 0.",
+  "description": "A UART receiver. Module `uart_rx` with a parameter CLKS_PER_BIT (default 4), inputs clk, rst_n (active-low reset) and rx, and outputs data (8 bits) and valid. rx idles at 1 and is already synchronous to clk. A frame is a start bit (0), 8 data bits least significant first and a stop bit (1), each CLKS_PER_BIT cycles long; sample each bit near its middle. After a frame whose stop bit is 1, valid is 1 for exactly one clock cycle, no later than one bit time after the stop bit ends, and data holds the byte during that cycle. A frame whose stop bit is 0 is discarded (no valid). A start bit that has already ended at the middle of the bit (half a bit or shorter) is a glitch and is ignored. Reset makes it idle with valid 0.",
   "open_points": [],
   "starter": {
     "title": "UART receiver",

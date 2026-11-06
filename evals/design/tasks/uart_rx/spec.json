@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "intent": "A UART receiver. Module `uart_rx` with a parameter CLKS_PER_BIT (default 4), inputs clk, rst_n (active-low reset) and rx, and outputs data (8 bits) and valid. rx idles at 1 and is already synchronous to clk. A frame is a start bit (0), 8 data bits least significant first and a stop bit (1), each CLKS_PER_BIT cycles long; sample each bit near its middle. After a frame whose stop bit is 1, valid is 1 for exactly one clock cycle, no later than one bit time after the stop bit ends, and data holds the byte during that cycle. A frame whose stop bit is 0 is discarded (no valid). Reset makes it idle with valid 0.",
+  "intent": "A UART receiver. Module `uart_rx` with a parameter CLKS_PER_BIT (default 4), inputs clk, rst_n (active-low reset) and rx, and outputs data (8 bits) and valid. rx idles at 1 and is already synchronous to clk. A frame is a start bit (0), 8 data bits least significant first and a stop bit (1), each CLKS_PER_BIT cycles long; sample each bit near its middle. After a frame whose stop bit is 1, valid is 1 for exactly one clock cycle, no later than one bit time after the stop bit ends, and data holds the byte during that cycle. A frame whose stop bit is 0 is discarded (no valid). A start bit that has already ended at the middle of the bit (half a bit or shorter) is a glitch and is ignored. Reset makes it idle with valid 0.",
   "top": "uart_rx",
   "clock": {
     "port": "clk",
@@ -332,6 +332,514 @@
           "signal": "valid",
           "value": "0",
           "cycles": 50
+        }
+      ]
+    },
+    {
+      "id": "short_start_ignored",
+      "title": "A start bit of only half a bit is ignored",
+      "given": "rx goes low for half a bit (2 clock cycles), then a real byte 0xA5 follows",
+      "expect": "no valid for the glitch; the byte is received",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 3,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "glitch"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 2,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "expect_for",
+          "signal": "valid",
+          "value": "0",
+          "cycles": 8,
+          "note": "the glitch is not a byte"
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "start bit"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "bit 0"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "bit 1"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "bit 2"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "bit 3"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "bit 4"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "bit 5"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "bit 6"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "bit 7"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "stop bit"
+        },
+        {
+          "op": "wait_until",
+          "signal": "valid",
+          "value": "1",
+          "cycles": 8,
+          "note": ""
+        },
+        {
+          "op": "expect",
+          "signal": "data",
+          "value": "0xA5",
+          "cycles": 0,
+          "note": ""
+        }
+      ]
+    },
+    {
+      "id": "back_to_back",
+      "title": "Two bytes with no gap between them",
+      "given": "0x55 then 0xAA, the second start bit right after the first stop bit",
+      "expect": "both bytes arrive, the second one 0xAA",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 2,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "start bit"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "bit 0"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "bit 1"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "bit 2"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "bit 3"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "bit 4"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "bit 5"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "bit 6"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "bit 7"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "stop bit"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "start bit"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "bit 0"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "bit 1"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "bit 2"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "bit 3"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "bit 4"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "bit 5"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "0",
+          "cycles": 0,
+          "note": "bit 6"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "bit 7"
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 4,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rx",
+          "value": "1",
+          "cycles": 0,
+          "note": "stop bit"
+        },
+        {
+          "op": "wait_until",
+          "signal": "valid",
+          "value": "1",
+          "cycles": 8,
+          "note": ""
+        },
+        {
+          "op": "expect",
+          "signal": "data",
+          "value": "0xAA",
+          "cycles": 0,
+          "note": ""
         }
       ]
     }

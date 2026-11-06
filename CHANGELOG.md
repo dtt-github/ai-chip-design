@@ -54,6 +54,10 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Changed
 
+- The UART receiver starter (and eval task) has two more examples, a half-bit glitch being ignored
+  and two bytes back to back, and says in its description that such glitches are ignored. Its
+  examples now catch 32 of 34 planted mistakes (were 28); the other two are timing the description
+  leaves open. A test keeps every starter's examples catching every mistake that matters.
 - Links to the repository (README badge, package metadata, issue template) point at its new home,
   `dtt-github/wafersmith`.
 - The development-only `wafersmith-dev-cli` client secret no longer carries the old `sc` prefix.
