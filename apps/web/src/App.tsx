@@ -57,7 +57,7 @@ function SignedIn() {
     return (
       <div className="center">
         <div className="card welcome">
-          <h1>SiliconCommons</h1>
+          <h1>Wafersmith</h1>
           <p className="muted">Open, browser-based chip design on the IHP SG13G2 open PDK.</p>
           <button className="primary" onClick={() => login()}>
             Sign in
@@ -70,7 +70,7 @@ function SignedIn() {
     <div className="shell">
       <header className="topbar">
         <Link to="/" className="brand">
-          SiliconCommons
+          Wafersmith
         </Link>
         <span className="spacer" />
         <span className="muted">{displayName(user)}</span>

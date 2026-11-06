@@ -2,8 +2,8 @@
 # Regenerates apps/web/src/pdk/ihp-sg13g2.json from the PDK in the Docker volume.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-IMAGE="${SC_LIBRELANE_IMAGE:-ghcr.io/librelane/librelane:3.0.16}"
-VOLUME="${SC_PDK_VOLUME:-siliconcommons_pdk}"
+IMAGE="${WAFER_LIBRELANE_IMAGE:-ghcr.io/librelane/librelane:3.0.16}"
+VOLUME="${WAFER_PDK_VOLUME:-wafersmith_pdk}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 docker run --rm --user "$(id -u):$(id -g)" -v "$VOLUME:/pdk:ro" -v "$TMP:/out" "$IMAGE" \

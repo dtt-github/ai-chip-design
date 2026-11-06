@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # The web app (with its WebAssembly simulator and layout parser), served by Caddy, which also
 # terminates HTTPS and routes /api to the API and /auth/v1 to Rauthy.
-# Build from the repository root: docker build -f deploy/pilot/Dockerfile.web --build-arg SC_DOMAIN=... .
+# Build from the repository root: docker build -f deploy/pilot/Dockerfile.web --build-arg WAFER_DOMAIN=... .
 
 FROM rust:1.99.1-slim-trixie AS wasm
 RUN rustup target add wasm32-unknown-unknown
@@ -23,10 +23,10 @@ COPY apps/web/package.json apps/web/package.json
 RUN pnpm install --frozen-lockfile
 COPY apps/web apps/web
 COPY --from=wasm /src/apps/web/src/wasm apps/web/src/wasm
-ARG SC_DOMAIN
-ENV VITE_OIDC_AUTHORITY=https://${SC_DOMAIN}/auth/v1/ \
-    VITE_OIDC_CLIENT_ID=siliconcommons-web
-RUN test -n "$SC_DOMAIN" && pnpm --filter @siliconcommons/web build
+ARG WAFER_DOMAIN
+ENV VITE_OIDC_AUTHORITY=https://${WAFER_DOMAIN}/auth/v1/ \
+    VITE_OIDC_CLIENT_ID=wafersmith-web
+RUN test -n "$WAFER_DOMAIN" && pnpm --filter @wafersmith/web build
 
 FROM caddy:2.10-alpine
 COPY deploy/pilot/Caddyfile /etc/caddy/Caddyfile

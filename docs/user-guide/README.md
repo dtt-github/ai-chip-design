@@ -1,6 +1,6 @@
 # User guide
 
-SiliconCommons has two ways into the same project:
+Wafersmith has two ways into the same project:
 
 - **Design view**, for engineers who don't write Verilog: describe the design, give examples (which
   are the tests), build the chip from blocks, and check its health in plain words. The AI writes the

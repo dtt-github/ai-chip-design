@@ -2084,93 +2084,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sc-api"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "dotenvy",
- "futures-util",
- "http-body-util",
- "jsonwebtoken",
- "reqwest",
- "sc-git",
- "sc-jobs",
- "sc-sim",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "sqlx",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-tungstenite 0.30.0",
- "tokio-util",
- "tower",
- "tower-http 0.7.1",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "yrs",
-]
-
-[[package]]
-name = "sc-gds"
-version = "0.1.0"
-dependencies = [
- "earcutr",
- "thiserror",
-]
-
-[[package]]
-name = "sc-gds-wasm"
-version = "0.1.0"
-dependencies = [
- "sc-gds",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "sc-git"
-version = "0.1.0"
-dependencies = [
- "git2",
- "serde",
- "tempfile",
- "thiserror",
-]
-
-[[package]]
-name = "sc-jobs"
-version = "0.1.0"
-dependencies = [
- "roxmltree",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "sc-sim"
-version = "0.1.0"
-dependencies = [
- "thiserror",
-]
-
-[[package]]
-name = "sc-sim-wasm"
-version = "0.1.0"
-dependencies = [
- "sc-sim",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "schannel"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3130,6 +3043,93 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "wafer-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "dotenvy",
+ "futures-util",
+ "http-body-util",
+ "jsonwebtoken",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "sqlx",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-tungstenite 0.30.0",
+ "tokio-util",
+ "tower",
+ "tower-http 0.7.1",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "wafer-git",
+ "wafer-jobs",
+ "wafer-sim",
+ "yrs",
+]
+
+[[package]]
+name = "wafer-gds"
+version = "0.1.0"
+dependencies = [
+ "earcutr",
+ "thiserror",
+]
+
+[[package]]
+name = "wafer-gds-wasm"
+version = "0.1.0"
+dependencies = [
+ "wafer-gds",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "wafer-git"
+version = "0.1.0"
+dependencies = [
+ "git2",
+ "serde",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "wafer-jobs"
+version = "0.1.0"
+dependencies = [
+ "roxmltree",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "wafer-sim"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
+name = "wafer-sim-wasm"
+version = "0.1.0"
+dependencies = [
+ "wafer-sim",
+ "wasm-bindgen",
+]
 
 [[package]]
 name = "walkdir"

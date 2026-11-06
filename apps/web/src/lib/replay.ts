@@ -1,5 +1,5 @@
 // Replays an example's steps against a simulation of its generated testbench,
-// cycle by cycle, the way the testbench itself runs them (crates/sc-api/src/spec.rs):
+// cycle by cycle, the way the testbench itself runs them (crates/wafer-api/src/spec.rs):
 // everything happens on the falling clock edge, after reset is held for two
 // cycles (one idle tick when there is no reset). Gives what each connection
 // actually did per cycle, every check with its outcome, and the first

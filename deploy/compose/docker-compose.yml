@@ -1,20 +1,20 @@
-# SiliconCommons local development stack (infra only; the API and web app run on the host).
+# Wafersmith local development stack (infra only; the API and web app run on the host).
 #   docker compose -f deploy/compose/docker-compose.yml up -d
-name: siliconcommons
+name: wafersmith
 
 services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: sc
-      POSTGRES_PASSWORD: sc
-      POSTGRES_DB: siliconcommons
+      POSTGRES_USER: wafer
+      POSTGRES_PASSWORD: wafer
+      POSTGRES_DB: wafersmith
     ports:
       - "127.0.0.1:5442:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sc -d siliconcommons"]
+      test: ["CMD-SHELL", "pg_isready -U wafer -d wafersmith"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -27,7 +27,7 @@ services:
       - ./rauthy/bootstrap:/app/bootstrap:ro
       - rauthy-data:/app/data
     environment:
-      BOOTSTRAP_ADMIN_PASSWORD_PLAIN: "SiliconCommons-admin-2026"
+      BOOTSTRAP_ADMIN_PASSWORD_PLAIN: "Wafersmith-admin-2026"
     ports:
       - "127.0.0.1:8180:8080"
 

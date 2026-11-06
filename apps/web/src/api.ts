@@ -344,7 +344,7 @@ export interface ReviewNote {
   wire: number;
   level: "ok" | "warning";
   note: string;
-  adapter: "" | "sc_rise_pulse" | "sc_sync2" | "sc_invert" | "sc_resize";
+  adapter: "" | "wafer_rise_pulse" | "wafer_sync2" | "wafer_invert" | "wafer_resize";
 }
 
 /** Licences offered when creating a project (the server accepts any it knows). */

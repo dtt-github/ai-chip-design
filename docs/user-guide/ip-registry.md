@@ -1,7 +1,7 @@
 # IP registry
 
 The **IP** panel publishes a project as a reusable block and imports blocks from other projects
-(`sc-api/src/ip.rs`). Imported blocks can then be placed on the [Blocks](blocks.md) canvas.
+(`wafer-api/src/ip.rs`). Imported blocks can then be placed on the [Blocks](blocks.md) canvas.
 
 ## Publishing
 
@@ -32,7 +32,7 @@ pin. Module names that would clash with the project's are refused.
 ## Licence checks
 
 Every project declares an SPDX licence (chosen when it's created, default Apache-2.0, written into
-the starter files). A block's licence is judged against it (`sc-api/src/licence.rs`):
+the starter files). A block's licence is judged against it (`wafer-api/src/licence.rs`):
 
 - permissive licences are compatible (except Apache-2.0 into GPL-2.0-only);
 - file-level copyleft (CERN-OHL-W, MPL, LGPL) is compatible with conditions;

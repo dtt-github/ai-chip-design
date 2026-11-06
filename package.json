@@ -1,5 +1,5 @@
 {
-  "name": "siliconcommons",
+  "name": "wafersmith",
   "private": true,
   "license": "Apache-2.0",
   "author": "DigitalTwin Technology GmbH",
@@ -9,8 +9,8 @@
   },
   "packageManager": "pnpm@10.34.9",
   "scripts": {
-    "dev:web": "pnpm --filter @siliconcommons/web dev",
-    "build:web": "pnpm --filter @siliconcommons/web build",
+    "dev:web": "pnpm --filter @wafersmith/web dev",
+    "build:web": "pnpm --filter @wafersmith/web build",
     "typecheck": "pnpm -r typecheck"
   }
 }

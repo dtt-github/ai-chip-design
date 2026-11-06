@@ -41,17 +41,17 @@ You can also insert one yourself from the connection's menu.
 
 | Adapter | What it does |
 |---|---|
-| `sc_rise_pulse` | A level in, a one-clock pulse out when it goes from 0 to 1. |
-| `sc_sync2` | Two flip-flops that bring an outside signal safely into this clock (adds 2 cycles). |
-| `sc_invert` | Flips every bit (setting `W` = width). |
-| `sc_resize` | Changes width: pads with zeros, or keeps the lowest bits (settings `IN`, `OUT`). |
+| `wafer_rise_pulse` | A level in, a one-clock pulse out when it goes from 0 to 1. |
+| `wafer_sync2` | Two flip-flops that bring an outside signal safely into this clock (adds 2 cycles). |
+| `wafer_invert` | Flips every bit (setting `W` = width). |
+| `wafer_resize` | Changes width: pads with zeros, or keeps the lowest bits (settings `IN`, `OUT`). |
 
 ## Saving
 
 **Save chip** commits, in one commit:
 
 - `blocks.json` (the layout: pins, blocks with their settings and positions, connections);
-- the chip's top level `src/<chip>.v` and, when adapters are used, `src/sc_adapters.v`, both
+- the chip's top level `src/<chip>.v` and, when adapters are used, `src/wafer_adapters.v`, both
   generated and never edited by hand;
 - `config.json`, now building the chip (`DESIGN_NAME`) from exactly the files it uses;
 - regenerated chip examples, if any.

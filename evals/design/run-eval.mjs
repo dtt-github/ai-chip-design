@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
-// Design evals for the SiliconCommons assistant and agent: pass rate and cost per task.
+// Design evals for the Wafersmith assistant and agent: pass rate and cost per task.
 // See docs/evals.md. Built on the eval runner scaffold from Anthropic's claude-api skill
 // (resume, retries, results.jsonl / traces / errors.jsonl, harness-change gate).
 //
@@ -134,7 +134,7 @@ function mkdirNoFollow(dir) {
 // the same list so a suffixed ref never gets an extensionless shadow.
 const REF_EXTS = ['', '.html', '.txt', '.json'];
 
-// --- SiliconCommons design evals ----------------------------------------------
+// --- Wafersmith design evals ----------------------------------------------
 //
 // Two evals over one task set (evals/design/tasks/<id>/), both through the real API:
 //
@@ -155,17 +155,17 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const TASKS_DIR = join(HERE, 'tasks');
 const env = (k, d) => process.env[k] ?? d;
 // Defaults are the local development stack's fixtures (docs/getting-started.md); set the
-// SC_EVAL_* variables for any other server.
-const API = env('SC_EVAL_API', 'http://127.0.0.1:8090/api').replace(/\/$/, '');
-const TOKEN_URL = env('SC_EVAL_TOKEN_URL', 'http://localhost:8180/auth/v1/oidc/token');
-const CLIENT_ID = env('SC_EVAL_CLIENT_ID', 'siliconcommons-dev-cli');
-const CLIENT_SECRET = env('SC_EVAL_CLIENT_SECRET', 'scdevcli'.repeat(8));
-const USERNAME = env('SC_EVAL_USER', 'dev@siliconcommons.dev');
-const PASSWORD = env('SC_EVAL_PASSWORD', 'SiliconCommons-dev-2026');
+// WAFER_EVAL_* variables for any other server.
+const API = env('WAFER_EVAL_API', 'http://127.0.0.1:8090/api').replace(/\/$/, '');
+const TOKEN_URL = env('WAFER_EVAL_TOKEN_URL', 'http://localhost:8180/auth/v1/oidc/token');
+const CLIENT_ID = env('WAFER_EVAL_CLIENT_ID', 'wafersmith-dev-cli');
+const CLIENT_SECRET = env('WAFER_EVAL_CLIENT_SECRET', 'scdevcli'.repeat(8));
+const USERNAME = env('WAFER_EVAL_USER', 'dev@wafersmith.dev');
+const PASSWORD = env('WAFER_EVAL_PASSWORD', 'Wafersmith-dev-2026');
 const POLL_MS = 5000;
 
 // Costs come from the server, which prices each call for the model that served it
-// (crates/sc-api/src/spend.rs); a server without per-model prices reports none.
+// (crates/wafer-api/src/spend.rs); a server without per-model prices reports none.
 const serverUsd = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 let token = null;
@@ -220,7 +220,7 @@ async function saveSpec(project, spec) {
   return api('PUT', `/projects/${project}/spec`, { spec, parent: view.head, message: 'Eval spec' });
 }
 
-/** A design with the spec's connections whose outputs are all 0 (as in crates/sc-api/tests/evals.rs). */
+/** A design with the spec's connections whose outputs are all 0 (as in crates/wafer-api/tests/evals.rs). */
 function nullDesign(spec) {
   const params = spec.params?.length ? ` #(${spec.params.map(p => `parameter ${p.name} = ${p.value}`).join(', ')})` : '';
   const ports = spec.ports.map(p => `${p.dir === 'in' ? 'input' : 'output'} wire ${p.width > 1 ? `[${p.width - 1}:0] ` : ''}${p.name}`);
@@ -232,7 +232,7 @@ const read = (dir, f) => readFileSync(join(dir, f), 'utf8');
 
 /** Return the list of input cases. Each must have a stable `id`. */
 async function loadCases() {
-  const only = process.env.SC_EVAL_TASKS ? new Set(process.env.SC_EVAL_TASKS.split(',')) : null;
+  const only = process.env.WAFER_EVAL_TASKS ? new Set(process.env.WAFER_EVAL_TASKS.split(',')) : null;
   const ids = readdirSync(TASKS_DIR).filter(d => !only || only.has(d)).sort();
   return ids.map(id => {
     const dir = join(TASKS_DIR, id);
@@ -423,7 +423,7 @@ function parseArgs(argv) {
     eprint('--eval must be assistant or agent, and --mode live, oracle or null');
     usage(); process.exit(2);
   }
-  // The server runs at most 2 agent proposals per person at once (crates/sc-api/src/agent.rs).
+  // The server runs at most 2 agent proposals per person at once (crates/wafer-api/src/agent.rs).
   if (a.eval === 'agent' && a.concurrency > 2) a.concurrency = 2;
   if (!/^(baseline|v[1-9]\d*)$/.test(a.variant)) {
     // The report only reads directories named 'baseline' or 'v<N>' - any other

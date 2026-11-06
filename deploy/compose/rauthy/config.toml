@@ -12,8 +12,8 @@ bootstrap_dir = 'bootstrap'
 [cluster]
 node_id = 1
 nodes = ["1 localhost:8100 localhost:8200"]
-secret_raft = "SiliconCommonsDevRaftSecret"
-secret_api = "SiliconCommonsDevApiSecret"
+secret_raft = "WafersmithDevRaftSecret"
+secret_api = "WafersmithDevApiSecret"
 
 [database]
 hiqlite = true
@@ -45,4 +45,4 @@ enable = false
 [webauthn]
 rp_id = 'localhost'
 rp_origin = 'http://localhost:8180'
-rp_name = 'SiliconCommons (dev)'
+rp_name = 'Wafersmith (dev)'

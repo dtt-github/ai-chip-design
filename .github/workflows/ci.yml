@@ -27,16 +27,16 @@ jobs:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_USER: sc
-          POSTGRES_PASSWORD: sc
-          POSTGRES_DB: siliconcommons
+          POSTGRES_USER: wafer
+          POSTGRES_PASSWORD: wafer
+          POSTGRES_DB: wafersmith
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U sc -d siliconcommons"
+          --health-cmd "pg_isready -U wafer -d wafersmith"
           --health-interval 2s --health-timeout 3s --health-retries 30
     env:
       # sqlx::test creates a fresh database per test from this server.
-      DATABASE_URL: postgres://sc:sc@localhost:5432/siliconcommons
+      DATABASE_URL: postgres://wafer:wafer@localhost:5432/wafersmith
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@master
@@ -71,5 +71,5 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @siliconcommons/web typecheck
-      - run: pnpm --filter @siliconcommons/web build
+      - run: pnpm --filter @wafersmith/web typecheck
+      - run: pnpm --filter @wafersmith/web build

@@ -3,9 +3,9 @@
 # Docker volume, which job containers mount read-only at /pdk.
 set -euo pipefail
 
-IMAGE="${SC_LIBRELANE_IMAGE:-ghcr.io/librelane/librelane:3.0.16}"
-VOLUME="${SC_PDK_VOLUME:-siliconcommons_pdk}"
-PDK="${SC_PDK:-ihp-sg13g2}"
+IMAGE="${WAFER_LIBRELANE_IMAGE:-ghcr.io/librelane/librelane:3.0.16}"
+VOLUME="${WAFER_PDK_VOLUME:-wafersmith_pdk}"
+PDK="${WAFER_PDK:-ihp-sg13g2}"
 
 docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull "$IMAGE"
 docker volume create "$VOLUME" >/dev/null

@@ -1,0 +1,44 @@
+[package]
+name = "wafer-api"
+description = "Wafersmith HTTP API"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "wafersmith-api"
+path = "src/main.rs"
+
+[dependencies]
+wafer-git = { path = "../wafer-git" }
+wafer-jobs = { path = "../wafer-jobs" }
+wafer-sim = { path = "../wafer-sim" }
+anyhow.workspace = true
+axum.workspace = true
+chrono.workspace = true
+jsonwebtoken.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.11"
+sqlx.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util = { version = "0.7", features = ["io"] }
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+yrs = { version = "0.28", features = ["sync"] }
+dotenvy = "0.15"
+
+[dev-dependencies]
+reqwest = { workspace = true }
+wafer-jobs = { path = "../wafer-jobs" }
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+tokio-tungstenite = "0.30"
+tower.workspace = true
+http-body-util = "0.1"

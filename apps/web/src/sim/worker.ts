@@ -1,6 +1,6 @@
 // Runs the Rust simulator (WASM) off the main thread.
-import init, { simulate, topCandidates, type Simulation } from "../wasm/sc_sim.js";
-import wasmUrl from "../wasm/sc_sim_bg.wasm?url";
+import init, { simulate, topCandidates, type Simulation } from "../wasm/wafer_sim.js";
+import wasmUrl from "../wasm/wafer_sim_bg.wasm?url";
 import type { SimRequest, SimResponse } from "./protocol";
 
 const ready = init({ module_or_path: wasmUrl });

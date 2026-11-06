@@ -5,7 +5,7 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-authors = ["DigitalTwin Technology GmbH and the SiliconCommons contributors"]
+authors = ["DigitalTwin Technology GmbH and the Wafersmith contributors"]
 license = "Apache-2.0"
 repository = "https://github.com/dtt-github/ai-chip-design"
 publish = false

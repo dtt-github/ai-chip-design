@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Downloads the pinned Verible release (Verilog parser, linter, formatter and
 # language server) into .tools/verible/. The API finds verible-verilog-ls there
-# unless SC_VERIBLE_LS points elsewhere.
+# unless WAFER_VERIBLE_LS points elsewhere.
 set -euo pipefail
 
 VERSION="v0.0-4296-g0f262651"

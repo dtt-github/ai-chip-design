@@ -1,6 +1,6 @@
 // Shared working copy of a project (Yjs), synced with the API's collab room.
 //
-// Document layout (see crates/sc-api/src/collab.rs):
+// Document layout (see crates/wafer-api/src/collab.rs):
 //   files:   Y.Map<path, Y.Text>   every text file
 //   deleted: Y.Map<path, true>     deletions staged in the working copy
 //   meta:    Y.Map { head }        the commit the working copy is based on

@@ -7,11 +7,11 @@ the flow config next to the button: any `config*.json`, `.yaml` or `.tcl` in the
 
 ## What a run does
 
-Runs are queued in Postgres and picked up by workers inside the API (`SC_JOB_WORKERS`, default 2).
+Runs are queued in Postgres and picked up by workers inside the API (`WAFER_JOB_WORKERS`, default 2).
 Each run:
 
 - exports the project at the run's commit to `data/jobs/<run id>/work/`;
-- runs `librelane --manual-pdk --pdk ihp-sg13g2 --run-tag sc ./<config>` in a throwaway container
+- runs `librelane --manual-pdk --pdk ihp-sg13g2 --run-tag wafer ./<config>` in a throwaway container
   with no network, no Linux capabilities, the PDK mounted read-only, and CPU, memory, process and
   time limits ([configuration.md](../configuration.md#flow-runs-rtl--gds));
 - streams the output to `flow.log`;
@@ -20,13 +20,13 @@ Each run:
   timing, power, IR drop, DRC/LVS/antenna) with a sign-off verdict.
 
 Each person can have 3 runs queued or running. Run directories are deleted after the retention
-period (`SC_JOB_RETENTION_DAYS`); the summary stays.
+period (`WAFER_JOB_RETENTION_DAYS`); the summary stays.
 
 ## Gate-level simulation
 
 After a successful flow, the project's testbenches run again on the synthesised netlist with Icarus
 Verilog and the PDK's cell models (zero-delay), in a fresh directory the server prepares
-(`sc-api/src/gls.rs`). Verdicts follow the simulation gate's rules. The netlist is built for one set
+(`wafer-api/src/gls.rs`). Verdicts follow the simulation gate's rules. The netlist is built for one set
 of settings (module defaults plus the config's `SYNTH_PARAMETERS`), so a testbench runs only if it
 drives the built design with exactly those values; testbenches for other settings, or that test a
 block rather than the chip, are listed as skipped with the reason. A failure shows as "netlist sim
@@ -39,7 +39,7 @@ reports and every file in `final/` for download.
 
 ### Layout viewer
 
-- `sc-gds` (Rust, compiled to WebAssembly) parses the GDSII, flattens the hierarchy (rotation,
+- `wafer-gds` (Rust, compiled to WebAssembly) parses the GDSII, flattens the hierarchy (rotation,
   reflection, magnification) and tessellates polygons and paths per layer, in µm.
 - WebGPU draws fills and outlines with the PDK's colours and stack order; without WebGPU, a Canvas
   2D renderer does the same.

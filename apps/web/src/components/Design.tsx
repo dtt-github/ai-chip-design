@@ -299,7 +299,7 @@ export function DesignFlow({ projectId, startIntent, onWide, head, canEdit, onOp
 
 // ---- First run --------------------------------------------------------------------
 
-const GUIDE_KEY = "sc.guide.dismissed";
+const GUIDE_KEY = "wafersmith.guide.dismissed";
 
 /** How the three steps work, until dismissed (remembered in this browser). */
 function FirstRun() {
@@ -1261,7 +1261,7 @@ function Health({
     plain: exTotal === 0 ? "Add examples so there's something to check the design against." : `${exPass} of ${exTotal} examples pass on your design.${onGates}`,
     explain:
       "Each example is run in simulation on the Verilog. After a build, the testbenches that match the build's settings run again on the gate-level netlist the chip would be made from.",
-    expert: `${run?.engine ?? "sc-sim"} · examples ${exPass}/${exTotal}` + (gls ? ` · gate-level: ${gls.summary}` : " · no gate-level run yet"),
+    expert: `${run?.engine ?? "wafer-sim"} · examples ${exPass}/${exTotal}` + (gls ? ` · gate-level: ${gls.summary}` : " · no gate-level run yet"),
   });
   const cov = run?.coverage;
   if (cov) {

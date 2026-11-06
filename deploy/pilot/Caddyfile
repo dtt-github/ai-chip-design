@@ -2,7 +2,7 @@
 	email {$ACME_EMAIL}
 }
 
-{$SC_DOMAIN} {
+{$WAFER_DOMAIN} {
 	encode zstd gzip
 
 	header {

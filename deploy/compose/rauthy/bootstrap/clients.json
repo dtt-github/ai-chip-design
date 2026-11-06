@@ -1,7 +1,7 @@
 [
     {
-        "id": "siliconcommons-web",
-        "name": "SiliconCommons Web",
+        "id": "wafersmith-web",
+        "name": "Wafersmith Web",
         "secret": null,
         "redirect_uris": ["http://localhost:5173/auth/callback"],
         "post_logout_redirect_uris": ["http://localhost:5173/"],
@@ -18,8 +18,8 @@
         "force_mfa": false
     },
     {
-        "id": "siliconcommons-dev-cli",
-        "name": "SiliconCommons dev CLI - password grant - dev only",
+        "id": "wafersmith-dev-cli",
+        "name": "Wafersmith dev CLI - password grant - dev only",
         "secret": {"Plain": "scdevcliscdevcliscdevcliscdevcliscdevcliscdevcliscdevcliscdevcli"},
         "redirect_uris": ["http://localhost:5173/auth/callback"],
         "enabled": true,
