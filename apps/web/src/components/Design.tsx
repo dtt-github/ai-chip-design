@@ -14,6 +14,7 @@ import {
   type StepOp,
 } from "../api";
 import { extendTestbench, fmt as fmtValue, replay, targetSpec, type Replay } from "../lib/replay";
+import { findFix, type Fix } from "../lib/fixexample";
 import { StateMachine } from "./StateMachine";
 import { TryIt } from "./TryIt";
 import { SimClient } from "../sim/client";
@@ -830,6 +831,8 @@ function Examples({
                 busy={busy}
                 onFixDesign={(story) => fixDesign(sel, story)}
                 onFixExample={(story) => fixExample(sel, story)}
+                baseSpec={spec}
+                onReplaceSteps={(steps) => setEx({ steps })}
               />
             )}
             <div className="design-scroll">
@@ -939,16 +942,46 @@ function Happened({
   busy,
   onFixDesign,
   onFixExample,
+  baseSpec,
+  onReplaceSteps,
 }: {
   projectId: string;
+  /** The spec as this example sees it (the chip's pins for a chip example). */
   spec: Spec;
+  /** The project's spec, from which the server compiles a changed example. */
+  baseSpec: Spec;
   ex: SpecExample;
   canEdit: boolean;
   busy: boolean;
   onFixDesign: (story: string) => void;
   onFixExample: (story: string) => void;
+  onReplaceSteps: (steps: SpecExample["steps"]) => void;
 }) {
   const [rep, setRep] = useState<Replay | null>(null);
+  // "The design is right": a change to the example that makes it pass, worked out and re-checked.
+  const [fix, setFix] = useState<Fix | "working" | "none" | null>(null);
+  async function acceptDesign() {
+    if (!rep) return;
+    setFix("working");
+    const client = new SimClient();
+    try {
+      const snap = await api.snapshot(projectId);
+      const design = Object.entries(snap.files)
+        .filter(([p]) => /\.s?v$/.test(p) && !p.startsWith("tb/"))
+        .map(([name, source]) => ({ name, source }));
+      const simulate = async (changed: SpecExample) => {
+        const tb = await api.exampleTestbench(projectId, { spec: baseSpec, example: changed });
+        const sim = await client.run([...design, { name: tb.path, source: extendTestbench(tb.source, spec) }], tb.top);
+        return replay(spec, changed, sim);
+      };
+      setFix((await findFix(ex, rep, simulate)) ?? "none");
+    } catch (e) {
+      setError((e as Error).message);
+      setFix(null);
+    } finally {
+      client.dispose();
+    }
+  }
   const [error, setError] = useState<string | null>(null);
   // Fit the cycles to the space available; long examples scroll.
   const box = useRef<HTMLDivElement>(null);
@@ -1033,9 +1066,45 @@ function Happened({
           <button className="primary" disabled={busy} onClick={() => onFixDesign(rep.story)}>
             The design: ask the AI to fix it
           </button>
+          <button disabled={busy || fix === "working"} onClick={acceptDesign} title="Change the example to what the design did, without the AI">
+            The example: use what the design did
+          </button>
           <button disabled={busy} onClick={() => onFixExample(rep.story)}>
             The example: ask the assistant to correct it
           </button>
+        </div>
+      )}
+      {fix === "working" && <p className="muted small">Working out the change and checking it…</p>}
+      {fix === "none" && (
+        <p className="small">
+          There's no simple change (a check a few cycles off, a wait too short, a different value) that makes this example pass.
+          Ask the assistant, or the AI to fix the design.
+        </p>
+      )}
+      {fix && typeof fix === "object" && (
+        <div className="design-card fix-preview">
+          <strong className="small">{fix.passes ? "This change makes the example pass:" : "This change gets closer, but the example still fails:"}</strong>
+          <ul className="small">
+            {fix.edits.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+          <div className="design-row">
+            <button
+              className="primary small"
+              disabled={!fix.passes}
+              onClick={() => {
+                onReplaceSteps(fix.steps);
+                setFix(null);
+              }}
+            >
+              Change the example
+            </button>
+            <button className="small" onClick={() => setFix(null)}>
+              Cancel
+            </button>
+            {fix.passes && <span className="muted small">Then save the spec to keep it.</span>}
+          </div>
         </div>
       )}
     </div>

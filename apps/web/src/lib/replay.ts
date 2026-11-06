@@ -45,6 +45,8 @@ export interface Replay {
   story: string;
   /** Set when the replay couldn't follow the run (e.g. it stopped early). */
   problem: string | null;
+  /** A connection's value at a cycle's check point, including the cycles after the example. */
+  read: (port: string, cycle: number) => bigint | null;
 }
 
 const MAX_CYCLES = 4000;
@@ -173,7 +175,7 @@ export function replay(spec: Spec, ex: SpecExample, sim: SimResult, internal: { 
     ...internal.map((p): Row => ({ name: p.name, dir: "internal", width: p.width, values: Array.from({ length: cycles }, (_, k) => read(p.name, k)) })),
   ];
   const firstFail = checks.find((ch) => !ch.ok) ?? null;
-  return { cycles, exampleCycles, rows, checks, sets, firstFail, story: explain(spec, read, firstFail, checks.length), problem };
+  return { cycles, exampleCycles, rows, checks, sets, firstFail, story: explain(spec, read, firstFail, checks.length), problem, read };
 }
 
 function explain(spec: Spec, read: (port: string, c: number) => bigint | null, f: Check | null, total: number): string {

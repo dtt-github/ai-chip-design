@@ -2645,3 +2645,9 @@ a.button {
 .behaviour-list > li {
   margin-bottom: 8px;
 }
+
+/* "Use what the design did": the proposed change to an example. */
+.fix-preview ul {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}

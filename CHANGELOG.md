@@ -8,6 +8,10 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **The example: use what the design did**: when an example fails and the design is right, one
+  click rewrites the failing check from the simulation (moved a few cycles, a longer wait-until, a
+  shorter hold, or the value the design gave), re-simulates until it passes, and lists the changes
+  before applying them. No AI and no cost.
 - **What a proposal does**: agent proposals open on a behaviour tab. **Compare behaviour** runs
   every example before and after the change (in the browser) and describes each output that
   behaves differently ("`led` now changes 1 cycle earlier"), and compares examples passing,

@@ -83,11 +83,20 @@ Selecting an example simulates it in your browser and replays its steps against 
 by cycle: each connection's value, the example's checks laid over it (amber), any difference in red,
 and the inputs it sets. The first difference is explained in plain words, including when the
 expected value did appear ("it became 1 one cycle later, so the design may be one cycle slower
-than the example says"). Two buttons answer the one question to decide:
+than the example says"). Three buttons answer the one question to decide, **Which is wrong?**:
 
-- **The design is wrong**: ask the AI to fix the design, with this explanation;
-- **The example is wrong**: ask the assistant to re-check the example against the spec and
-  correct it.
+- **The design: ask the AI to fix it**, with this explanation;
+- **The example: use what the design did**: rewrites the failing check from the simulation,
+  without AI. If the expected value appears a few cycles later or earlier, the check moves
+  ("Step 3 (expect led = 1): checked 1 cycle later", by adding a wait or shortening the one
+  before it); a wait-until gets more cycles; a hold check covers only the cycles it held;
+  otherwise the check expects the value the design gave, written the same way (`0x`, `0b` or
+  decimal). The changed example is simulated again (repeating for further failing checks), and the
+  changes are listed first: **Change the example** applies them only if the example then passes,
+  and saving the spec keeps them. Use it when the design is right and the example's timing or
+  value was a guess;
+- **The example: ask the assistant to correct it**: re-checks the example against the spec in
+  words and corrects it.
 
 ## Health
 
