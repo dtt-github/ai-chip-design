@@ -99,6 +99,6 @@ Read `docs/security-review.md`. In short, for this pilot:
 ## Dry run on your own machine
 
 To try the stack without a public domain, use Caddy's internal certificate authority: copy the
-`Caddyfile`, add `tls internal` under the site line, set `WAFER_DOMAIN=sc.localhost:8443`, and use a
+`Caddyfile`, add `tls internal` under the site line, set `WAFER_DOMAIN=wafersmith.localhost:8443`, and use a
 Compose override that publishes `8443:8443` and mounts the modified Caddyfile. Browsers will warn
 about the certificate.

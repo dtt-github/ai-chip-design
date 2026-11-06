@@ -21,7 +21,7 @@ FROM docker:27-cli AS dockercli
 FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --uid 10001 --create-home --shell /usr/sbin/nologin sc
+    && useradd --uid 10001 --create-home --shell /usr/sbin/nologin wafer
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=build /wafersmith-api /usr/local/bin/wafersmith-api
 COPY --from=build /verible /opt/verible

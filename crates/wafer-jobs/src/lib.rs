@@ -19,12 +19,19 @@ pub use summary::{parse_metrics, summarize};
 pub use tokio_util::sync::CancellationToken;
 
 /// LibreLane `--run-tag`; fixed so results are at a known path.
-pub const RUN_TAG: &str = "sc";
+pub const RUN_TAG: &str = "wafer";
+/// The run tag before the rename from SiliconCommons; earlier jobs' results are still read from it.
+const LEGACY_RUN_TAG: &str = "sc";
 /// Logs beyond this are cut off (the flow keeps running).
 pub const MAX_LOG_BYTES: u64 = 32 * 1024 * 1024;
 
 pub fn run_dir(workdir: &Path) -> PathBuf {
-    workdir.join("runs").join(RUN_TAG)
+    let runs = workdir.join("runs");
+    let legacy = runs.join(LEGACY_RUN_TAG);
+    if !runs.join(RUN_TAG).exists() && std::fs::symlink_metadata(&legacy).is_ok_and(|m| m.is_dir()) {
+        return legacy;
+    }
+    runs.join(RUN_TAG)
 }
 
 pub fn final_dir(workdir: &Path) -> PathBuf {
@@ -139,27 +146,42 @@ pub trait Backend: Send + Sync {
 mod tests {
     use super::*;
 
+    #[test]
+    fn earlier_runs_are_found_under_the_old_tag() {
+        let job = tempfile::tempdir().unwrap();
+        assert_eq!(run_dir(job.path()), job.path().join("runs/wafer"));
+        std::fs::create_dir_all(job.path().join("runs/sc/final")).unwrap();
+        assert_eq!(final_dir(job.path()), job.path().join("runs/sc/final"));
+        std::fs::create_dir_all(job.path().join("runs/wafer")).unwrap();
+        assert_eq!(run_dir(job.path()), job.path().join("runs/wafer"));
+    }
+
     #[tokio::test]
     async fn links_out_of_the_job_are_refused_and_removed() {
         let outside = tempfile::tempdir().unwrap();
         std::fs::write(outside.path().join("secret"), "host file").unwrap();
         let job = tempfile::tempdir().unwrap();
         let root = job.path();
-        std::fs::create_dir_all(root.join("runs/sc/final")).unwrap();
-        std::fs::write(root.join("runs/sc/final/metrics.json"), "{}").unwrap();
-        std::os::unix::fs::symlink(outside.path().join("secret"), root.join("runs/sc/final/leak.json")).unwrap();
-        std::os::unix::fs::symlink(outside.path(), root.join("runs/sc/out")).unwrap();
-        std::os::unix::fs::symlink("metrics.json", root.join("runs/sc/final/inside.json")).unwrap();
+        std::fs::create_dir_all(root.join("runs/wafer/final")).unwrap();
+        std::fs::write(root.join("runs/wafer/final/metrics.json"), "{}").unwrap();
+        std::os::unix::fs::symlink(outside.path().join("secret"), root.join("runs/wafer/final/leak.json")).unwrap();
+        std::os::unix::fs::symlink(outside.path(), root.join("runs/wafer/out")).unwrap();
+        std::os::unix::fs::symlink("metrics.json", root.join("runs/wafer/final/inside.json")).unwrap();
 
-        assert_eq!(read_inside(root, &root.join("runs/sc/final/metrics.json")).await.unwrap(), b"{}");
-        for bad in ["runs/sc/final/leak.json", "runs/sc/out/secret", "runs/sc/final/inside.json", "runs/sc/final"] {
+        assert_eq!(read_inside(root, &root.join("runs/wafer/final/metrics.json")).await.unwrap(), b"{}");
+        for bad in
+            ["runs/wafer/final/leak.json", "runs/wafer/out/secret", "runs/wafer/final/inside.json", "runs/wafer/final"]
+        {
             assert!(read_inside(root, &root.join(bad)).await.is_err(), "{bad}");
         }
         assert!(read_inside(root, &outside.path().join("secret")).await.is_err());
 
         assert_eq!(remove_escaping_links(root), 2);
-        assert!(!root.join("runs/sc/final/leak.json").exists());
-        assert!(std::fs::symlink_metadata(root.join("runs/sc/final/inside.json")).is_ok(), "links within the job stay");
+        assert!(!root.join("runs/wafer/final/leak.json").exists());
+        assert!(
+            std::fs::symlink_metadata(root.join("runs/wafer/final/inside.json")).is_ok(),
+            "links within the job stay"
+        );
         assert!(outside.path().join("secret").exists());
     }
 }

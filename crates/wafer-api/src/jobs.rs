@@ -2,7 +2,7 @@
 //! a [`wafer_jobs::Backend`], and the HTTP endpoints around them.
 //!
 //! Each job lives in `<jobs root>/<job id>/`: `work/` holds the project files
-//! at the job's commit (LibreLane writes `work/runs/sc/` into it) and
+//! at the job's commit (LibreLane writes `work/runs/wafer/` into it) and
 //! `flow.log` the flow's output.
 
 use std::collections::HashMap;

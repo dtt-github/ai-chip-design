@@ -52,7 +52,8 @@ All notable changes to Wafersmith are recorded here. The format follows
   `wafer_*` in `src/wafer_adapters.v`, and the Docker Compose project, volumes, database and role
   `wafersmith`/`wafer`; the OIDC clients are `wafersmith-web` and `wafersmith-dev-cli`. Existing
   projects keep working: files generated under the old name are still recognised as generated,
-  and the old `src/sc_adapters.v` is removed the next time the blocks are saved. To move a local
+  the old `src/sc_adapters.v` is removed the next time the blocks are saved, and
+  flow runs now use LibreLane's run tag `wafer` while earlier runs are still read from `runs/sc/`. To move a local
   setup, rename the variables in `.env`, copy the `siliconcommons_pdk` and `siliconcommons_pg-data`
   volumes to `wafersmith_*`, rename the database and role, and let Rauthy bootstrap afresh.
 - Conditions in messages and coverage are printed with only the parentheses precedence needs

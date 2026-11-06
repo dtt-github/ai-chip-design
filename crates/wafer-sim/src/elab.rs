@@ -1026,41 +1026,44 @@ impl<'a> Elab<'a> {
             return self.err(s, line, format!("{name} calls itself too deeply"));
         }
         let vals = args.iter().map(|a| self.const_eval(s, a, line)).collect::<Result<Vec<_>>>()?;
-        let mut sc = s.clone();
+        let mut fscope = s.clone();
         let mut widths = HashMap::new();
-        let width = |sc: &Scope, range: &Option<(Expr, Expr)>, integer: bool, signed: bool| -> Result<(u32, bool)> {
-            Ok(match range {
-                Some((a, b)) => {
-                    ((self.const_eval(sc, a, line)? - self.const_eval(sc, b, line)?).unsigned_abs() as u32 + 1, signed)
-                }
-                None if integer => (32, true),
-                None => (1, signed),
-            })
-        };
+        let width =
+            |fscope: &Scope, range: &Option<(Expr, Expr)>, integer: bool, signed: bool| -> Result<(u32, bool)> {
+                Ok(match range {
+                    Some((a, b)) => (
+                        (self.const_eval(fscope, a, line)? - self.const_eval(fscope, b, line)?).unsigned_abs() as u32
+                            + 1,
+                        signed,
+                    ),
+                    None if integer => (32, true),
+                    None => (1, signed),
+                })
+            };
         widths.insert(f.name.clone(), width(s, &f.ret_range, f.ret_integer, f.ret_signed)?);
         for d in &f.decls {
             let w = width(s, &d.range, d.kind == Some(Kind::Integer), d.signed)?;
             for n in &d.names {
                 widths.insert(n.name.clone(), w);
-                sc.params.insert(n.name.clone(), 0);
+                fscope.params.insert(n.name.clone(), 0);
             }
         }
-        sc.params.insert(f.name.clone(), 0);
+        fscope.params.insert(f.name.clone(), 0);
         for ((n, _), v) in f.args.iter().zip(vals) {
-            sc.params.insert(n.clone(), fit(v, widths[n]));
+            fscope.params.insert(n.clone(), fit(v, widths[n]));
         }
         let mut budget = 1_000_000usize;
         self.const_depth.set(self.const_depth.get() + 1);
-        let r = self.const_exec(&mut sc, &f.body, &f.name, &widths, &mut budget, line);
+        let r = self.const_exec(&mut fscope, &f.body, &f.name, &widths, &mut budget, line);
         self.const_depth.set(self.const_depth.get() - 1);
         r?;
-        Ok(sc.params[&f.name])
+        Ok(fscope.params[&f.name])
     }
 
     /// Runs a constant function's statement; `Ok(true)` when it executed `return`.
     fn const_exec(
         &self,
-        sc: &mut Scope,
+        fscope: &mut Scope,
         st: &Stmt,
         fname: &str,
         widths: &HashMap<String, (u32, bool)>,
@@ -1075,90 +1078,90 @@ impl<'a> Elab<'a> {
             Stmt::Null | Stmt::SysTask { .. } => {}
             Stmt::Block(v) => {
                 for x in v {
-                    if self.const_exec(sc, x, fname, widths, budget, line)? {
+                    if self.const_exec(fscope, x, fname, widths, budget, line)? {
                         return Ok(true);
                     }
                 }
             }
             Stmt::Blocking { lhs, rhs, line } => {
-                let v = self.const_eval(sc, rhs, *line)?;
+                let v = self.const_eval(fscope, rhs, *line)?;
                 let (name, new) = match lhs {
                     Expr::Ident(n, _) => (n, v),
                     Expr::Index(b, i) => match b.as_ref() {
                         Expr::Ident(n, _) => {
-                            let i = self.const_eval(sc, i, *line)?.clamp(0, 63);
-                            let old = sc.params.get(n).copied().unwrap_or(0);
+                            let i = self.const_eval(fscope, i, *line)?.clamp(0, 63);
+                            let old = fscope.params.get(n).copied().unwrap_or(0);
                             (n, (old & !(1 << i)) | ((v & 1) << i))
                         }
-                        _ => return self.err(sc, *line, "a constant function can only assign its own variables"),
+                        _ => return self.err(fscope, *line, "a constant function can only assign its own variables"),
                     },
-                    _ => return self.err(sc, *line, "a constant function can only assign whole variables or bits"),
+                    _ => return self.err(fscope, *line, "a constant function can only assign whole variables or bits"),
                 };
                 let Some(w) = widths.get(name) else {
-                    return self.err(sc, *line, format!("a constant function can't assign '{name}'"));
+                    return self.err(fscope, *line, format!("a constant function can't assign '{name}'"));
                 };
-                sc.params.insert(name.clone(), fit(new, *w));
+                fscope.params.insert(name.clone(), fit(new, *w));
             }
             Stmt::If(c, t, f) => {
-                if self.const_eval(sc, c, line)? != 0 {
-                    return self.const_exec(sc, t, fname, widths, budget, line);
+                if self.const_eval(fscope, c, line)? != 0 {
+                    return self.const_exec(fscope, t, fname, widths, budget, line);
                 } else if let Some(f) = f {
-                    return self.const_exec(sc, f, fname, widths, budget, line);
+                    return self.const_exec(fscope, f, fname, widths, budget, line);
                 }
             }
             Stmt::Case { sel, items, default, line, .. } => {
-                let v = self.const_eval(sc, sel, *line)?;
+                let v = self.const_eval(fscope, sel, *line)?;
                 for (labels, body) in items {
                     for l in labels {
-                        if self.const_eval(sc, l, *line)? == v {
-                            return self.const_exec(sc, body, fname, widths, budget, *line);
+                        if self.const_eval(fscope, l, *line)? == v {
+                            return self.const_exec(fscope, body, fname, widths, budget, *line);
                         }
                     }
                 }
                 if let Some(d) = default {
-                    return self.const_exec(sc, d, fname, widths, budget, *line);
+                    return self.const_exec(fscope, d, fname, widths, budget, *line);
                 }
             }
             Stmt::For { init, cond, step, body } => {
-                self.const_exec(sc, init, fname, widths, budget, line)?;
-                while self.const_eval(sc, cond, line)? != 0 {
+                self.const_exec(fscope, init, fname, widths, budget, line)?;
+                while self.const_eval(fscope, cond, line)? != 0 {
                     if !tick(budget) {
-                        return self.err(sc, line, "a constant function's loop runs too long");
+                        return self.err(fscope, line, "a constant function's loop runs too long");
                     }
-                    if self.const_exec(sc, body, fname, widths, budget, line)? {
+                    if self.const_exec(fscope, body, fname, widths, budget, line)? {
                         return Ok(true);
                     }
-                    self.const_exec(sc, step, fname, widths, budget, line)?;
+                    self.const_exec(fscope, step, fname, widths, budget, line)?;
                 }
             }
             Stmt::While(c, body) => {
-                while self.const_eval(sc, c, line)? != 0 {
+                while self.const_eval(fscope, c, line)? != 0 {
                     if !tick(budget) {
-                        return self.err(sc, line, "a constant function's loop runs too long");
+                        return self.err(fscope, line, "a constant function's loop runs too long");
                     }
-                    if self.const_exec(sc, body, fname, widths, budget, line)? {
+                    if self.const_exec(fscope, body, fname, widths, budget, line)? {
                         return Ok(true);
                     }
                 }
             }
             Stmt::Repeat(n, body) => {
-                for _ in 0..self.const_eval(sc, n, line)?.max(0) {
+                for _ in 0..self.const_eval(fscope, n, line)?.max(0) {
                     if !tick(budget) {
-                        return self.err(sc, line, "a constant function's loop runs too long");
+                        return self.err(fscope, line, "a constant function's loop runs too long");
                     }
-                    if self.const_exec(sc, body, fname, widths, budget, line)? {
+                    if self.const_exec(fscope, body, fname, widths, budget, line)? {
                         return Ok(true);
                     }
                 }
             }
             Stmt::Return(e, line) => {
                 if let Some(e) = e {
-                    let v = self.const_eval(sc, e, *line)?;
-                    sc.params.insert(fname.to_string(), fit(v, widths[fname]));
+                    let v = self.const_eval(fscope, e, *line)?;
+                    fscope.params.insert(fname.to_string(), fit(v, widths[fname]));
                 }
                 return Ok(true);
             }
-            _ => return self.err(sc, line, "only assignments, if, case and loops can run in a constant function"),
+            _ => return self.err(fscope, line, "only assignments, if, case and loops can run in a constant function"),
         }
         Ok(false)
     }

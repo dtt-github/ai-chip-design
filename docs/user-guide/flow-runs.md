@@ -11,7 +11,7 @@ Runs are queued in Postgres and picked up by workers inside the API (`WAFER_JOB_
 Each run:
 
 - exports the project at the run's commit to `data/jobs/<run id>/work/`;
-- runs `librelane --manual-pdk --pdk ihp-sg13g2 --run-tag sc ./<config>` in a throwaway container
+- runs `librelane --manual-pdk --pdk ihp-sg13g2 --run-tag wafer ./<config>` in a throwaway container
   with no network, no Linux capabilities, the PDK mounted read-only, and CPU, memory, process and
   time limits ([configuration.md](../configuration.md#flow-runs-rtl--gds));
 - streams the output to `flow.log`;

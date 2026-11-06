@@ -65,12 +65,12 @@ pnpm install && pnpm dev:web
 
 Open http://localhost:5173 and sign in.
 
-| Service  | URL                           | Notes                                   |
-| -------- | ----------------------------- | --------------------------------------- |
-| Web      | http://localhost:5173         | Vite dev server, proxies `/api` to 8090 |
-| API      | http://localhost:8090         | `GET /healthz`                          |
-| Rauthy   | http://localhost:8180/auth/v1 | admin UI at `/auth/v1/admin`            |
-| Postgres | localhost:5442                | `sc` / `sc`, database `wafersmith`  |
+| Service  | URL                           | Notes                                    |
+|----------|-------------------------------|------------------------------------------|
+| Web      | http://localhost:5173         | Vite dev server, proxies `/api` to 8090  |
+| API      | http://localhost:8090         | `GET /healthz`                           |
+| Rauthy   | http://localhost:8180/auth/v1 | admin UI at `/auth/v1/admin`             |
+| Postgres | localhost:5442                | `wafer` / `wafer`, database `wafersmith` |
 
 ## Development accounts
 
