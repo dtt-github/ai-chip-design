@@ -297,6 +297,33 @@ pub enum Op {
     },
     Finish,
     Halt,
+    /// Counts one visit of coverage point `n` (`Design::cover`).
+    Cover(usize),
+}
+
+/// A decision in the design whose branches the simulation can take or not: each `if`/`else`
+/// branch and `case` arm, so a testbench's coverage can be reported in words.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct CoverPoint {
+    pub file: String,
+    pub line: u32,
+    /// The instance (or generate block, function) it is in, e.g. `tb.dut`.
+    pub scope: String,
+    pub kind: CoverKind,
+    /// The condition or the `case` selector, as written (`cnt == N - 1`).
+    pub what: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum CoverKind {
+    /// The `if` branch: the condition was true.
+    Then,
+    /// The `else` branch (written, or the implicit one): the condition was false.
+    Else { written: bool },
+    /// A `case` arm, with its labels as written.
+    Arm { labels: String },
+    /// The `default` arm, or no arm matching when there is none.
+    Default { written: bool },
 }
 
 #[derive(Debug, Clone)]
@@ -317,6 +344,8 @@ pub struct Design {
     pub warnings: Vec<String>,
     /// Every module instance with its resolved (non-local) parameter values, top first.
     pub instances: Vec<InstanceInfo>,
+    /// Branch coverage points, numbered by `Op::Cover`.
+    pub cover: Vec<CoverPoint>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -732,6 +761,12 @@ impl<'a> Elab<'a> {
         self.d.signals.push(sig);
         self.d.names.insert(name, id);
         id
+    }
+
+    /// A new coverage point in `s`, and the op that counts it.
+    fn cover(&mut self, s: &Scope, line: u32, kind: CoverKind, what: String) -> Op {
+        self.d.cover.push(CoverPoint { file: s.module.file.clone(), line, scope: s.path.clone(), kind, what });
+        Op::Cover(self.d.cover.len() - 1)
     }
 
     fn temp(&mut self, s: &Scope) -> usize {
@@ -1516,21 +1551,25 @@ impl<'a> Elab<'a> {
                 };
                 ops.push(Op::NbAssign(lv, rhs, delay));
             }
-            Stmt::If(c, t, f) => {
-                let c = self.sexpr(s, c, ops)?;
+            Stmt::If(cond, t, f) => {
+                let line = cond.line().unwrap_or(0);
+                let what = cond.to_string();
+                let c = self.sexpr(s, cond, ops)?;
                 let jz = ops.len();
                 ops.push(Op::Halt); // patched
+                let cov = self.cover(s, line, CoverKind::Then, what.clone());
+                ops.push(cov);
                 self.stmt(s, t, ops)?;
-                match f {
-                    Some(f) => {
-                        let jend = ops.len();
-                        ops.push(Op::Halt);
-                        ops[jz] = Op::JumpIfZero(c, ops.len());
-                        self.stmt(s, f, ops)?;
-                        ops[jend] = Op::Jump(ops.len());
-                    }
-                    None => ops[jz] = Op::JumpIfZero(c, ops.len()),
+                // An implicit else is a branch too: "the condition was never false".
+                let jend = ops.len();
+                ops.push(Op::Halt);
+                ops[jz] = Op::JumpIfZero(c, ops.len());
+                let cov = self.cover(s, line, CoverKind::Else { written: f.is_some() }, what);
+                ops.push(cov);
+                if let Some(f) = f {
+                    self.stmt(s, f, ops)?;
                 }
+                ops[jend] = Op::Jump(ops.len());
             }
             Stmt::Case { kind, sel, items, default, line } => {
                 // Evaluate the selector once into a temporary.
@@ -1574,11 +1613,16 @@ impl<'a> Elab<'a> {
                     }
                     let jz = ops.len();
                     ops.push(Op::Halt);
+                    let labels = labels.iter().map(|l| l.to_string()).collect::<Vec<_>>().join(", ");
+                    let cov = self.cover(s, *line, CoverKind::Arm { labels }, sel.to_string());
+                    ops.push(cov);
                     self.stmt(s, body, ops)?;
                     end_jumps.push(ops.len());
                     ops.push(Op::Halt);
                     ops[jz] = Op::JumpIfZero(cond.expect("case item has labels"), ops.len());
                 }
+                let cov = self.cover(s, *line, CoverKind::Default { written: default.is_some() }, sel.to_string());
+                ops.push(cov);
                 if let Some(d) = default {
                     self.stmt(s, d, ops)?;
                 }
@@ -1762,6 +1806,6 @@ fn op_reads(op: &Op, out: &mut BTreeSet<usize>) {
         Op::JumpIfZero(e, _) | Op::Delay(e) | Op::WaitCond(e, _) => e.reads(out),
         Op::Display { args, .. } => args.iter().for_each(|a| a.reads(out)),
         Op::Wait(items) => items.iter().for_each(|i| i.expr.reads(out)),
-        Op::Jump(_) | Op::Finish | Op::Halt => {}
+        Op::Jump(_) | Op::Finish | Op::Halt | Op::Cover(_) => {}
     }
 }

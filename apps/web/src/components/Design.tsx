@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   api,
   isFinished,
@@ -81,6 +81,8 @@ export function DesignFlow({ projectId, startIntent, onWide, head, canEdit, onOp
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [run, setRun] = useState<SpecRun | null>(null);
+  // Text for "Add an example in words", from a coverage gap in Health.
+  const [exampleSeed, setExampleSeed] = useState<{ text: string } | null>(null);
   const [budget, setBudget] = useState<{ today_usd: number; limit_usd: number | null } | null>(null);
   const refreshBudget = useCallback(() => {
     api.aiUsage().then(setBudget, () => setBudget(null));
@@ -252,6 +254,7 @@ export function DesignFlow({ projectId, startIntent, onWide, head, canEdit, onOp
             runExamples={runExamples}
             makeItPass={makeItPass}
             onOpenFile={onOpenFile}
+            seed={exampleSeed}
             projectId={projectId}
             head={view.head}
             chip={view.chip}
@@ -272,7 +275,20 @@ export function DesignFlow({ projectId, startIntent, onWide, head, canEdit, onOp
         )}
         {step === "blocks" && <BlocksStep projectId={projectId} head={head} canEdit={canEdit} />}
         {step === "health" && (
-          <Health projectId={projectId} head={head} specTop={view.spec?.top ?? null} clockMhz={view.spec?.clock?.mhz ?? view.clock_mhz} run={run} canEdit={canEdit} onShowRun={onShowRun} />
+          <Health
+            projectId={projectId}
+            head={head}
+            specTop={view.spec?.top ?? null}
+            clockMhz={view.spec?.clock?.mhz ?? view.clock_mhz}
+            run={run}
+            canEdit={canEdit}
+            onShowRun={onShowRun}
+            onOpenFile={onOpenFile}
+            onAddExample={(text) => {
+              setExampleSeed({ text });
+              setStep("examples");
+            }}
+          />
         )}
       </div>
     </div>
@@ -599,7 +615,10 @@ function Examples({
   chip,
   fixDesign,
   fixExample,
+  seed,
 }: {
+  /** Text to start "Add an example in words" with (a new object each time). */
+  seed: { text: string } | null;
   projectId: string;
   head: string;
   /** The chip from the Blocks view, which examples can target. */
@@ -620,6 +639,15 @@ function Examples({
 }) {
   const [selId, setSelId] = useState<string | null>(null);
   const [words, setWords] = useState("");
+  useEffect(() => {
+    if (!seed) return;
+    setWords(seed.text);
+    window.setTimeout(() => {
+      const box = document.getElementById("words") as HTMLTextAreaElement | null;
+      box?.scrollIntoView({ block: "center" });
+      box?.focus();
+    }, 0);
+  }, [seed]);
   const sel = spec.examples.find((e) => e.id === selId) ?? spec.examples[0];
   const passing = spec.examples.filter((e) => results.get(e.id)?.verdict === "pass").length;
   const setEx = (patch: Partial<SpecExample>) => update({ examples: spec.examples.map((e) => (e.id === sel.id ? { ...e, ...patch } : e)) });
@@ -1121,7 +1149,12 @@ function Health({
   run,
   canEdit,
   onShowRun,
+  onOpenFile,
+  onAddExample,
 }: {
+  onOpenFile: (path: string) => void;
+  /** Opens Examples with "Add an example in words" filled in. */
+  onAddExample: (text: string) => void;
   projectId: string;
   head: string | null;
   /** From the spec, else the flow config's CLOCK_PERIOD. */
@@ -1170,7 +1203,7 @@ function Health({
   const speedup = periodNs && typeof wns === "number" && wns < periodNs ? periodNs / (periodNs - wns) : null;
   const mm2 = typeof s?.die_area_um2 === "number" ? s.die_area_um2 / 1e6 : null;
 
-  type Card = { id: string; ok: boolean | null; title: string; plain: string; explain: string; expert: string };
+  type Card = { id: string; ok: boolean | null; title: string; plain: string; explain: string; expert: string; extra?: ReactNode };
   const cards: Card[] = [];
   // Examples on the gates: some are for other settings (e.g. N = 2) and are skipped on this build.
   const gEx = (gls?.runs ?? []).filter((r) => r.top.startsWith("tb_ex_"));
@@ -1202,6 +1235,49 @@ function Health({
       "Each example is run in simulation on the Verilog. After a build, the testbenches that match the build's settings run again on the gate-level netlist the chip would be made from.",
     expert: `${run?.engine ?? "sc-sim"} · examples ${exPass}/${exTotal}` + (gls ? ` · gate-level: ${gls.summary}` : " · no gate-level run yet"),
   });
+  const cov = run?.coverage;
+  if (cov) {
+    // A default arm no example reaches is often impossible by design; it doesn't hold the project back.
+    const real = cov.gaps.filter((g) => g.kind !== "default");
+    const maybe = cov.gaps.length - real.length;
+    cards.push({
+      id: "tested",
+      ok: real.length === 0 ? true : null,
+      title:
+        cov.gaps.length === 0
+          ? "The examples try every decision in the design"
+          : real.length === 0
+            ? "The examples try every decision that can happen"
+            : `The examples don't try ${real.length} ${real.length === 1 ? "case" : "cases"} yet`,
+      plain:
+        `Your examples try ${cov.covered} of ${cov.total} decisions the design makes (each if/else branch and case choice).` +
+        (real.length ? " Passing examples only show the cases they try:" : "") +
+        (maybe ? ` ${maybe} ${maybe === 1 ? "choice is" : "choices are"} never reached, which may be impossible by design.` : ""),
+      explain:
+        "While your examples run, the simulator records which branches of the design they go through. A branch none of them takes could be wrong without any example noticing. Add an example for each case that matters.",
+      expert: `branch coverage ${cov.covered}/${cov.total} over the example testbenches (if/else, case arms; implicit defaults not counted)`,
+      extra: cov.gaps.length ? (
+        <ul className="coverage-gaps">
+          {[...real, ...cov.gaps.filter((g) => g.kind === "default")].slice(0, 10).map((g) => (
+            <li key={`${g.file}:${g.line}:${g.kind}:${g.labels ?? ""}`}>
+              <span className="small">{withCode(g.text)}</span>
+              <span className="coverage-actions">
+                {canEdit && g.kind !== "default" && (
+                  <button className="small" onClick={() => onAddExample(g.suggestion)}>
+                    Add an example
+                  </button>
+                )}
+                <button className="link small" onClick={() => onOpenFile(g.file)} title={`${g.file}, line ${g.line}`}>
+                  {g.file.split("/").pop()}:{g.line}
+                </button>
+              </span>
+            </li>
+          ))}
+          {cov.gaps.length > 10 && <li className="muted small">and {cov.gaps.length - 10} more</li>}
+        </ul>
+      ) : undefined,
+    });
+  }
   if (s) {
     cards.push({
       id: "fast",
@@ -1277,6 +1353,7 @@ function Health({
           <div className="design-health-text">
             <strong>{c.title}</strong>
             <span>{c.plain}</span>
+            {c.extra}
             {open[c.id] && (
               <div className="design-explain">
                 <span className="small">{c.explain}</span>
@@ -1303,3 +1380,8 @@ function Health({
 }
 
 const fmt = (v: unknown) => (typeof v === "number" ? Number(v.toPrecision(4)).toLocaleString() : "?");
+
+/** Text with `backticked` parts shown as code. */
+function withCode(text: string) {
+  return text.split("`").map((part, i) => (i % 2 ? <code key={i}>{part}</code> : <span key={i}>{part}</span>));
+}

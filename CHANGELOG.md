@@ -8,6 +8,11 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Added
 
+- **What the examples don't test**: the simulator counts every `if`/`else` branch and `case` arm
+  it runs, and Health shows how many of the design's decisions the examples try, each gap in
+  plain terms ("Never tried: `en` = 0") with **Add an example** (opens Examples with the case
+  written out) and a link to the line. `POST /spec/run` returns `coverage`; starter cards show
+  their figure.
 - **Starter designs**: the 16 verified design-eval tasks are offered as starting points. The
   projects page has a gallery (by group, with what goes in and out); a project started from one
   has its spec, design and passing examples from the first commit. The Blocks step can add any of

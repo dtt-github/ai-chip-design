@@ -277,3 +277,37 @@ impl Expr {
         }
     }
 }
+
+impl std::fmt::Display for Expr {
+    /// The expression as Verilog, for messages (`cnt == N - 1`); parentheses only where nested.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let paren = |e: &Expr| match e {
+            Expr::Binary(..) | Expr::Ternary(..) => format!("({e})"),
+            _ => e.to_string(),
+        };
+        match self {
+            Expr::Num(n) => match n.width {
+                Some(w) if n.xz != 0 => write!(f, "{w}'b{:0w$b}", n.value, w = w as usize),
+                Some(w) if w > 1 && n.value > 9 => write!(f, "{w}'h{:x}", n.value),
+                _ => write!(f, "{}", n.value),
+            },
+            Expr::Str(s) => write!(f, "\"{s}\""),
+            Expr::Ident(n, _) => write!(f, "{n}"),
+            Expr::Index(a, i) => write!(f, "{a}[{i}]"),
+            Expr::Range(a, m, l) => write!(f, "{a}[{m}:{l}]"),
+            Expr::IndexedPart { base, start, width, up } => {
+                write!(f, "{base}[{start} {} {width}]", if *up { "+:" } else { "-:" })
+            }
+            Expr::Concat(v) => write!(f, "{{{}}}", v.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ")),
+            Expr::Repl(n, v) => {
+                write!(f, "{{{n}{{{}}}}}", v.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", "))
+            }
+            Expr::Unary(op, a) => write!(f, "{op}{}", paren(a)),
+            Expr::Binary(op, a, b) => write!(f, "{} {op} {}", paren(a), paren(b)),
+            Expr::Ternary(c, t, e) => write!(f, "{} ? {} : {}", paren(c), paren(t), paren(e)),
+            Expr::Call(n, args, _) => {
+                write!(f, "{n}({})", args.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", "))
+            }
+        }
+    }
+}

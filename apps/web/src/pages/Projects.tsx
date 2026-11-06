@@ -103,6 +103,11 @@ export function ProjectsPage() {
                       <span className="small">{st.summary}</span>
                       <span className="muted small">
                         <code>{connections(st)}</code> · {st.examples} examples
+                        {st.covered
+                          ? st.covered[0] === st.covered[1]
+                            ? " trying every decision"
+                            : ` trying ${st.covered[0]} of ${st.covered[1]} decisions`
+                          : ""}
                         {st.clock_mhz ? ` · ${st.clock_mhz} MHz` : " · no clock"}
                       </span>
                     </button>

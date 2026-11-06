@@ -6,6 +6,7 @@ pub mod blocks;
 pub mod chip;
 pub mod claude;
 pub mod collab;
+pub mod coverage;
 pub mod design;
 pub mod error;
 pub mod gate;

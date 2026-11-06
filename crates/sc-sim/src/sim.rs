@@ -56,6 +56,8 @@ pub struct SimResult {
     pub signals: Vec<WaveSignal>,
     pub warnings: Vec<String>,
     pub steps: u64,
+    /// Every branch coverage point of the design, with how often it was taken.
+    pub coverage: Vec<(crate::elab::CoverPoint, u64)>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -111,6 +113,7 @@ pub struct Sim<'d> {
     waves: Vec<Option<WaveSignal>>,
     changes: usize,
     warnings: Vec<String>,
+    cover_hits: Vec<u64>,
 }
 
 const fn mask(w: u32) -> u64 {
@@ -167,6 +170,7 @@ impl<'d> Sim<'d> {
             waves,
             changes: 0,
             warnings: d.warnings.clone(),
+            cover_hits: vec![0; d.cover.len()],
         }
     }
 
@@ -186,6 +190,7 @@ impl<'d> Sim<'d> {
             signals,
             warnings: self.warnings,
             steps: self.steps,
+            coverage: self.d.cover.iter().cloned().zip(self.cover_hits).collect(),
         })
     }
 
@@ -383,6 +388,7 @@ impl<'d> Sim<'d> {
                     self.procs[p].state = State::Done;
                     return Ok(());
                 }
+                Op::Cover(n) => self.cover_hits[*n] += 1,
             }
         }
     }

@@ -89,6 +89,37 @@ async fn start_from_and_add_starters(db: PgPool) {
     let (s, _) = call(&app, Method::POST, &format!("/api/projects/{id}/starters/nothing"), &ada, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 
+    // Coverage: the starter's examples try every decision; drop one and the gap is named.
+    assert_eq!(run["coverage"]["covered"], run["coverage"]["total"], "{run}");
+    let (_, b) =
+        call(&app, Method::POST, "/api/projects", &ada, Some(json!({ "name": "Blink", "starter": "blinker" }))).await;
+    let bid = b["id"].as_str().unwrap().to_string();
+    let (_, v) = call(&app, Method::GET, &format!("/api/projects/{bid}/spec"), &ada, None).await;
+    let mut spec = v["spec"].clone();
+    spec["examples"] = json!([spec["examples"][0].clone()]);
+    let (s, _) = call(
+        &app,
+        Method::PUT,
+        &format!("/api/projects/{bid}/spec"),
+        &ada,
+        Some(json!({ "spec": spec, "parent": v["head"] })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, run) = call(&app, Method::POST, &format!("/api/projects/{bid}/spec/run"), &ada, None).await;
+    let cov = &run["coverage"];
+    assert!(cov["covered"].as_u64() < cov["total"].as_u64(), "{cov}");
+    let gaps: Vec<&str> = cov["gaps"].as_array().unwrap().iter().map(|g| g["text"].as_str().unwrap()).collect();
+    assert!(gaps.contains(&"Never tried: `en` = 0"), "{gaps:?}");
+    assert!(cov["gaps"][0]["suggestion"].as_str().unwrap().contains("src/blinker.v"), "{cov}");
+
+    // The gallery shows each starter's figure.
+    let (_, list) = call(&app, Method::GET, "/api/starters", &ada, None).await;
+    let fig = |id: &str| list.as_array().unwrap().iter().find(|x| x["id"] == id).unwrap()["covered"].clone();
+    assert_eq!(fig("uart_tx"), json!([10, 10]));
+    assert_eq!(fig("traffic"), json!([11, 12]));
+    assert!(fig("parity8").is_null());
+
     // Only editors can add.
     let bob = token("bob", "bob@example.org");
     let (s, _) = call(&app, Method::POST, &format!("/api/projects/{id}/starters/blinker"), &bob, None).await;

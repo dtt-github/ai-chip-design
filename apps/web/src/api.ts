@@ -211,10 +211,32 @@ export interface ExampleResult {
   log: string[];
 }
 
+/** A branch of the design no example takes. */
+export interface CoverageGap {
+  file: string;
+  line: number;
+  kind: "then" | "else" | "arm" | "default";
+  what: string;
+  labels: string | null;
+  /** In words, with the condition in backticks: "`full` is never true in the examples". */
+  text: string;
+  /** A starting point for an example that would take this branch. */
+  suggestion: string;
+}
+
+/** What the examples exercise: every if/else branch and case arm of the design. */
+export interface Coverage {
+  covered: number;
+  total: number;
+  gaps: CoverageGap[];
+}
+
 export interface SpecRun {
   commit: string;
   examples: ExampleResult[];
   others: GateReport["runs"];
+  /** Null without examples, or for a design without any if or case. */
+  coverage: Coverage | null;
   engine: string;
 }
 
@@ -532,6 +554,8 @@ export interface Starter {
   clock: string | null;
   reset: string | null;
   examples: number;
+  /** Branches of the design its examples take: [covered, total]; null if it has none. */
+  covered: [number, number] | null;
 }
 
 export const api = {

@@ -27,6 +27,9 @@ pub struct TestbenchRun {
     pub steps: u64,
     pub log: Vec<String>,
     pub reason: Option<String>,
+    /// Branch coverage of this run (`crate::coverage`); not part of stored reports.
+    #[serde(skip)]
+    pub coverage: Vec<(sc_sim::elab::CoverPoint, u64)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -133,6 +136,7 @@ fn run_inner(files: &BTreeMap<String, String>) -> GateReport {
                 steps: 0,
                 log: Vec::new(),
                 reason: Some(e.to_string()),
+                coverage: Vec::new(),
             },
             Ok(r) => {
                 let (v, reason) = if !r.finished {
@@ -148,6 +152,7 @@ fn run_inner(files: &BTreeMap<String, String>) -> GateReport {
                     steps: r.steps,
                     log: r.log,
                     reason,
+                    coverage: r.coverage,
                 }
             }
         };
