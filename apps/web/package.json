@@ -6,7 +6,7 @@
   "author": "DigitalTwin Technology GmbH",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dtt-github/ai-chip-design.git",
+    "url": "https://github.com/dtt-github/wafersmith.git",
     "directory": "apps/web"
   },
   "type": "module",

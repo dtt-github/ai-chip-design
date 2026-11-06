@@ -54,6 +54,8 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Changed
 
+- Links to the repository (README badge, package metadata, issue template) point at its new home,
+  `dtt-github/wafersmith`.
 - The development-only `wafersmith-dev-cli` client secret no longer carries the old `sc` prefix.
 - **Renamed to Wafersmith** (formerly SiliconCommons, a name already used by lowRISC for its
   open-silicon process). Crates are now `wafer-*` (binary `wafersmith-api`), environment
