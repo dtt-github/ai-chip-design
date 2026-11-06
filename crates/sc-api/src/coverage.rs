@@ -87,7 +87,7 @@ fn gap(file: &str, line: u32, kind: &CoverKind, what: &str) -> Gap {
 
 /// The situation in which condition `what` is `truth`: as symbols for the gap ("`en` = 0") and in
 /// words for an example ("en is 0"). Plain names, negations and (in)equalities are spelled out.
-fn situation(what: &str, truth: bool) -> (String, String) {
+pub(crate) fn situation(what: &str, truth: bool) -> (String, String) {
     let name = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || "_.[]".contains(c));
     let eq = |a: &str, b: &str, is: bool| {
         if is {

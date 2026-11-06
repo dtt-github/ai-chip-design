@@ -9,6 +9,7 @@ pub mod collab;
 pub mod coverage;
 pub mod design;
 pub mod error;
+pub mod fsm;
 pub mod gate;
 pub mod gls;
 pub mod ip;

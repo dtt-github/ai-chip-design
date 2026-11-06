@@ -231,12 +231,36 @@ export interface Coverage {
   gaps: CoverageGap[];
 }
 
+export interface MachineTransition {
+  from: string;
+  to: string;
+  /** When it happens, conditions in backticks ("`rx` = 0"), or "always". */
+  when: string;
+  line: number;
+  /** Taken by an example; null when it can't be told (a ?: choice). */
+  covered: boolean | null;
+}
+
+/** A state machine found in the design's Verilog. */
+export interface Machine {
+  module: string;
+  file: string;
+  /** The state register. */
+  state: string;
+  states: string[];
+  /** Each state's number, when known. */
+  values: (number | null)[];
+  transitions: MachineTransition[];
+  reset: string | null;
+}
+
 export interface SpecRun {
   commit: string;
   examples: ExampleResult[];
   others: GateReport["runs"];
   /** Null without examples, or for a design without any if or case. */
   coverage: Coverage | null;
+  machines: Machine[];
   engine: string;
 }
 

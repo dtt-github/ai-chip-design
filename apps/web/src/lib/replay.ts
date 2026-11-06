@@ -10,7 +10,8 @@ import type { SimResult, SimSignal } from "../sim/protocol";
 
 export interface Row {
   name: string;
-  dir: "in" | "out";
+  /** `internal`: a signal inside the design (e.g. `dut.state`), asked for by name. */
+  dir: "in" | "out" | "internal";
   width: number;
   /** Value at each cycle's check point; null if the simulation ended before it. */
   values: (bigint | null)[];
@@ -92,7 +93,7 @@ export function fmt(v: bigint | null | undefined, width: number): string {
   return `0x${v.toString(16)} (${v.toString()})`;
 }
 
-export function replay(spec: Spec, ex: SpecExample, sim: SimResult): Replay {
+export function replay(spec: Spec, ex: SpecExample, sim: SimResult, internal: { name: string; width: number }[] = []): Replay {
   const top = `tb_ex_${ex.id}`;
   const byName = new Map(sim.signals.map((s) => [s.name, s]));
   const sig = (port: string) => byName.get(`${top}.${port}`) ?? byName.get(port);
@@ -167,12 +168,10 @@ export function replay(spec: Spec, ex: SpecExample, sim: SimResult): Replay {
   // The clock and reset are the same in every example; leave them out unless a step uses them.
   const used = new Set(ex.steps.map((st) => st.signal));
   const shown = spec.ports.filter((p) => p.name !== spec.clock?.port && (p.name !== spec.reset?.port || used.has(p.name)));
-  const rows: Row[] = shown.map((p) => ({
-    name: p.name,
-    dir: p.dir,
-    width: p.width,
-    values: Array.from({ length: cycles }, (_, k) => read(p.name, k)),
-  }));
+  const rows: Row[] = [
+    ...shown.map((p): Row => ({ name: p.name, dir: p.dir, width: p.width, values: Array.from({ length: cycles }, (_, k) => read(p.name, k)) })),
+    ...internal.map((p): Row => ({ name: p.name, dir: "internal", width: p.width, values: Array.from({ length: cycles }, (_, k) => read(p.name, k)) })),
+  ];
   const firstFail = checks.find((ch) => !ch.ok) ?? null;
   return { cycles, exampleCycles, rows, checks, sets, firstFail, story: explain(spec, read, firstFail, checks.length), problem };
 }

@@ -382,5 +382,5 @@ endmodule"#);
     assert!(taken("Arm { labels: \"0\"") > 0 && taken("Arm { labels: \"1\"") > 0, "{hits:?}");
     assert_eq!(taken("Default { written: true }"), 0, "sel was never 2 or 3: {hits:?}");
     assert!(taken("Then") > 0 && taken("Else { written: false }") > 0, "{hits:?}");
-    assert_eq!(hits.iter().find(|h| h.0 == "Then").unwrap().1, "go && (sel != 3)");
+    assert_eq!(hits.iter().find(|h| h.0 == "Then").unwrap().1, "go && sel != 3");
 }

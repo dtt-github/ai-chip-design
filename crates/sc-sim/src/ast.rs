@@ -279,12 +279,31 @@ impl Expr {
 }
 
 impl std::fmt::Display for Expr {
-    /// The expression as Verilog, for messages (`cnt == N - 1`); parentheses only where nested.
+    /// The expression as Verilog, for messages (`cnt == N - 1`); parentheses only where precedence
+    /// needs them.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let paren = |e: &Expr| match e {
-            Expr::Binary(..) | Expr::Ternary(..) => format!("({e})"),
-            _ => e.to_string(),
-        };
+        // Binding strength, as the parser's levels (higher binds tighter).
+        fn prec(e: &Expr) -> u8 {
+            match e {
+                Expr::Ternary(..) => 0,
+                Expr::Binary(op, ..) => match *op {
+                    "||" => 1,
+                    "&&" => 2,
+                    "|" => 3,
+                    "^" | "~^" => 4,
+                    "&" => 5,
+                    "==" | "!=" => 6,
+                    "<" | "<=" | ">" | ">=" => 7,
+                    "<<" | ">>" | "<<<" | ">>>" => 8,
+                    "+" | "-" => 9,
+                    "*" | "/" | "%" => 10,
+                    _ => 11,
+                },
+                _ => 12,
+            }
+        }
+        // Operands that bind more loosely than `min` get parentheses.
+        let paren = |e: &Expr, min: u8| if prec(e) < min { format!("({e})") } else { e.to_string() };
         match self {
             Expr::Num(n) => match n.width {
                 Some(w) if n.xz != 0 => write!(f, "{w}'b{:0w$b}", n.value, w = w as usize),
@@ -302,9 +321,10 @@ impl std::fmt::Display for Expr {
             Expr::Repl(n, v) => {
                 write!(f, "{{{n}{{{}}}}}", v.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", "))
             }
-            Expr::Unary(op, a) => write!(f, "{op}{}", paren(a)),
-            Expr::Binary(op, a, b) => write!(f, "{} {op} {}", paren(a), paren(b)),
-            Expr::Ternary(c, t, e) => write!(f, "{} ? {} : {}", paren(c), paren(t), paren(e)),
+            Expr::Unary(op, a) => write!(f, "{op}{}", paren(a, 12)),
+            // Left-associative: the right operand needs parentheses at equal strength too.
+            Expr::Binary(op, a, b) => write!(f, "{} {op} {}", paren(a, prec(self)), paren(b, prec(self) + 1)),
+            Expr::Ternary(c, t, e) => write!(f, "{} ? {} : {}", paren(c, 1), paren(t, 1), e),
             Expr::Call(n, args, _) => {
                 write!(f, "{n}({})", args.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", "))
             }

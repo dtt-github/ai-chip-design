@@ -168,6 +168,8 @@ pub struct RunResult {
     pub others: Vec<TestbenchRun>,
     /// What the examples exercise in the design; `None` without examples or branches.
     pub coverage: Option<crate::coverage::Coverage>,
+    /// State machines in the design, each transition marked taken by an example or not.
+    pub machines: Vec<crate::fsm::Machine>,
     pub engine: String,
 }
 
@@ -180,10 +182,12 @@ pub async fn run(State(state): State<AppState>, user: AuthUser, Path(id): Path<U
         Some(t) => parse_spec(t)?,
         None => return Err(ApiError::NotFound("this project has no spec yet".into())),
     };
+    let mut machines = machines_in(&files);
     let report = tokio::task::spawn_blocking(move || gate::run(&files)).await?;
     let example_tops: Vec<String> = spec.examples.iter().map(|e| spec::tb_name(&e.id)).collect();
-    let coverage =
-        crate::coverage::of(&report.runs.iter().filter(|r| example_tops.contains(&r.top)).collect::<Vec<_>>());
+    let example_runs: Vec<&TestbenchRun> = report.runs.iter().filter(|r| example_tops.contains(&r.top)).collect();
+    let coverage = crate::coverage::of(&example_runs);
+    crate::fsm::mark(&mut machines, &example_runs);
     let mut runs: BTreeMap<String, TestbenchRun> = report.runs.into_iter().map(|r| (r.top.clone(), r)).collect();
     let examples = spec
         .examples
@@ -209,7 +213,24 @@ pub async fn run(State(state): State<AppState>, user: AuthUser, Path(id): Path<U
             },
         })
         .collect();
-    Ok(Json(RunResult { commit, examples, others: runs.into_values().collect(), coverage, engine: report.engine }))
+    Ok(Json(RunResult {
+        commit,
+        examples,
+        others: runs.into_values().collect(),
+        coverage,
+        machines,
+        engine: report.engine,
+    }))
+}
+
+/// The design's state machines (`crate::fsm`), or none if the design doesn't parse.
+fn machines_in(files: &BTreeMap<String, String>) -> Vec<crate::fsm::Machine> {
+    let hdl: Vec<(&str, &str)> = files
+        .iter()
+        .filter(|(p, _)| gate::is_hdl(p) && !p.starts_with("tb/"))
+        .map(|(p, c)| (p.as_str(), c.as_str()))
+        .collect();
+    sc_sim::parse(&hdl).map(|(m, _)| crate::fsm::find(&m)).unwrap_or_default()
 }
 
 #[derive(Debug, Deserialize)]

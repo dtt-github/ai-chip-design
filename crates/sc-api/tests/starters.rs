@@ -149,6 +149,23 @@ async fn start_from_and_add_starters(db: PgPool) {
     assert_eq!(s, StatusCode::BAD_REQUEST);
     assert!(e["message"].as_str().unwrap().contains("'nope' is not one of the connections"), "{e}");
 
+    // The receiver's state machine, every transition taken by its examples except ones they skip.
+    let (_, r) =
+        call(&app, Method::POST, "/api/projects", &ada, Some(json!({ "name": "Rx", "starter": "uart_rx" }))).await;
+    let rid = r["id"].as_str().unwrap().to_string();
+    let (_, run) = call(&app, Method::POST, &format!("/api/projects/{rid}/spec/run"), &ada, None).await;
+    let m = &run["machines"][0];
+    assert_eq!(m["state"], "state", "{run}");
+    assert_eq!(m["states"], json!(["0", "1", "2", "3"]));
+    let ts = m["transitions"].as_array().unwrap();
+    assert_eq!(ts.len(), 5, "{m}");
+    // Both sides of `state <= rx ? 0 : 2` are in one branch: whether each was taken can't be told.
+    let glitch = ts.iter().find(|t| t["from"] == "1" && t["to"] == "0").unwrap();
+    assert!(glitch["covered"].is_null(), "{glitch}");
+    let taken =
+        |from: &str, to: &str| ts.iter().find(|t| t["from"] == from && t["to"] == to).unwrap()["covered"].clone();
+    assert_eq!((taken("0", "1"), taken("2", "3"), taken("3", "0")), (json!(true), json!(true), json!(true)));
+
     // The gallery shows each starter's figure.
     let (_, list) = call(&app, Method::GET, "/api/starters", &ada, None).await;
     let fig = |id: &str| list.as_array().unwrap().iter().find(|x| x["id"] == id).unwrap()["covered"].clone();
