@@ -1,8 +1,9 @@
 // "Why is it this value?": the assignment in the design that wrote a value, the if/case decisions
 // that led to it and the values it read, from the simulator's record of what wrote each change.
-// Port connections are followed through; the example's own inputs end the chain.
+// Port connections are followed through, and a memory read to the word read and what wrote it;
+// the example's own inputs end the chain.
 
-import { NO_ORIGIN, type SimOrigin, type SimSignal } from "../sim/protocol";
+import { NO_ORIGIN, type SimOrigin, type SimResult, type SimSignal } from "../sim/protocol";
 import type { Replay } from "./replay";
 
 /** A value an explanation mentions, which can be explained in turn. */
@@ -12,7 +13,7 @@ export interface Read {
   full: string;
   /** In decimal, as examples write values. */
   value: string;
-  /** The moment to explain it at; null if it isn't recorded (a memory). */
+  /** The moment to explain it at; null if it isn't recorded (a memory word the run didn't). */
   t: number | null;
 }
 
@@ -55,9 +56,46 @@ function changeAt(s: SimSignal, t: number): number {
 /** A nonblocking assignment (`q <= d`), as opposed to `=` or a comparison inside one. */
 const nonblocking = (code: string) => /^[^=<]*<=/.test(code);
 
-/** Why `full` (a signal's full name) has the value it has at time `t`. */
-export function why(rep: Replay, full: string, t: number): Because | null {
-  const signals = new Map(rep.sim.signals.map((s) => [s.name, s]));
+/** For each origin that reads memory words: the entries of `wordReads` it made, in order. */
+const readsByOrigin = new WeakMap<SimResult, Map<number, number[]>>();
+
+/** The memory words origin `by` read the last time it ran at or before `time`, one per entry of
+ * its `words`; null if the run didn't record it. */
+function wordsRead(sim: SimResult, by: number, time: number): number[] | null {
+  const n = sim.origins[by]?.words.length ?? 0;
+  if (!n) return null;
+  let index = readsByOrigin.get(sim);
+  if (!index) {
+    index = new Map();
+    sim.wordReads.origins.forEach((o, j) => {
+      const list = index!.get(o);
+      if (list) list.push(j);
+      else index!.set(o, [j]);
+    });
+    readsByOrigin.set(sim, index);
+  }
+  const list = index.get(by) ?? [];
+  const { times, words } = sim.wordReads;
+  let lo = 0;
+  let hi = list.length - 1;
+  let end = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (times[list[mid]] <= time) {
+      end = mid;
+      lo = mid + 1;
+    } else hi = mid - 1;
+  }
+  // Each run records one entry per word, so the last `n` entries are its words.
+  if (end + 1 < n) return null;
+  const group = list.slice(end + 1 - n, end + 1).map((j) => words[j]);
+  return group.includes(NO_ORIGIN) ? null : group;
+}
+
+/** How to look values up in a run: its signals and memory words by full name, and how a person
+ * names them (`count`, `u_rx.state`, `mem[2]`). */
+function lookup(rep: Replay) {
+  const signals = new Map([...rep.sim.signals, ...rep.sim.words].map((s) => [s.name, s]));
   const name = (f: string) => {
     const rest = f.startsWith(`${rep.top}.`) ? f.slice(rep.top.length + 1) : f;
     return rest.startsWith("dut.") ? rest.slice(4) : rest;
@@ -67,6 +105,23 @@ export function why(rep: Replay, full: string, t: number): Because | null {
     const i = s ? changeAt(s, at) : -1;
     return { name: name(f), full: f, value: s && i >= 0 ? s.values[i].toString() : "?", t: s && i >= 0 ? at : null };
   };
+  /** The values origin `by`, run at `ran`, computed from (as they were at `at`); a memory it
+   * read is the words it read. */
+  const reads = (by: number, ran: number, at: number): Read[] => {
+    const o = rep.sim.origins[by];
+    const got = wordsRead(rep.sim, by, ran);
+    return o.reads.flatMap((r) => {
+      if (!got || !o.words.includes(r)) return [read(r, at)];
+      const words = [...new Set(got.filter((_, i) => o.words[i] === r))];
+      return words.map((k) => read(rep.sim.words[k].name, at));
+    });
+  };
+  return { signals, name, read, reads };
+}
+
+/** Why `full` (a signal's or memory word's full name) has the value it has at time `t`. */
+export function why(rep: Replay, full: string, t: number): Because | null {
+  const { signals, name, read, reads } = lookup(rep);
   const shown = full;
   let cur = full;
   let time = t;
@@ -98,7 +153,7 @@ export function why(rep: Replay, full: string, t: number): Because | null {
       line: o.line,
       code: o.text,
       conds: o.conds.map((c) => ({ line: c.line, code: c.text, taken: c.taken, reads: c.reads.map((r) => read(r, at)) })),
-      reads: o.reads.map((r) => read(r, at)),
+      reads: reads(by, s.times[i], at),
     };
   }
   return null;
@@ -177,16 +232,7 @@ function constant(s: string): bigint | null {
 export function whyNot(rep: Replay, full: string, cycle: number, expected: bigint): WhyNot | null {
   const t = rep.at(cycle);
   if (t === undefined) return null;
-  const signals = new Map(rep.sim.signals.map((s) => [s.name, s]));
-  const name = (f: string) => {
-    const rest = f.startsWith(`${rep.top}.`) ? f.slice(rep.top.length + 1) : f;
-    return rest.startsWith("dut.") ? rest.slice(4) : rest;
-  };
-  const read = (f: string, at: number): Read => {
-    const s = signals.get(f);
-    const i = s ? changeAt(s, at) : -1;
-    return { name: name(f), full: f, value: s && i >= 0 ? s.values[i].toString() : "?", t: s && i >= 0 ? at : null };
-  };
+  const { signals, name, read, reads } = lookup(rep);
   // Through port connections to the signal the design writes.
   let cur = full;
   for (let hop = 0; hop < 32; hop++) {
@@ -233,7 +279,7 @@ export function whyNot(rep: Replay, full: string, cycle: number, expected: bigin
   };
 
   const seen = new Set<string>();
-  for (const o of rep.sim.origins) {
+  for (const [by, o] of rep.sim.origins.entries()) {
     if (o.writes !== cur || /^(input|output) \S+ of /.test(o.text) || o.text.endsWith("(its starting value)")) continue;
     const key = `${o.file}:${o.line}:${o.text}`;
     if (seen.has(key)) continue;
@@ -265,9 +311,9 @@ export function whyNot(rep: Replay, full: string, cycle: number, expected: bigin
           }
           cand.passed.push(cond(c, times[j]));
         }
-        if (cand.verdict === "ran") cand.reads = o.reads.map((r) => read(r, valuesAt(times[j])));
+        if (cand.verdict === "ran") cand.reads = reads(by, times[j], valuesAt(times[j]));
       }
-    } else cand.reads = o.reads.map((r) => read(r, valuesAt(t)));
+    } else cand.reads = reads(by, t, valuesAt(t));
     out.candidates.push(cand);
   }
   return out;

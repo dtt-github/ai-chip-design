@@ -509,3 +509,50 @@ endmodule
     assert!(r.decisions.windows(2).all(|w| w[0].0 <= w[1].0), "in time order");
     assert!(!r.decisions_cut);
 }
+
+#[test]
+fn memory_words_are_recorded_like_signals() {
+    let src = r#"
+module fifo (input wire clk, input wire wr, input wire [7:0] din, input wire [1:0] rptr, output wire [7:0] dout);
+    reg [7:0] mem [1:4];
+    reg [1:0] wptr = 0;
+    always @(posedge clk) if (wr) begin
+        mem[wptr + 1] <= din;
+        wptr <= wptr + 1;
+    end
+    assign dout = mem[rptr + 1] + mem[1][3:0];
+endmodule
+
+module tb;
+    reg clk = 0, wr = 0;
+    reg [7:0] din = 0;
+    reg [1:0] rptr = 0;
+    wire [7:0] dout;
+    fifo dut (.clk(clk), .wr(wr), .din(din), .rptr(rptr), .dout(dout));
+    always #5 clk = ~clk;
+    initial begin
+        #1 wr = 1; din = 7;
+        #10 din = 9;
+        #10 wr = 0; rptr = 1;
+        #10 $finish;
+    end
+endmodule
+"#;
+    let r = run(src);
+    let word = |n: &str| r.words.iter().position(|s| s.name == n).unwrap_or_else(|| panic!("{n}"));
+    let (w1, w2) = (word("tb.dut.mem[1]"), word("tb.dut.mem[2]"));
+    assert_eq!((r.words[w1].times.as_slice(), r.words[w1].values.as_slice()), (&[0, 5][..], &[0, 7][..]));
+    assert_eq!((r.words[w2].times.as_slice(), r.words[w2].values.as_slice()), (&[0, 15][..], &[0, 9][..]));
+    let store = &r.origins[r.words[w2].by[1] as usize];
+    assert_eq!((store.text.as_str(), store.line), ("mem[wptr + 1] <= din", 6));
+    assert!(store.words.is_empty(), "writing a word isn't reading one");
+
+    // `dout` reads two words each time it is computed, in the order written.
+    let dout = r.signals.iter().find(|s| s.name == "tb.dut.dout").unwrap();
+    let by = *dout.by.last().unwrap();
+    assert_eq!(r.origins[by as usize].words, ["tb.dut.mem", "tb.dut.mem"]);
+    let last: Vec<u32> = r.word_reads.iter().filter(|&&(_, o, _)| o == by).map(|&(_, _, k)| k).rev().take(2).collect();
+    assert_eq!(last, [w1 as u32, w2 as u32], "after rptr = 1: mem[2], then mem[1]");
+    assert_eq!(*dout.values.last().unwrap(), 9 + 7);
+    assert!(r.word_reads.windows(2).all(|w| w[0].0 <= w[1].0), "in time order");
+}

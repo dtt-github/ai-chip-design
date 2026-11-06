@@ -222,6 +222,42 @@ impl CExpr {
             CExpr::Const { .. } | CExpr::Str(_) | CExpr::Time | CExpr::Random(_) => {}
         }
     }
+
+    /// The memory words this expression reads (`mem[i]`, `mem[i][3:0]`): the memory and the index.
+    pub fn words(&self, out: &mut Vec<(usize, CExpr)>) {
+        match self {
+            CExpr::Word { sig, idx } => {
+                idx.words(out);
+                out.push((*sig, (**idx).clone()));
+            }
+            CExpr::Bit { sig, word, idx } => {
+                idx.words(out);
+                if let Some(w) = word {
+                    w.words(out);
+                    out.push((*sig, (**w).clone()));
+                }
+            }
+            CExpr::Part { sig, word, .. } => {
+                if let Some(w) = word {
+                    w.words(out);
+                    out.push((*sig, (**w).clone()));
+                }
+            }
+            CExpr::IPart { start, .. } => start.words(out),
+            CExpr::Concat(v) => v.iter().for_each(|e| e.words(out)),
+            CExpr::Repl(_, e) | CExpr::Unary(_, e) | CExpr::Signed(e) | CExpr::Unsigned(e) => e.words(out),
+            CExpr::Binary(_, a, b) => {
+                a.words(out);
+                b.words(out);
+            }
+            CExpr::Ternary(c, t, f, _) => {
+                c.words(out);
+                t.words(out);
+                f.words(out);
+            }
+            CExpr::Sig { .. } | CExpr::Const { .. } | CExpr::Str(_) | CExpr::Time | CExpr::Random(_) => {}
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -351,6 +387,9 @@ pub struct Origin {
     pub reads: Vec<String>,
     /// The signal it writes (full name), or empty when it writes several (`{a, b} = ...`).
     pub writes: String,
+    /// The memories it reads a word of, in the order the words are read: each time it runs, the
+    /// simulation records which words those were ([`crate::SimResult::word_reads`]).
+    pub words: Vec<String>,
     /// The `if` and `case` decisions it is inside, outermost first.
     pub conds: Vec<Cond>,
 }
@@ -394,6 +433,8 @@ pub struct Design {
     /// For each coverage point that is a branch of an `if` or `case`: the decision it belongs to
     /// (numbered from 0); [`NO_DECISION`] for the others.
     pub cover_decision: Vec<u32>,
+    /// For each origin: the memory words it reads, as the memory and the index to evaluate.
+    pub origin_words: Vec<Vec<(usize, CExpr)>>,
 }
 
 /// [`Design::cover_decision`] of a coverage point that isn't a branch.
@@ -850,6 +891,9 @@ impl<'a> Elab<'a> {
             | LVal::Part { sig, .. }
             | LVal::IPart { sig, .. } => self.d.signals[*sig].name.clone(),
         };
+        let mut words = Vec::new();
+        from.words(&mut words);
+        words.retain(|&(sig, _)| !self.d.signals[sig].hidden);
         self.d.origins.push(Origin {
             file: s.module.file.clone(),
             line,
@@ -857,8 +901,10 @@ impl<'a> Elab<'a> {
             text,
             reads,
             writes,
+            words: words.iter().map(|&(sig, _)| self.d.signals[sig].name.clone()).collect(),
             conds: self.conds.clone(),
         });
+        self.d.origin_words.push(words);
         Op::From((self.d.origins.len() - 1) as u32)
     }
 
