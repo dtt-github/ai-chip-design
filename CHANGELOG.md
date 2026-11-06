@@ -6,6 +6,18 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Your first chip** ([docs/user-guide/first-chip.md](docs/user-guide/first-chip.md)): a
+  step-by-step walk-through with screenshots, from the start page to a checked layout in about ten
+  minutes, linked from the README and the user guide.
+
+### Fixed
+
+- Health said "Add examples to finish checking" for a design with a state machine even when
+  everything was checked: the state-machine diagram and the "Find examples for everything" card
+  are information, and no longer count towards being ready.
+
 ## [0.1.0] - 2026-11-06
 
 The first release. A person who doesn't write Verilog can take a small design from a description

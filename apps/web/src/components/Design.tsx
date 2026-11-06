@@ -1654,7 +1654,8 @@ function Health({
   const speedup = periodNs && typeof wns === "number" && wns < periodNs ? periodNs / (periodNs - wns) : null;
   const mm2 = typeof s?.die_area_um2 === "number" ? s.die_area_um2 / 1e6 : null;
 
-  type Card = { id: string; ok: boolean | null; title: string; plain: string; explain: string; expert: string; extra?: ReactNode };
+  // `info`: shows how the design works or offers a tool; it doesn't count towards being ready.
+  type Card = { id: string; ok: boolean | null; title: string; plain: string; explain: string; expert: string; extra?: ReactNode; info?: boolean };
   const cards: Card[] = [];
   // Examples on the gates: some are for other settings (e.g. N = 2) and are skipped on this build.
   const gEx = (gls?.runs ?? []).filter((r) => r.top.startsWith("tb_ex_"));
@@ -1810,6 +1811,7 @@ function Health({
     cards.push({
       id: "find-all",
       ok: null,
+      info: true,
       title: "Find examples for everything",
       plain:
         `The simulator can search for examples for ${[gapsN && `the ${gapsN} untried ${gapsN === 1 ? "case" : "cases"}`, slippedN && `the ${slippedN} slipped ${slippedN === 1 ? "mistake" : "mistakes"}`].filter(Boolean).join(" and ")} above at once, using one example for several where it can. You check each one before it is added.` +
@@ -1825,6 +1827,7 @@ function Health({
     cards.push({
       id: `machine-${i}`,
       ok: null,
+      info: true,
       title: `How it works: ${m.module} steps through ${m.states.length} states`,
       plain:
         `${m.transitions.length} ways to move between them` +
@@ -1876,7 +1879,7 @@ function Health({
               ? "Not built yet"
               : stale
                 ? "Built from an older version"
-                : cards.every((c) => c.ok === true)
+                : cards.every((c) => c.info || c.ok === true)
                   ? "Ready for expert review"
                   : cards.some((c) => c.ok === false)
                     ? "Needs work"
