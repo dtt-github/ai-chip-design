@@ -143,6 +143,128 @@ pub fn find(spec: &Spec, files: &BTreeMap<String, String>, target: &Target, budg
     Ok(Found { example, tried: s.tried, elapsed_ms: started.elapsed().as_millis() as u64, message })
 }
 
+/// A draft example "Find examples for everything" found, and the targets it tries or catches.
+#[derive(Debug, Clone, Serialize)]
+pub struct Draft {
+    pub example: Example,
+    /// Indexes into the targets asked for: the one it was searched for first, then the others it
+    /// covers too.
+    pub covers: Vec<usize>,
+}
+
+/// A target no example was found for, and why.
+#[derive(Debug, Clone, Serialize)]
+pub struct Unfound {
+    pub target: usize,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FoundAll {
+    pub drafts: Vec<Draft>,
+    /// In the order asked for.
+    pub left: Vec<Unfound>,
+    pub tried: usize,
+    pub elapsed_ms: u64,
+}
+
+/// "Find examples for everything": searches for each target in turn (at most `each`, all of them
+/// within `total`), and keeps each example found as a draft. An example found for one target is
+/// checked against the targets still open, so one that also tries another case or catches another
+/// mistake covers it, and later searches start from the examples found so far. Fails (in words)
+/// only if the design doesn't parse. Call on a big stack.
+pub fn find_all(
+    spec: &Spec,
+    files: &BTreeMap<String, String>,
+    targets: &[Target],
+    each: Duration,
+    total: Duration,
+) -> Result<FoundAll, String> {
+    let started = Instant::now();
+    let hdl: Vec<(&str, &str)> = files
+        .iter()
+        .filter(|(p, _)| crate::gate::is_hdl(p) && !p.starts_with("tb/"))
+        .map(|(p, c)| (p.as_str(), c.as_str()))
+        .collect();
+    let (design, _) = wafer_sim::parse(&hdl).map_err(|e| format!("the design doesn't parse: {e}"))?;
+    let mutants: Vec<Option<Vec<Module>>> = targets
+        .iter()
+        .map(|t| match t {
+            Target::Gap { .. } => None,
+            Target::Mistake { file, line, original, mistake, .. } => {
+                crate::mistakes::planted(&design, files, file, *line, original, mistake)
+            }
+        })
+        .collect();
+    let mut spec = spec.clone();
+    let mut open: Vec<usize> = (0..targets.len()).collect();
+    let (mut drafts, mut left, mut tried) = (Vec::new(), Vec::new(), 0);
+    while !open.is_empty() {
+        let i = open.remove(0);
+        let spent = started.elapsed();
+        if spent >= total {
+            left.push(Unfound {
+                target: i,
+                message: "Not searched: the time for one search ran out. Add the examples found, then search again."
+                    .into(),
+            });
+            continue;
+        }
+        let found = match find(&spec, files, &targets[i], each.min(total - spent)) {
+            Ok(f) => f,
+            Err(message) => {
+                left.push(Unfound { target: i, message });
+                continue;
+            }
+        };
+        tried += found.tried;
+        let Some(ex) = found.example else {
+            left.push(Unfound { target: i, message: found.message.unwrap_or_default() });
+            continue;
+        };
+        let bare = Spec { examples: Vec::new(), ..spec.clone() };
+        let mut covers = vec![i];
+        open.retain(|&j| {
+            let hit = covered(&bare, &design, mutants[j].as_deref(), &ex, &targets[j]);
+            if hit {
+                covers.push(j);
+            }
+            !hit
+        });
+        spec.examples.push(ex.clone());
+        drafts.push(Draft { example: ex, covers });
+    }
+    left.sort_by_key(|u| u.target);
+    Ok(FoundAll { drafts, left, tried, elapsed_ms: started.elapsed().as_millis() as u64 })
+}
+
+/// Whether `ex`, which passes on the design, also covers `target`: takes the gap's branch, or
+/// fails with the mistake planted (`mutant`).
+fn covered(spec: &Spec, design: &[Module], mutant: Option<&[Module]>, ex: &Example, target: &Target) -> bool {
+    match target {
+        Target::Gap { file, line, text } => run_one(spec, design, ex).is_some_and(|r| {
+            r.coverage
+                .iter()
+                .any(|(p, n)| *n > 0 && p.file == *file && p.line == *line && crate::coverage::text_of(p) == *text)
+        }),
+        Target::Mistake { .. } => match mutant {
+            Some(m) => run_one(spec, m, ex).is_none_or(|r| crate::gate::verdict(&r.log).0 != "pass"),
+            None => false,
+        },
+    }
+}
+
+/// Runs `ex` alone on `modules` with `spec`'s settings; None if it doesn't build or finish.
+fn run_one(spec: &Spec, modules: &[Module], ex: &Example) -> Option<SimResult> {
+    let one = Spec { examples: vec![ex.clone()], ..spec.clone() };
+    let tb = one.testbench(ex);
+    let (tbm, ts) = wafer_sim::parse(&[("tb/examples/search.v", tb.as_str())]).ok()?;
+    let mut all = modules.to_vec();
+    all.extend(tbm);
+    let r = wafer_sim::run_parsed(&all, ts, &crate::spec::tb_name(&ex.id), crate::gate::limits()).ok()?;
+    r.finished.then_some(r)
+}
+
 struct Search<'a> {
     /// The spec without its examples: the search's examples are run one at a time.
     spec: Spec,
@@ -165,13 +287,7 @@ impl Search<'_> {
     /// Runs `ex` on `modules`; None if it doesn't build or finish.
     fn run(&mut self, modules: &[Module], ex: &Example) -> Option<SimResult> {
         self.tried += 1;
-        let one = Spec { examples: vec![ex.clone()], ..self.spec.clone() };
-        let tb = one.testbench(ex);
-        let (tbm, ts) = wafer_sim::parse(&[("tb/examples/search.v", tb.as_str())]).ok()?;
-        let mut all = modules.to_vec();
-        all.extend(tbm);
-        let r = wafer_sim::run_parsed(&all, ts, &crate::spec::tb_name(&ex.id), crate::gate::limits()).ok()?;
-        r.finished.then_some(r)
+        run_one(&self.spec, modules, ex)
     }
 
     /// The example made of `segs`, then `tail`.
@@ -616,6 +732,62 @@ mod tests {
         let strong = check(&files(&spec), &tops);
         assert!(!strong.slipped.iter().any(|x| x.original == "count + 1"), "{strong:#?}");
         assert!(strong.slipped.len() < weak.slipped.len());
+    }
+
+    #[test]
+    fn finds_examples_for_everything_at_once() {
+        let (mut spec, f) = project(&[1]);
+        let tops: Vec<String> = spec.examples.iter().map(|e| crate::spec::tb_name(&e.id)).collect();
+        let check = |f: &BTreeMap<String, String>, tops: &[String]| {
+            wafer_sim::on_big_stack(|| crate::mistakes::check(f, tops, 40, Duration::from_secs(60))).expect("checks")
+        };
+        let weak = check(&f, &tops);
+        let mut targets: Vec<Target> = gaps(&spec)
+            .iter()
+            .filter(|g| g.kind != "default")
+            .map(|g| Target::Gap { file: g.file.clone(), line: g.line, text: g.text.clone() })
+            .collect();
+        let gap_count = targets.len();
+        targets.extend(weak.slipped.iter().map(|s| Target::Mistake {
+            file: s.file.clone(),
+            line: s.line,
+            kind: s.kind.clone(),
+            original: s.original.clone(),
+            mistake: s.mistake.clone(),
+        }));
+        assert!(gap_count > 0 && targets.len() > gap_count, "the weak examples leave gaps and slipped mistakes");
+        // A target that can't be found is reported, not fatal.
+        targets.push(Target::Gap { file: "src/updown.v".into(), line: 1, text: "Never tried: nothing".into() });
+
+        let all = wafer_sim::on_big_stack(|| {
+            find_all(&spec, &f, &targets, Duration::from_secs(10), Duration::from_secs(120))
+        })
+        .expect("searches");
+        let mut seen: Vec<usize> =
+            all.drafts.iter().flat_map(|d| d.covers.clone()).chain(all.left.iter().map(|u| u.target)).collect();
+        seen.sort();
+        assert_eq!(seen, (0..targets.len()).collect::<Vec<_>>(), "every target is covered once or left with a reason");
+        assert!(all.drafts.len() < targets.len() - all.left.len(), "examples are shared: {:#?}", all.drafts);
+        assert!(all.left.iter().any(|u| u.target == targets.len() - 1 && u.message.contains("isn't in the design")));
+        let ids: BTreeSet<&str> = all.drafts.iter().map(|d| d.example.id.as_str()).collect();
+        assert_eq!(ids.len(), all.drafts.len(), "each draft has its own id");
+
+        // With the drafts added, the gaps they cover are tried and the mistakes caught.
+        spec.examples.extend(all.drafts.iter().map(|d| d.example.clone()));
+        let after = gaps(&spec);
+        let tops: Vec<String> = spec.examples.iter().map(|e| crate::spec::tb_name(&e.id)).collect();
+        let strong = check(&files(&spec), &tops);
+        for i in all.drafts.iter().flat_map(|d| d.covers.iter()) {
+            match &targets[*i] {
+                Target::Gap { text, line, .. } => {
+                    assert!(!after.iter().any(|g| g.text == *text && g.line == *line), "{text} is still a gap")
+                }
+                Target::Mistake { original, mistake, line, .. } => assert!(
+                    !strong.slipped.iter().any(|x| x.original == *original && x.mistake == *mistake && x.line == *line),
+                    "{original} -> {mistake} still slips through"
+                ),
+            }
+        }
     }
 
     #[test]

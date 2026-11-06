@@ -2316,6 +2316,30 @@ select.small {
   text-align: right;
 }
 
+/* "Find examples for everything": the examples found, to check and add. */
+.find-all-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.find-all-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.find-all-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Try it: the design as a small board. */
 .tryit {
   display: flex;

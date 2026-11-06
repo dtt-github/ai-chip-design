@@ -174,6 +174,15 @@ mean?** and the expert numbers underneath:
   The search takes at most about 30 seconds, and the same design and spec always give the same
   example. If nothing is found, it says why: the case may be impossible by design, or the mistake
   may change nothing that can be seen.
+- **Find examples for everything**: when two or more cases are untried or mistakes slipped
+  through, one button searches for all of them at once (planted mistakes are included once you
+  have checked them). Each example found is run against the cases and mistakes still open, and
+  every one it also covers is ticked off, so a few examples usually cover many. The results list
+  each example as a sentence ("After reset: `down` is set to 1; 2 clock cycles pass; `count` must
+  be 14"), with what it covers ("tries `down && !up` is true; catches `count - 1` as `count + 1`
+  (line 14)"), and the ones not found with the reason. Untick any you don't want, then **Add**:
+  they open in Examples, unsaved, to check and save with the rest. About 10 seconds a search, 90
+  at most; no AI and nothing to pay.
 - **How it works**: each state machine found in the Verilog, drawn as states (boxes, with the one
   after reset marked) and numbered moves between them, listed with when they happen ("state 0 →
   state 1 when `rx` = 0"). Moves an example takes are solid; dashed red ones no example takes yet;
