@@ -98,6 +98,14 @@ mean?** and the expert numbers underneath:
   try. **Add an example** opens Examples with the missing case written out as a new example's
   description; the file and line link opens the code. A `default` choice that no example reaches
   is shown but doesn't hold the project back, since it is often impossible by design.
+- **Would your examples catch a mistake?**: **Plant mistakes and check** makes small, typical
+  mistakes in a copy of the design, one at a time (a comparison turned round, a number one off, a
+  condition reversed, a `!` left out, `+` for `-`, an assignment left out), and runs every example
+  against each. It reports how many some example caught, and each one that slipped through ("If
+  `cnt == N - 1` were `cnt == N` (one off, line 15), every example would still pass"), with **Add
+  an example** and a link to the line. Your files aren't changed. A few planted mistakes change
+  nothing at all and can't be caught. Up to 40 mistakes, spread over the design, in at most 30
+  seconds.
 - **How it works**: each state machine found in the Verilog, drawn as states (boxes, with the one
   after reset marked) and numbered moves between them, listed with when they happen ("state 0 →
   state 1 when `rx` = 0"). Moves an example takes are solid; dashed red ones no example takes yet;

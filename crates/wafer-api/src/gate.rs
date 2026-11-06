@@ -59,6 +59,11 @@ pub(crate) fn looks_like_tb(name: &str) -> bool {
     n.starts_with("tb") || n.ends_with("_tb") || n.contains("test")
 }
 
+/// The bounds every testbench runs under.
+pub(crate) fn limits() -> wafer_sim::Limits {
+    wafer_sim::Limits { max_time: MAX_TIME, max_steps: MAX_STEPS, max_log_lines: MAX_LOG_LINES, ..Default::default() }
+}
+
 pub(crate) fn verdict(log: &[String]) -> (&'static str, Option<String>) {
     let has = |word: &str| log.iter().find(|l| l.split(|c: char| !c.is_ascii_alphanumeric()).any(|w| w == word));
     for bad in ["FAIL", "ERROR", "MISMATCH"] {
@@ -123,12 +128,7 @@ fn run_inner(files: &BTreeMap<String, String>) -> GateReport {
     if tbs.is_empty() {
         return fail("no testbench found (a top-level module named tb*, *_tb or *test*)".into(), Vec::new(), inputs);
     }
-    let limits = wafer_sim::Limits {
-        max_time: MAX_TIME,
-        max_steps: MAX_STEPS,
-        max_log_lines: MAX_LOG_LINES,
-        ..Default::default()
-    };
+    let limits = limits();
     let mut runs = Vec::new();
     for top in tbs {
         let run = match wafer_sim::simulate(&hdl, Some(&top), limits) {

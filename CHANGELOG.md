@@ -8,6 +8,11 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **Would your examples catch a mistake?** Health can plant small mistakes in a copy of the design,
+  one at a time (comparisons turned round, constants one off, conditions and negations reversed,
+  `&&`/`||` and `+`/`-` swapped, assignments left out), run the examples against each, and list
+  those that slip through in plain words with **Add an example**. `POST /projects/{id}/spec/mistakes`
+  (mutation testing on the parsed design; files untouched; 40 mistakes, 30 s at most).
 - `scripts/remap-dev-users.sh`: after Rauthy starts afresh, moves the development accounts' existing
   users (and so their projects) to the subjects Rauthy gave them; without it, signing in shows an
   empty project list.

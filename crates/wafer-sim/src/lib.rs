@@ -99,7 +99,12 @@ pub fn simulate(files: &[(&str, &str)], top: Option<&str>, limits: Limits) -> Re
             msg: "no modules found".into(),
         })?,
     };
-    let design = elab::elaborate(&modules, &top)?;
+    run_parsed(&modules, timescale, &top, limits)
+}
+
+/// Elaborates and runs modules already parsed (and perhaps changed, e.g. with a planted mistake).
+pub fn run_parsed(modules: &[ast::Module], timescale: u64, top: &str, limits: Limits) -> Result<SimResult> {
+    let design = elab::elaborate(modules, top)?;
     sim::Sim::new(&design, limits).run(timescale)
 }
 

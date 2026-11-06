@@ -233,6 +233,34 @@ fn machines_in(files: &BTreeMap<String, String>) -> Vec<crate::fsm::Machine> {
     wafer_sim::parse(&hdl).map(|(m, _)| crate::fsm::find(&m)).unwrap_or_default()
 }
 
+/// Planted mistakes tried per check, and how long a check may take.
+const MAX_MISTAKES: usize = 40;
+const MISTAKES_BUDGET: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// "Would your examples catch a mistake?" (`crate::mistakes`), at the branch tip (editors: it costs
+/// server time, one simulation slot like the gate).
+pub async fn mistakes(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<crate::mistakes::Report>> {
+    authorize(&state, &user, id, Role::Editor).await?;
+    let commit = head(&state, id).await?;
+    let files = files_at(&state, id, &commit).await?;
+    let spec = match files.get(SPEC_FILE) {
+        Some(t) => parse_spec(t)?,
+        None => return Err(ApiError::NotFound("this project has no spec yet".into())),
+    };
+    let tops: Vec<String> = spec.examples.iter().map(|e| spec::tb_name(&e.id)).collect();
+    let report = tokio::task::spawn_blocking(move || {
+        gate::with_slot(|| {
+            wafer_sim::on_big_stack(|| crate::mistakes::check(&files, &tops, MAX_MISTAKES, MISTAKES_BUDGET))
+        })
+    })
+    .await?;
+    report.map(Json).map_err(ApiError::Conflict)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct TestbenchReq {
     /// The spec being edited (unsaved edits included).

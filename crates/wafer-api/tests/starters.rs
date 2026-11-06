@@ -14,6 +14,10 @@ use tower::ServiceExt;
 use wafer_api::lsp::LspConfig;
 use wafer_api::router;
 
+fn bob_token() -> String {
+    token("bob", "bob@example.org")
+}
+
 async fn call(app: &Router, method: Method, uri: &str, tok: &str, body: Option<Value>) -> (StatusCode, Value) {
     let req = Request::builder().method(method).uri(uri).header("authorization", format!("Bearer {tok}"));
     let req = match body {
@@ -165,6 +169,14 @@ async fn start_from_and_add_starters(db: PgPool) {
     let taken =
         |from: &str, to: &str| ts.iter().find(|t| t["from"] == from && t["to"] == to).unwrap()["covered"].clone();
     assert_eq!((taken("0", "1"), taken("2", "3"), taken("3", "0")), (json!(true), json!(true), json!(true)));
+
+    // Planted mistakes: the receiver's examples miss a few; the blinker with one example misses none.
+    let (s, m) = call(&app, Method::POST, &format!("/api/projects/{rid}/spec/mistakes"), &ada, None).await;
+    assert_eq!(s, StatusCode::OK, "{m}");
+    assert!(m["caught"].as_u64() < m["tried"].as_u64() && m["tried"].as_u64() == m["sites"].as_u64(), "{m}");
+    assert!(m["slipped"][0]["text"].as_str().unwrap().ends_with("every example would still pass."), "{m}");
+    let (s, _) = call(&app, Method::POST, &format!("/api/projects/{rid}/spec/mistakes"), &bob_token(), None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "only members can run it");
 
     // The gallery shows each starter's figure.
     let (_, list) = call(&app, Method::GET, "/api/starters", &ada, None).await;
