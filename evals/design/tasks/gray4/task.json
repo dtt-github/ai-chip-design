@@ -7,5 +7,10 @@
   ],
   "top": "gray4",
   "description": "A Gray-code counter. Module `gray4` with inputs clk, rst_n (active-low reset) and en, and a 4-bit output gray. At each rising clock edge where en is 1 it moves to the next value of the 4-bit reflected binary Gray code (0, 1, 3, 2, 6, 7, 5, 4, 12, 13, 15, 14, 10, 11, 9, 8, then back to 0). With en 0 it holds. Reset sets it to 0.",
-  "open_points": []
+  "open_points": [],
+  "starter": {
+    "title": "Gray-code counter",
+    "summary": "Counts in Gray code, where only one bit changes per step (safe for position encoders and crossing clock domains).",
+    "category": "Basics"
+  }
 }

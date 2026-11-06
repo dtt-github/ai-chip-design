@@ -7,5 +7,10 @@
   ],
   "top": "seq1011",
   "description": "A pattern detector. Module `seq1011` with inputs clk, rst_n (active-low reset) and din, and output found. din is sampled at each rising clock edge. found is 1 for the clock cycle right after the edge that samples the last bit of the pattern 1, 0, 1, 1, and 0 otherwise. Overlapping patterns count (1011011 finds two). found comes from a register; reset clears it and forgets earlier bits.",
-  "open_points": []
+  "open_points": [],
+  "starter": {
+    "title": "Pattern detector",
+    "summary": "Watches a serial input and signals each time it sees the bit pattern 1011.",
+    "category": "Data"
+  }
 }

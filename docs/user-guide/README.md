@@ -12,6 +12,7 @@ Both work on the same files and Git history, so experts and non-experts can work
 
 | Page | What it covers |
 |---|---|
+| [Starter designs](starters.md) | Sixteen verified designs to start a project from or add as blocks |
 | [Design view](design-view.md) | Describe, Examples (and chip examples), what actually happened, Health; the spec format |
 | [Blocks](blocks.md) | Building the chip from blocks, connection checks, adapters, the assistant's review |
 | [Code and collaboration](code-and-collaboration.md) | The editor, co-editing, the language server, browser simulation |
@@ -21,8 +22,8 @@ Both work on the same files and Git history, so experts and non-experts can work
 
 ## Getting around
 
-- The projects page starts new projects, optionally from a starter idea (LED blinker, button
-  debouncer, PWM output, UART transmitter), and chooses the project's licence.
+- The projects page starts new projects, blank or from one of the [starter designs](starters.md),
+  and chooses the project's licence.
 - In a project, the switch above the editor chooses **Design** or **Code**. The right-hand panel
   has Changes (commit the shared working copy), Runs, Agent and IP.
 - AI features (drafting, reviews, the agent) count against a daily budget per person; Describe

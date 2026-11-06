@@ -25,6 +25,10 @@ Each task has:
   behavioural model; `parity8` tries every input; `uart_rx` sends 150 random frames, some with a
   bad stop bit.
 
+The tasks double as the [starter designs](user-guide/starters.md): `task.json`'s `starter` entry
+gives the title, summary and group shown in the gallery, and the server builds the spec and the
+reference design in. Changing a reference changes the starter too.
+
 `cargo test -p sc-api --test evals` checks the references themselves: every reference design
 passes its examples and its hidden testbench, and a design that drives every output to 0 fails
 both. Writing a hidden testbench that also catches off-by-one variants (a counter one short, a

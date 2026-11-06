@@ -30,7 +30,7 @@ shows how to get one locally). `GET /healthz` (outside `/api`) needs no token.
 | Method | Path | Role | Description |
 |---|---|---|---|
 | GET | `/projects` | | Projects you are a member of. |
-| POST | `/projects` | | Create `{name, slug?, description?, visibility?, licence?}` with a starter design; `licence` is an SPDX id (default `Apache-2.0`). |
+| POST | `/projects` | | Create `{name, slug?, description?, visibility?, licence?, starter?}`: from the starter design `starter` (`GET /starters`), or the counter template; `licence` is an SPDX id (default `Apache-2.0`). |
 | GET | `/projects/{id}` | viewer | Project, your role, head commit. |
 | GET | `/projects/{id}/tree?rev=` | viewer | Files at a revision (default: `main`). |
 | GET | `/projects/{id}/files/{path}?rev=` | viewer | One file's content. |
@@ -51,6 +51,13 @@ shows how to get one locally). `GET /healthz` (outside `/api`) needs no token.
 | POST | `/projects/{id}/spec/draft` | editor | `{instruction, spec?}`: the assistant writes or revises the spec; nothing is saved. Returns `{spec, note, model, usage, usd, elapsed_ms}`; `usd` is priced for the model that served it and counts against the AI budget. |
 
 The spec format and the example step semantics are in [user-guide/design-view.md](user-guide/design-view.md).
+
+## Starter designs
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/starters` | | The starter designs: `{id, title, summary, category, top, ports, params, clock_mhz, clock, reset, examples}`. |
+| POST | `/projects/{id}/starters/{starter}` | editor | Adds the design as `starters/<top>.v` and to every flow config's `VERILOG_FILES`, in one commit. `409` if it's there or its module name is taken. |
 
 ## Blocks: the chip
 

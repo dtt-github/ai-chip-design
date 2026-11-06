@@ -17,6 +17,7 @@ pub mod lsp;
 pub mod projects;
 pub mod spec;
 pub mod spend;
+pub mod starters;
 mod template;
 pub mod workspace;
 
@@ -68,6 +69,8 @@ pub fn router(state: AppState) -> Router {
         .route("/projects/{id}/spec", get(design::get).put(design::save))
         .route("/projects/{id}/spec/run", post(design::run))
         .route("/projects/{id}/spec/draft", post(design::draft))
+        .route("/starters", get(starters::list))
+        .route("/projects/{id}/starters/{starter}", post(starters::add))
         .route("/ip", get(ip::list))
         .route("/projects/{id}/ip", post(ip::publish))
         .route("/projects/{id}/ip/imports", get(ip::imports))

@@ -82,5 +82,10 @@
         ]
       }
     ]
+  },
+  "starter": {
+    "title": "Push-button toggle",
+    "summary": "Each press of a button switches an LED on or off.",
+    "category": "Inputs"
   }
 }

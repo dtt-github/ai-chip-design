@@ -143,6 +143,8 @@ pub struct CreateProject {
     pub visibility: Option<String>,
     /// SPDX identifier; defaults to Apache-2.0.
     pub licence: Option<String>,
+    /// Start from a starter design (`GET /starters`) instead of the counter template.
+    pub starter: Option<String>,
 }
 
 fn slugify(name: &str) -> String {
@@ -179,6 +181,12 @@ pub async fn create(
             crate::licence::project_licences().join(", ")
         )));
     }
+    let starter = match req.starter.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(s) => {
+            Some(crate::starters::get(s).ok_or_else(|| ApiError::BadRequest(format!("no starter design '{s}'")))?)
+        }
+        None => None,
+    };
     let id = Uuid::new_v4();
 
     let mut tx = state.db.begin().await?;
@@ -206,7 +214,10 @@ pub async fn create(
         .await?;
 
     let repos = state.repos.clone();
-    let files = template::starter_files(&name, &slug, &licence);
+    let files = match starter {
+        Some(st) => st.project_files(&name),
+        None => template::starter_files(&name, &slug, &licence),
+    };
     let author = Author { name: user.display_name.clone(), email: user.email.clone() };
     let initial = tokio::task::spawn_blocking(move || repos.create(&id.to_string(), files, &author)).await??;
 

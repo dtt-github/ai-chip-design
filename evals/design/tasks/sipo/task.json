@@ -6,5 +6,10 @@
   ],
   "top": "sipo",
   "description": "A serial-in, parallel-out shift register. Module `sipo` with inputs clk, rst_n (active-low reset), din and shift, and an 8-bit output q. At each rising clock edge where shift is 1, q shifts left by one and din enters at bit 0 (so the first bit shifted in ends up as the most significant after 8 shifts). With shift 0, q holds. Reset clears q.",
-  "open_points": []
+  "open_points": [],
+  "starter": {
+    "title": "Serial-to-parallel register",
+    "summary": "Collects bits arriving one at a time into an 8-bit value.",
+    "category": "Data"
+  }
 }

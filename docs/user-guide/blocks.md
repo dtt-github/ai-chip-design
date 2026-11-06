@@ -1,7 +1,7 @@
 # Blocks: building the chip
 
-The Blocks step puts the chip together from your design, blocks imported from the IP registry and
-small adapters. It uses the whole window while it's open.
+The Blocks step puts the chip together from your design, verified [starter designs](starters.md),
+blocks imported from the IP registry and small adapters. It uses the whole window while it's open.
 
 ## Starting
 
@@ -10,8 +10,9 @@ connections, already wired. The chip gets its own name (`<design>_chip`).
 
 ## The canvas
 
-- **Blocks** on the left: your project's modules, imported IP, and the adapters. Click one to
-  place it; drag blocks by their title.
+- **Blocks** on the left: your project's modules, starter designs, imported IP, and the adapters.
+  Click one to place it; drag blocks by their title. **+ Add a starter design** adds another
+  verified design to the project.
 - **Chip pins**: inputs on the left edge, outputs on the right. Add them with **+ Input** /
   **+ Output**; select one to rename it, set its width and meaning, and mark the clock and reset.
 - **Connecting**: click a connection point, then another. Either order works.

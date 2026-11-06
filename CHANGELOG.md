@@ -8,6 +8,11 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Added
 
+- **Starter designs**: the 16 verified design-eval tasks are offered as starting points. The
+  projects page has a gallery (by group, with what goes in and out); a project started from one
+  has its spec, design and passing examples from the first commit. The Blocks step can add any of
+  them to a project as a block (`starters/<module>.v`). `GET /starters`,
+  `POST /projects/{id}/starters/{starter}`, and `starter` on `POST /projects`.
 - The simulator runs **functions, tasks and generate blocks**: Verilog-2001 and ANSI functions and
   tasks with locals, loops and `return`, constant functions in parameters and ranges, and generate
   `for`/`if`/`case` and named blocks (including references such as `g[2].w`). Checked against Icarus
@@ -41,6 +46,8 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Fixed
 
+- The Blocks step no longer throws away an unsaved chip when the project changes underneath it
+  (a commit by someone else, or adding a block).
 - The spec check refuses an example that runs longer than the simulator's 50 µs limit (it could
   never pass), saying how many cycles fit; the assistant is told to use small settings instead.
 - Drafting no longer crashes the request when the model sends the spec as JSON text instead of an

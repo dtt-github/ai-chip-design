@@ -6,5 +6,10 @@
   ],
   "top": "parity8",
   "description": "A parity checker. Module `parity8` with an 8-bit input d and an output odd, and no clock or reset. odd is 1 when d has an odd number of 1 bits, and 0 otherwise.",
-  "open_points": []
+  "open_points": [],
+  "starter": {
+    "title": "Parity checker",
+    "summary": "Tells whether an 8-bit value has an odd number of 1s (no clock needed).",
+    "category": "Basics"
+  }
 }

@@ -119,5 +119,10 @@
         ]
       }
     ]
+  },
+  "starter": {
+    "title": "Watchdog timer",
+    "summary": "Raises an alarm if it isn't \"kicked\" within a set number of cycles.",
+    "category": "Control"
   }
 }

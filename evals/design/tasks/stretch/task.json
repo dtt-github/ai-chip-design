@@ -86,5 +86,10 @@
         ]
       }
     ]
+  },
+  "starter": {
+    "title": "Pulse stretcher",
+    "summary": "Makes short pulses at least N cycles long, so they can be seen or counted.",
+    "category": "Inputs"
   }
 }

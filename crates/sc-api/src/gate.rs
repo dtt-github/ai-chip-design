@@ -47,7 +47,7 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn is_hdl(path: &str) -> bool {
+pub(crate) fn is_hdl(path: &str) -> bool {
     path.rsplit_once('.').is_some_and(|(_, e)| matches!(e.to_ascii_lowercase().as_str(), "v" | "sv"))
 }
 

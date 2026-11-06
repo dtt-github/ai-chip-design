@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, type BlockModule, type BlockPort, type Blocks, type BlocksCheck, type BlocksView, type ReviewNote } from "../api";
+import { api, type BlockModule, type BlockPort, type Blocks, type BlocksCheck, type BlocksView, type ReviewNote, type Starter } from "../api";
 
 // Canvas geometry.
 const BW = 210;
@@ -37,17 +37,37 @@ export function BlocksStep({ projectId, head, canEdit }: { projectId: string; he
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // The chip as last loaded from the server, to tell unsaved edits apart when reloading.
+  const saved = useRef<Blocks | null>(null);
   const load = useCallback(async () => {
     const v = await api.getBlocks(projectId);
     setView(v);
-    setDraft((d) => (d && view?.blocks && !same(d, view.blocks) ? d : v.blocks));
+    // Keep a draft with unsaved edits (also one not saved yet at all); otherwise show the saved chip.
+    setDraft((d) => (d && !(saved.current && same(d, saved.current)) ? d : v.blocks));
+    saved.current = v.blocks;
     setCheck(v.check);
-    // `view` is only read to keep unsaved edits.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
   useEffect(() => {
     load().catch((e: Error) => setError(e.message));
   }, [load, head]);
+  const [starters, setStarters] = useState<Starter[]>([]);
+  useEffect(() => {
+    api.starters().then(setStarters, () => setStarters([]));
+  }, []);
+
+  /** Adds a starter design's file to the project; it then appears among the blocks. */
+  async function addStarter(st: Starter) {
+    setBusy(`Adding ${st.title}…`);
+    setError(null);
+    try {
+      await api.addStarter(projectId, st.id);
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   // Re-check as the layout changes (debounced).
   useEffect(() => {
@@ -75,7 +95,7 @@ export function BlocksStep({ projectId, head, canEdit }: { projectId: string; he
         <section className="design-card">
           <h3>Build the chip from blocks</h3>
           <p className="small" style={{ margin: 0 }}>
-            Put your design together with blocks from the IP registry and small adapters, and connect them. SiliconCommons checks every
+            Put your design together with verified starter designs, blocks from the IP registry and small adapters, and connect them. SiliconCommons checks every
             connection and writes the chip's top level for you; saving makes the chip what Health builds.
           </p>
           {canEdit && design && (
@@ -238,6 +258,22 @@ export function BlocksStep({ projectId, head, canEdit }: { projectId: string; he
               ))}
             </div>
           ))}
+          {canEdit && starters.some((st) => !modules.some((m) => m.name === st.top)) && (
+            <details className="blocks-group blocks-library">
+              <summary className="design-label">+ Add a starter design</summary>
+              <span className="muted small">Verified designs; adding one puts its file in the project as a block.</span>
+              {starters
+                .filter((st) => !modules.some((m) => m.name === st.top))
+                .map((st) => (
+                  <button key={st.id} className="blocks-mod" onClick={() => addStarter(st)} disabled={!!busy} title={st.summary}>
+                    <code>{st.top}</code>
+                    <span className="muted small">
+                      {st.title}: {st.summary}
+                    </span>
+                  </button>
+                ))}
+            </details>
+          )}
           <h3>Chip pins</h3>
           {canEdit && (
             <div className="design-row">
@@ -304,11 +340,13 @@ function startFrom(m: BlockModule, design: string): Blocks {
 
 function groups(modules: BlockModule[], top: string): [string, BlockModule[]][] {
   const mine = modules.filter((m) => m.source === "project" && m.name !== top);
+  const starter = modules.filter((m) => m.source === "starter");
   const ip = modules.filter((m) => m.source.startsWith("ip:"));
   const adapters = modules.filter((m) => m.source === "adapter");
   return (
     [
       ["Your design", mine],
+      ["Starter designs", starter],
       ["Imported IP", ip],
       ["Adapters", adapters],
     ] as [string, BlockModule[]][]
