@@ -1,10 +1,17 @@
 # Changelog
 
 All notable changes to Wafersmith are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions will follow
-[Semantic Versioning](https://semver.org/) from the first release.
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
+[Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-11-06
+
+The first release. A person who doesn't write Verilog can take a small design from a description
+in words to a layout that passes DRC, LVS and timing on IHP SG13G2, without typing Verilog or
+testbench code; checked in the [release rehearsal](docs/release-rehearsal.md). What works and
+what doesn't yet is in the [README](README.md#what-works-and-what-doesnt-yet). Runs locally.
 
 ### Added
 
@@ -172,7 +179,7 @@ All notable changes to Wafersmith are recorded here. The format follows
   (an example of a design without a clock could see the value from before the last `set`). The
   "what actually happened" replay samples at the same moment.
 
-## 0.1.0 development line (2026-11-05)
+## Before 0.1.0: the development line (to 2026-11-05)
 
 Built before this changelog was kept; the commits on `main` have the details.
 
@@ -194,3 +201,6 @@ Built before this changelog was kept; the commits on `main` have the details.
 - Continuous integration on GitHub (`89a0a74`).
 - The assistant no longer writes examples that depend on unanswered questions (`feb5e1d`).
 - Blocks view: build the chip from blocks with checked connections and adapters (`f22d844`).
+
+[Unreleased]: https://github.com/dtt-github/wafersmith/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/dtt-github/wafersmith/releases/tag/v0.1.0
