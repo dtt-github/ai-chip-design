@@ -8,6 +8,11 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Added
 
+- **Try it**: in Examples, the design as a small board (switches, pulse buttons and number boxes
+  for inputs, lights and values for outputs, a clock you step), simulated in the browser. What you
+  do is recorded as steps and the outputs you tick as checks; **Save as an example** adds it to
+  the spec. Each step is simulated with the testbench the example compiles to
+  (`POST /projects/{id}/spec/testbench`, which saves nothing).
 - **What the examples don't test**: the simulator counts every `if`/`else` branch and `case` arm
   it runs, and Health shows how many of the design's decisions the examples try, each gap in
   plain terms ("Never tried: `en` = 0") with **Add an example** (opens Examples with the case

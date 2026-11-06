@@ -13,6 +13,7 @@ import {
   type StepOp,
 } from "../api";
 import { extendTestbench, fmt as fmtValue, replay, targetSpec, type Replay } from "../lib/replay";
+import { TryIt } from "./TryIt";
 import { SimClient } from "../sim/client";
 import { BlocksStep } from "./Blocks";
 
@@ -639,6 +640,8 @@ function Examples({
 }) {
   const [selId, setSelId] = useState<string | null>(null);
   const [words, setWords] = useState("");
+  const [trying, setTrying] = useState(false);
+  const [tried, setTried] = useState<string | null>(null);
   useEffect(() => {
     if (!seed) return;
     setWords(seed.text);
@@ -672,6 +675,9 @@ function Examples({
               {passing} of {spec.examples.length} passing
             </span>
           )}
+          <button onClick={() => setTrying(!trying)} aria-expanded={trying} title="Play with the design and turn what you do into an example">
+            Try it
+          </button>
           <button onClick={runExamples} disabled={busy || dirty || spec.examples.length === 0} title={dirty ? "Save the spec first" : undefined}>
             Run examples
           </button>
@@ -682,6 +688,26 @@ function Examples({
           )}
         </div>
       </section>
+
+      {trying && (
+        <TryIt
+          projectId={projectId}
+          spec={spec}
+          canEdit={canEdit}
+          onClose={() => setTrying(false)}
+          onSave={(ex) => {
+            update({ examples: [...spec.examples, ex] });
+            setSelId(ex.id);
+            setTried(ex.title);
+            setTrying(false);
+          }}
+        />
+      )}
+      {tried && dirty && (
+        <p className="design-row small">
+          Added “{tried}”. <strong>Save the spec</strong> to keep it; it then runs with the other examples.
+        </p>
+      )}
 
       <div className="design-split">
         <section className="design-card design-examples">

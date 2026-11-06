@@ -46,6 +46,21 @@ gate-level simulation after a build. **Run examples** shows the result of each o
 **Ask the AI to make them pass** opens an agent proposal with the failures. The AI may not change
 the spec or the examples.
 
+### Try it: an example by playing with the design
+
+**Try it** (next to **Run examples**) shows the design as a small board, simulated in your browser:
+switches and **Pulse** buttons for 1-bit inputs, number boxes for wider ones, lights and values for
+the outputs, and the clock, which only moves when you say (**+1**, **+5**, **+20** cycles). A strip
+underneath shows what every connection did over the last 40 cycles.
+
+When an output shows what it should, click **✓ Right** (or **✓ All outputs are right**). Everything
+you did is listed as plain steps ("set en to 1", "4 cycles pass", "check led is 1"), with **Undo**
+and **Start over**. **Save as an example** turns it into an example with those steps; save the
+spec to keep it. Each change is simulated from reset with the testbench the example compiles to
+(`POST /spec/testbench`), so the saved example checks exactly what you saw. It is a quick way to
+close a gap Health shows ("Never tried: `en` = 0"): set the input, tick the outputs, save. It uses
+the committed design and tests the design, not the whole chip.
+
 ### Chip examples
 
 Once the Blocks step has built a chip, an example can test **the whole chip** instead of the

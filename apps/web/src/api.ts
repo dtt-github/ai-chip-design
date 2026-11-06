@@ -576,6 +576,8 @@ export const api = {
   saveSpec: (id: string, body: { spec: Spec; parent: string; message?: string }) =>
     request<{ commit: string; changed: boolean }>("PUT", `/projects/${enc(id)}/spec`, body),
   runSpec: (id: string) => request<SpecRun>("POST", `/projects/${enc(id)}/spec/run`),
+  exampleTestbench: (id: string, body: { spec: Spec; example: SpecExample }) =>
+    request<{ path: string; top: string; source: string }>("POST", `/projects/${enc(id)}/spec/testbench`, body),
   draftSpec: (id: string, body: { instruction: string; spec?: Spec | null }) =>
     request<SpecDraft>("POST", `/projects/${enc(id)}/spec/draft`, body),
   ipBlocks: () => request<IpBlock[]>("GET", "/ip"),

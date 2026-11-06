@@ -113,6 +113,42 @@ async fn start_from_and_add_starters(db: PgPool) {
     assert!(gaps.contains(&"Never tried: `en` = 0"), "{gaps:?}");
     assert!(cov["gaps"][0]["suggestion"].as_str().unwrap().contains("src/blinker.v"), "{cov}");
 
+    // The playground's testbench: one example compiled without saving, exactly as Save would.
+    let try_it = json!({ "id": "try_it", "title": "Tried in the playground", "params": [], "steps": [
+        { "op": "set", "signal": "en", "value": "1" },
+        { "op": "wait", "cycles": 4 },
+        { "op": "expect", "signal": "led", "value": "1" }
+    ]});
+    let (s, tb) = call(
+        &app,
+        Method::POST,
+        &format!("/api/projects/{bid}/spec/testbench"),
+        &ada,
+        Some(json!({ "spec": spec, "example": try_it })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{tb}");
+    assert_eq!(tb["path"], "tb/examples/tb_ex_try_it.v");
+    assert_eq!(tb["top"], "tb_ex_try_it");
+    assert!(
+        tb["source"].as_str().unwrap().contains("blinker #(.N(4))")
+            || tb["source"].as_str().unwrap().contains("blinker dut")
+    );
+    let (_, files) = call(&app, Method::GET, &format!("/api/projects/{bid}/tree"), &ada, None).await;
+    assert!(!files.to_string().contains("tb_ex_try_it"), "nothing is saved");
+    let mut bad = try_it.clone();
+    bad["steps"][0]["signal"] = json!("nope");
+    let (s, e) = call(
+        &app,
+        Method::POST,
+        &format!("/api/projects/{bid}/spec/testbench"),
+        &ada,
+        Some(json!({ "spec": spec, "example": bad })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert!(e["message"].as_str().unwrap().contains("'nope' is not one of the connections"), "{e}");
+
     // The gallery shows each starter's figure.
     let (_, list) = call(&app, Method::GET, "/api/starters", &ada, None).await;
     let fig = |id: &str| list.as_array().unwrap().iter().find(|x| x["id"] == id).unwrap()["covered"].clone();

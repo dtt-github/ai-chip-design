@@ -212,6 +212,36 @@ pub async fn run(State(state): State<AppState>, user: AuthUser, Path(id): Path<U
     Ok(Json(RunResult { commit, examples, others: runs.into_values().collect(), coverage, engine: report.engine }))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct TestbenchReq {
+    /// The spec being edited (unsaved edits included).
+    pub spec: Spec,
+    pub example: spec::Example,
+}
+
+/// The testbench one example compiles to, without saving anything: the "Try it" playground
+/// simulates its session this way, so it runs exactly as the example will once saved.
+pub async fn testbench(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(req): Json<TestbenchReq>,
+) -> ApiResult<Json<Value>> {
+    authorize(&state, &user, id, Role::Viewer).await?;
+    let chip = match req.example.target.as_deref().filter(|t| *t != req.spec.top) {
+        Some(_) => chip_of(&files_at(&state, id, &head(&state, id).await?).await?),
+        None => None,
+    };
+    let tb = spec::tb_name(&req.example.id);
+    let one = Spec { examples: vec![req.example], ..req.spec };
+    let problems = one.check(chip.as_ref());
+    if !problems.is_empty() {
+        return Err(ApiError::BadRequest(problems.join("; ")));
+    }
+    let (path, source) = one.testbenches_for(chip.as_ref()).into_iter().next().expect("one example");
+    Ok(Json(json!({ "path": path, "top": tb, "source": source })))
+}
+
 // ---- drafting with the assistant -----------------------------------------------
 
 const DRAFT_SYSTEM: &str = "You are the design assistant in SiliconCommons, a platform where engineers \
