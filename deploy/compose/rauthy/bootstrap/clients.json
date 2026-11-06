@@ -20,7 +20,7 @@
     {
         "id": "wafersmith-dev-cli",
         "name": "Wafersmith dev CLI - password grant - dev only",
-        "secret": {"Plain": "scdevcliscdevcliscdevcliscdevcliscdevcliscdevcliscdevcliscdevcli"},
+        "secret": {"Plain": "wafersmithdevcliwafersmithdevcliwafersmithdevcliwafersmithdevcli"},
         "redirect_uris": ["http://localhost:5173/auth/callback"],
         "enabled": true,
         "flows_enabled": ["password"],

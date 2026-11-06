@@ -8,6 +8,9 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- `scripts/remap-dev-users.sh`: after Rauthy starts afresh, moves the development accounts' existing
+  users (and so their projects) to the subjects Rauthy gave them; without it, signing in shows an
+  empty project list.
 - **How it works**: state machines are found in the design's Verilog (a `case` on a register
   whose arms set it, directly or through a next-state variable) and drawn in Health: states,
   numbered moves listed with when they happen, the reset state, and which moves the examples
@@ -46,6 +49,7 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Changed
 
+- The development-only `wafersmith-dev-cli` client secret no longer carries the old `sc` prefix.
 - **Renamed to Wafersmith** (formerly SiliconCommons, a name already used by lowRISC for its
   open-silicon process). Crates are now `wafer-*` (binary `wafersmith-api`), environment
   variables `WAFER_*` instead of `SC_*`, the web package `@wafersmith/web`, the adapter modules
@@ -55,7 +59,8 @@ All notable changes to Wafersmith are recorded here. The format follows
   the old `src/sc_adapters.v` is removed the next time the blocks are saved, and
   flow runs now use LibreLane's run tag `wafer` while earlier runs are still read from `runs/sc/`. To move a local
   setup, rename the variables in `.env`, copy the `siliconcommons_pdk` and `siliconcommons_pg-data`
-  volumes to `wafersmith_*`, rename the database and role, and let Rauthy bootstrap afresh.
+  volumes to `wafersmith_*`, rename the database and role, let Rauthy bootstrap afresh, and run
+  `scripts/remap-dev-users.sh` before signing in so the development accounts keep their projects.
 - Conditions in messages and coverage are printed with only the parentheses precedence needs
   (`cnt == N / 2 - 1`).
 - The assistant counts example timing explicitly (cycle by cycle, with the reasoning), asks whether
