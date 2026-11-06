@@ -132,6 +132,13 @@ run each) passed all 6 runs and cost $1.32: $0.28 per spec draft (71-103 s) and 
 proposal (35-66 s, 4-7 turns). At that rate the whole set, 16 tasks with 2 repeats on both evals,
 costs about $14; larger tasks such as `uart_rx` and `fifo4` will likely cost more.
 
+## Changes to the tasks
+
+- 2026-11-06, `uart_rx`: two examples (a half-bit glitch is ignored; two bytes back to back) and a
+  sentence in the description saying glitches of half a bit or less are ignored. The planted-mistakes
+  check showed its examples let 6 of 34 mistakes through; now only 2 do, both timing the
+  description leaves open. Results below for `uart_rx` predate this.
+
 ## Baseline results
 
 First full run, 2026-11-05: Claude Opus 5.5 through OpenRouter, 16 tasks, 2 repeats, both evals.

@@ -352,17 +352,30 @@ mod tests {
         assert_eq!(design(&mut modules.clone()), before, "the original is untouched");
     }
 
+    /// The starters' examples catch every planted mistake except these, which change nothing the
+    /// description fixes. A new survivor means a starter's examples got weaker; a missing one means
+    /// they got stronger (update the list).
     #[test]
-    fn every_starter_can_be_checked() {
+    fn starter_examples_catch_every_mistake_that_matters() {
+        let allowed: &[(&str, &str, &str)] = &[
+            // The start-bit check one cycle later: only a pulse of exactly 3/4 of a bit is treated
+            // differently, and the description says nothing about those.
+            ("uart_rx", "cnt == CLKS_PER_BIT / 2 - 1", "cnt == CLKS_PER_BIT / 2"),
+            // valid one cycle later: still "no later than one bit time after the stop bit".
+            ("uart_rx", "cnt == CLKS_PER_BIT - 1", "cnt == CLKS_PER_BIT"),
+            // The line is already 1 from the stop bit, so setting it again changes nothing.
+            ("uart_tx", "tx <= 1", ""),
+        ];
+        let mut found = Vec::new();
         for st in crate::starters::all() {
             let (files, examples) = project(&st.id);
             let r = run(&files, &examples).unwrap_or_else(|e| panic!("{}: {e}", st.id));
-            assert!(r.tried > 0 && r.tried == r.sites.min(40) && r.caught <= r.tried, "{}", st.id);
-            println!("{:<10} {:>2}/{:<2} sites {:>2} {:>4} ms", st.id, r.caught, r.tried, r.sites, r.elapsed_ms);
-            for x in &r.slipped {
-                println!("    {}", x.text);
-            }
+            assert!(r.tried > 0 && r.tried == r.sites.min(40), "{}", st.id);
+            found.extend(r.slipped.iter().map(|x| (st.id.clone(), x.original.clone(), x.mistake.clone())));
         }
+        let found: Vec<(&str, &str, &str)> =
+            found.iter().map(|(a, b, c)| (a.as_str(), b.as_str(), c.as_str())).collect();
+        assert_eq!(found, allowed);
     }
 
     #[test]
