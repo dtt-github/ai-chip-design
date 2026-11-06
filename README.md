@@ -65,6 +65,7 @@ Then open http://localhost:5173.
 | [Pilot deployment](deploy/pilot/README.md) | One-host HTTPS deployment, backups and restore |
 | [Security review](docs/security-review.md) | What was reviewed, fixed and accepted before the pilot |
 | [Phase 0 gate](docs/phase0-gate.md) | The first end-to-end milestone |
+| [Release rehearsal](docs/release-rehearsal.md) | Three starters to a clean layout, timed, before 0.1.0 |
 
 Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md); report vulnerabilities as described in
 [SECURITY.md](SECURITY.md).
