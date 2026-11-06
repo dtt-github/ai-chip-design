@@ -90,12 +90,20 @@ docker compose -f deploy/compose/docker-compose.yml down
 docker volume rm wafersmith_rauthy-data
 ```
 
+Rauthy then gives the development accounts new subjects, and the API knows users by subject, so
+signing in would show an empty project list. Start the stack again and, before signing in, move the
+existing users (and their projects) to the new subjects:
+
+```bash
+scripts/remap-dev-users.sh
+```
+
 ### A token for `curl`
 
 The development-only `wafersmith-dev-cli` client allows the password grant:
 
 ```bash
-curl -s -X POST localhost:8180/auth/v1/oidc/token -d grant_type=password -d client_id=wafersmith-dev-cli -d client_secret=scdevcliscdevcliscdevcliscdevcliscdevcliscdevcliscdevcliscdevcli -d username=dev@wafersmith.dev -d password=Wafersmith-dev-2026
+curl -s -X POST localhost:8180/auth/v1/oidc/token -d grant_type=password -d client_id=wafersmith-dev-cli -d client_secret=wafersmithdevcliwafersmithdevcliwafersmithdevcliwafersmithdevcli -d username=dev@wafersmith.dev -d password=Wafersmith-dev-2026
 ```
 
 Send the `access_token` as `Authorization: Bearer <token>`; see [api.md](api.md).

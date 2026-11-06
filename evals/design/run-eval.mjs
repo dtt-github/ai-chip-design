@@ -159,7 +159,7 @@ const env = (k, d) => process.env[k] ?? d;
 const API = env('WAFER_EVAL_API', 'http://127.0.0.1:8090/api').replace(/\/$/, '');
 const TOKEN_URL = env('WAFER_EVAL_TOKEN_URL', 'http://localhost:8180/auth/v1/oidc/token');
 const CLIENT_ID = env('WAFER_EVAL_CLIENT_ID', 'wafersmith-dev-cli');
-const CLIENT_SECRET = env('WAFER_EVAL_CLIENT_SECRET', 'scdevcli'.repeat(8));
+const CLIENT_SECRET = env('WAFER_EVAL_CLIENT_SECRET', 'wafersmithdevcli'.repeat(4));
 const USERNAME = env('WAFER_EVAL_USER', 'dev@wafersmith.dev');
 const PASSWORD = env('WAFER_EVAL_PASSWORD', 'Wafersmith-dev-2026');
 const POLL_MS = 5000;
