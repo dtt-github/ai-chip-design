@@ -8,6 +8,12 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **Why? through memories**: in "Why is it this value?", a value read from a memory (`dout =
+  mem[rptr]`) now names the word it was (`mem[0] = 17`), and that word can be clicked like any
+  value, back to the line that stored it (`mem[wptr] <= din`) and why it ran. The simulator records
+  each memory word's changes like a signal's (`SimResult::words`) and, each time an assignment that
+  reads memory words runs, which words it read (`SimResult::word_reads`, `Origin::words`). Runs in
+  the browser; no AI and no cost.
 - **Try a small fix**: a failing example offers "The design: try a small fix". Without AI, the
   server tries the small repairs that undo the most common mistakes (a comparison turned around, a
   limit one off in either direction, a condition reversed, a missing or extra `!`/`~`, `&&` for

@@ -4,7 +4,7 @@
 //! nonblocking assignments, repeating until nothing changes; then `$strobe` and
 //! `$monitor` output, then time advances to the next scheduled event.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use crate::ast::Edge;
 use crate::elab::*;
@@ -73,10 +73,19 @@ pub struct SimResult {
     pub cover_decision: Vec<u32>,
     /// Set when the run made more than [`MAX_DECISIONS`] decisions: only the first are recorded.
     pub decisions_cut: bool,
+    /// The memory words written or read, each like a signal (`tb.dut.mem[2]`), in no set order.
+    pub words: Vec<WaveSignal>,
+    /// Each time an assignment that reads memory words ran: when, the origin, and the words it
+    /// read (indexes into [`SimResult::words`]), one entry per word in [`crate::elab::Origin::words`]
+    /// order. Only the first [`MAX_WORD_READS`] are recorded.
+    pub word_reads: Vec<(u64, u32, u32)>,
 }
 
 /// Decisions recorded per run, at most.
 pub const MAX_DECISIONS: usize = 1 << 21;
+
+/// The most memory word reads [`SimResult::word_reads`] keeps.
+pub const MAX_WORD_READS: usize = 1 << 20;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum State {
@@ -139,6 +148,10 @@ pub struct Sim<'d> {
     cover_hits: Vec<std::cell::Cell<u64>>,
     decisions: Vec<(u64, u32)>,
     decisions_cut: bool,
+    words: Vec<WaveSignal>,
+    /// The entry in `words` of a memory word's slot.
+    word_of: HashMap<usize, u32>,
+    word_reads: Vec<(u64, u32, u32)>,
 }
 
 const fn mask(w: u32) -> u64 {
@@ -206,6 +219,9 @@ impl<'d> Sim<'d> {
             cover_hits: (0..d.cover.len()).map(|_| std::cell::Cell::new(0)).collect(),
             decisions: Vec::new(),
             decisions_cut: false,
+            words: Vec::new(),
+            word_of: HashMap::new(),
+            word_reads: Vec::new(),
         }
     }
 
@@ -230,6 +246,8 @@ impl<'d> Sim<'d> {
             decisions: std::mem::take(&mut self.decisions),
             cover_decision: self.d.cover_decision.clone(),
             decisions_cut: self.decisions_cut,
+            words: self.words,
+            word_reads: self.word_reads,
         })
     }
 
@@ -339,6 +357,7 @@ impl<'d> Sim<'d> {
             match op {
                 Op::From(n) => self.procs[p].from = *n,
                 Op::Assign(lv, e) => {
+                    self.note_word_reads(p);
                     let w = lv.width(self.d);
                     let v = self.eval_ctx(e, w);
                     let writes = self.resolve(lv, v, self.procs[p].from);
@@ -347,6 +366,7 @@ impl<'d> Sim<'d> {
                     }
                 }
                 Op::NbAssign(lv, e, delay) => {
+                    self.note_word_reads(p);
                     let w = lv.width(self.d);
                     let v = self.eval_ctx(e, w);
                     let writes = self.resolve(lv, v, self.procs[p].from);
@@ -501,6 +521,7 @@ impl<'d> Sim<'d> {
 
     fn write(&mut self, w: &Write) {
         let old = self.vals[w.slot];
+        let word = if self.d.signals[w.sig].array.is_some() { self.word(w.sig, w.slot) } else { None };
         let m = mask(w.w) << w.lo;
         let new = ((old & !m) | ((w.value & mask(w.w)) << w.lo)) & mask(self.d.signals[w.sig].width);
         if new == old {
@@ -511,9 +532,29 @@ impl<'d> Sim<'d> {
             {
                 *wave.by.last_mut().unwrap() = w.by;
             }
+            if let Some(k) = word {
+                let wave = &mut self.words[k as usize];
+                if wave.by.last() == Some(&NO_ORIGIN) {
+                    *wave.by.last_mut().unwrap() = w.by;
+                }
+            }
             return;
         }
         self.vals[w.slot] = new;
+        if let Some(k) = word
+            && self.changes < self.limits.max_changes
+        {
+            let wave = &mut self.words[k as usize];
+            if wave.times.last() == Some(&self.now) {
+                *wave.values.last_mut().unwrap() = new;
+                *wave.by.last_mut().unwrap() = w.by;
+            } else {
+                wave.times.push(self.now);
+                wave.values.push(new);
+                wave.by.push(w.by);
+                self.changes += 1;
+            }
+        }
         if let Some(wave) = self.waves[w.sig].as_mut()
             && self.changes < self.limits.max_changes
         {
@@ -531,6 +572,42 @@ impl<'d> Sim<'d> {
             }
         }
         self.notify(w.sig);
+    }
+
+    /// The entry in `words` of the memory word at `slot` (of memory `sig`), made on first use;
+    /// `None` for a hidden memory.
+    fn word(&mut self, sig: usize, slot: usize) -> Option<u32> {
+        let s = &self.d.signals[sig];
+        if s.hidden {
+            return None;
+        }
+        if let Some(&k) = self.word_of.get(&slot) {
+            return Some(k);
+        }
+        let lo = s.array.map(|(lo, _)| lo).unwrap_or(0);
+        let k = self.words.len() as u32;
+        self.words.push(WaveSignal {
+            name: format!("{}[{}]", s.name, lo + (slot - s.slot) as i64),
+            width: s.width,
+            times: vec![0],
+            values: vec![self.vals[slot]],
+            by: vec![NO_ORIGIN],
+        });
+        self.word_of.insert(slot, k);
+        Some(k)
+    }
+
+    /// Records the memory words the assignment process `p` is about to run reads.
+    fn note_word_reads(&mut self, p: usize) {
+        let from = self.procs[p].from;
+        let Some(list) = self.d.origin_words.get(from as usize) else { return };
+        if list.is_empty() || self.word_reads.len() + list.len() > MAX_WORD_READS {
+            return;
+        }
+        for (sig, idx) in list {
+            let k = self.word_slot(*sig, Some(idx)).and_then(|slot| self.word(*sig, slot));
+            self.word_reads.push((self.now, from, k.unwrap_or(NO_ORIGIN)));
+        }
     }
 
     /// An index or part-select start: unsigned unless the expression is signed, so a sized

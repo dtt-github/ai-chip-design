@@ -29,6 +29,15 @@ self.onmessage = async (ev: MessageEvent<SimRequest>) => {
         cut: last.decisionsCut,
       };
       const signals = names.map((name, i) => ({ name, width: widths[i], times: last!.times(i), values: last!.values(i), by: last!.by(i) }));
+      const wordWidths = last.wordWidths;
+      const words = last.wordNames.map((name, i) => ({
+        name,
+        width: wordWidths[i],
+        times: last!.wordTimes(i),
+        values: last!.wordValues(i),
+        by: last!.wordBy(i),
+      }));
+      const wordReads = { times: last.wordReadTimes(), origins: last.wordReadOrigins(), words: last.wordReadWords() };
       reply(
         {
           type: "result",
@@ -45,9 +54,18 @@ self.onmessage = async (ev: MessageEvent<SimRequest>) => {
             signals,
             origins: JSON.parse(last.origins()),
             decisions,
+            words,
+            wordReads,
           },
         },
-        [...signals.flatMap((s) => [s.times.buffer, s.values.buffer, s.by.buffer]), decisions.times.buffer, decisions.branches.buffer],
+        [
+          ...[...signals, ...words].flatMap((s) => [s.times.buffer, s.values.buffer, s.by.buffer]),
+          decisions.times.buffer,
+          decisions.branches.buffer,
+          wordReads.times.buffer,
+          wordReads.origins.buffer,
+          wordReads.words.buffer,
+        ],
       );
     }
   } catch (e) {

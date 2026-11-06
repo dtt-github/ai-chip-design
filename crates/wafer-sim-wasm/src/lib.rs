@@ -119,7 +119,52 @@ impl Simulation {
         self.r.decisions_cut
     }
 
-    /// Where written values come from, as JSON: `[{file, line, scope, text, reads, writes, conds:
+    /// The memory words written or read (`tb.dut.mem[2]`); `wordTimes`, `wordValues` and `wordBy`
+    /// give each one's changes as for signals.
+    #[wasm_bindgen(getter, js_name = wordNames)]
+    pub fn word_names(&self) -> Vec<String> {
+        self.r.words.iter().map(|s| s.name.clone()).collect()
+    }
+
+    #[wasm_bindgen(getter, js_name = wordWidths)]
+    pub fn word_widths(&self) -> Vec<u32> {
+        self.r.words.iter().map(|s| s.width).collect()
+    }
+
+    #[wasm_bindgen(js_name = wordTimes)]
+    pub fn word_times(&self, i: usize) -> Vec<f64> {
+        self.r.words.get(i).map(|s| s.times.iter().map(|&t| t as f64).collect()).unwrap_or_default()
+    }
+
+    #[wasm_bindgen(js_name = wordValues)]
+    pub fn word_values(&self, i: usize) -> Vec<u64> {
+        self.r.words.get(i).map(|s| s.values.clone()).unwrap_or_default()
+    }
+
+    #[wasm_bindgen(js_name = wordBy)]
+    pub fn word_by(&self, i: usize) -> Vec<u32> {
+        self.r.words.get(i).map(|s| s.by.clone()).unwrap_or_default()
+    }
+
+    /// When each recorded memory word read happened, in order.
+    #[wasm_bindgen(js_name = wordReadTimes)]
+    pub fn word_read_times(&self) -> Vec<f64> {
+        self.r.word_reads.iter().map(|&(t, _, _)| t as f64).collect()
+    }
+
+    /// The origin (assignment) that read it.
+    #[wasm_bindgen(js_name = wordReadOrigins)]
+    pub fn word_read_origins(&self) -> Vec<u32> {
+        self.r.word_reads.iter().map(|&(_, o, _)| o).collect()
+    }
+
+    /// The word read: an index into `wordNames`, 0xFFFFFFFF for one outside the memory.
+    #[wasm_bindgen(js_name = wordReadWords)]
+    pub fn word_read_words(&self) -> Vec<u32> {
+        self.r.word_reads.iter().map(|&(_, _, k)| k).collect()
+    }
+
+    /// Where written values come from, as JSON: `[{file, line, scope, text, reads, writes, words, conds:
     /// [{line, text, reads, taken, point}]}]`.
     pub fn origins(&self) -> String {
         let list: Vec<String> = self
@@ -142,13 +187,14 @@ impl Simulation {
                     })
                     .collect();
                 format!(
-                    r#"{{"file":{},"line":{},"scope":{},"text":{},"reads":{},"writes":{},"conds":[{}]}}"#,
+                    r#"{{"file":{},"line":{},"scope":{},"text":{},"reads":{},"writes":{},"words":{},"conds":[{}]}}"#,
                     json(&o.file),
                     o.line,
                     json(&o.scope),
                     json(&o.text),
                     strings(&o.reads),
                     json(&o.writes),
+                    strings(&o.words),
                     conds.join(",")
                 )
             })

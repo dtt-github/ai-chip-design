@@ -24,6 +24,8 @@ export interface SimOrigin {
   reads: string[];
   /** Full name of the signal it writes; empty when it writes several. */
   writes: string;
+  /** The memories it reads a word of, in the order read; `SimWordReads` says which words. */
+  words: string[];
   /** The `if`/`case` decisions it is inside, outermost first, and which way each went for it to
    * run; `point` is that branch, as in `SimDecisions`. */
   conds: { line: number; text: string; reads: string[]; taken: string; point: number }[];
@@ -40,6 +42,15 @@ export interface SimDecisions {
   cut: boolean;
 }
 
+/** Each time an assignment that reads memory words ran, one entry per word it read. */
+export interface SimWordReads {
+  times: Float64Array;
+  /** The assignment (an index into `origins`). */
+  origins: Uint32Array;
+  /** The word read: an index into `SimResult.words`, or NO_ORIGIN for one outside the memory. */
+  words: Uint32Array;
+}
+
 export interface SimResult {
   log: string[];
   time: number;
@@ -52,6 +63,9 @@ export interface SimResult {
   signals: SimSignal[];
   origins: SimOrigin[];
   decisions: SimDecisions;
+  /** Memory words written or read, each like a signal: `tb.dut.mem[2]`. */
+  words: SimSignal[];
+  wordReads: SimWordReads;
 }
 
 export type SimRequest =

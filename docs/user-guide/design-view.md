@@ -91,8 +91,10 @@ it ("line 20 of blinker.v wrote it: `led <= ~led`"), why that line ran (each `if
 around it and which way it went: "`cnt == N - 1` was true (cnt = 3)"), and the values it used.
 Every value mentioned can be clicked in turn, so you can follow a wrong output back, one step at
 a time, to the decision or the example input that caused it. Values passed through a port of a
-block are followed into the block; an input the example sets ends the chain ("set by step 1 of
-the example"). When you then ask the AI to fix the design or the assistant to correct the
+block are followed into the block, and a value read from a memory names the word it was
+("It used `mem[0]` = 17, `rptr` = 0"), which leads to the line that stored it there
+("`mem[wptr] <= din`"). An input the example sets ends the chain ("set by step 1 of the
+example"). When you then ask the AI to fix the design or the assistant to correct the
 example, the explanation you followed goes with the request.
 
 **Why wasn't it the expected value?** When an example fails, the account of the difference ends
