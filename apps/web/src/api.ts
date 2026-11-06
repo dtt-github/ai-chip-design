@@ -518,10 +518,29 @@ async function send(method: string, path: string, body?: unknown): Promise<Respo
 const enc = encodeURIComponent;
 const filePath = (p: string) => p.split("/").map(enc).join("/");
 
+/** A verified starter design (`GET /starters`): start a project from it, or add it as a block. */
+export interface Starter {
+  id: string;
+  title: string;
+  summary: string;
+  category: string;
+  /** The design's module name. */
+  top: string;
+  ports: SpecPort[];
+  params: { name: string; value: string; meaning: string }[];
+  clock_mhz: number | null;
+  clock: string | null;
+  reset: string | null;
+  examples: number;
+}
+
 export const api = {
   listProjects: () => request<Project[]>("GET", "/projects"),
-  createProject: (body: { name: string; description?: string; visibility?: string; licence?: string }) =>
+  createProject: (body: { name: string; description?: string; visibility?: string; licence?: string; starter?: string }) =>
     request<Project>("POST", "/projects", body),
+  starters: () => request<Starter[]>("GET", "/starters"),
+  addStarter: (id: string, starter: string) =>
+    request<{ commit: string; path: string; module: string }>("POST", `/projects/${enc(id)}/starters/${enc(starter)}`),
   aiUsage: () => request<{ today_usd: number; limit_usd: number | null }>("GET", "/me/ai-usage"),
   getBlocks: (id: string) => request<BlocksView>("GET", `/projects/${enc(id)}/blocks`),
   checkBlocks: (id: string, blocks: Blocks) => request<BlocksCheck>("POST", `/projects/${enc(id)}/blocks/check`, { blocks }),

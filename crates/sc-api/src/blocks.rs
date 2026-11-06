@@ -71,7 +71,7 @@ pub struct Wire {
 pub struct ModuleInfo {
     pub name: String,
     pub file: String,
-    /// `project`, `ip:<block>`, or `adapter`.
+    /// `project`, `starter`, `ip:<block>`, or `adapter`.
     pub source: String,
     pub params: BTreeMap<String, i64>,
     pub ports: Vec<PortInfo>,
@@ -182,15 +182,23 @@ pub fn discover(files: &BTreeMap<String, String>, top: Option<&str>) -> (Vec<Mod
         }
         match module_ports(&modules, &m.name, &HashMap::new()) {
             Ok((params, ports)) => {
+                let starter = m
+                    .file
+                    .strip_prefix(&format!("{}/", crate::starters::DIR))
+                    .and_then(|_| crate::starters::all().iter().find(|s| s.top == m.name));
                 let source = if m.file == ADAPTERS_FILE {
                     "adapter".to_string()
+                } else if starter.is_some() {
+                    "starter".to_string()
                 } else if let Some(rest) = m.file.strip_prefix("ip/") {
                     format!("ip:{}", rest.split('/').next().unwrap_or(""))
                 } else {
                     "project".to_string()
                 };
                 out.push(ModuleInfo {
-                    description: adapter_description(&m.name).unwrap_or("").to_string(),
+                    description: starter
+                        .map(|s| s.summary.clone())
+                        .unwrap_or_else(|| adapter_description(&m.name).unwrap_or("").to_string()),
                     name: m.name.clone(),
                     file: m.file.clone(),
                     source,

@@ -2216,3 +2216,68 @@ select.small {
 .design-chip-hint button {
   align-self: flex-start;
 }
+
+/* Starter designs on the projects page. */
+.starters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.starters-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.starters-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.starters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.starter-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.starter-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
+.starter-card.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.starter-title {
+  font-weight: 600;
+}
+
+.blocks-library summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.blocks-add {
+  margin-left: auto;
+}

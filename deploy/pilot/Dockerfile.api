@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends pkg-config cmak
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY crates crates
+# The starter designs are built into the API (crates/sc-api/build.rs).
+COPY evals/design/tasks evals/design/tasks
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
     cargo build --release --locked -p sc-api && cp target/release/siliconcommons-api /siliconcommons-api

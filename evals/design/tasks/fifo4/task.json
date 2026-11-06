@@ -7,5 +7,10 @@
   ],
   "top": "fifo4",
   "description": "A small FIFO. Module `fifo4` with inputs clk, rst_n (active-low reset), wr, din (8 bits) and rd, and outputs dout (8 bits), empty and full. It holds up to 4 bytes. At a rising clock edge, wr stores din if the FIFO is not full, and rd removes the oldest byte if it is not empty (judged by the state before the edge; both can happen at the same edge). dout always shows the oldest byte while the FIFO is not empty (no read latency); empty and full describe the current contents. Reset empties it.",
-  "open_points": []
+  "open_points": [],
+  "starter": {
+    "title": "Small FIFO",
+    "summary": "A 4-byte queue: bytes come out in the order they went in, with full and empty flags.",
+    "category": "Data"
+  }
 }

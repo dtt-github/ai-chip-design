@@ -80,5 +80,10 @@
         ]
       }
     ]
+  },
+  "starter": {
+    "title": "Traffic light",
+    "summary": "Cycles red, green and yellow with a set time for each light.",
+    "category": "Control"
   }
 }

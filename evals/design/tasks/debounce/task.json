@@ -7,5 +7,10 @@
   ],
   "top": "debounce",
   "description": "A debouncer. Module `debounce` with a parameter N (default 4), inputs clk, rst_n (active-low reset) and din, and output dout. din is already synchronous to clk. dout takes din's new value only once din has differed from dout at N consecutive rising clock edges; dout changes at the Nth of those edges. Shorter changes are ignored. After reset dout is 0.",
-  "open_points": []
+  "open_points": [],
+  "starter": {
+    "title": "Button debouncer",
+    "summary": "Cleans up a noisy input: the output changes only after the input has been stable for N cycles.",
+    "category": "Inputs"
+  }
 }

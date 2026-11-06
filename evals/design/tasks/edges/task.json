@@ -81,5 +81,10 @@
         ]
       }
     ]
+  },
+  "starter": {
+    "title": "Edge detector",
+    "summary": "Gives a one-cycle pulse when an input goes up, and another when it goes down.",
+    "category": "Inputs"
   }
 }

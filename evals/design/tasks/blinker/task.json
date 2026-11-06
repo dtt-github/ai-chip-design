@@ -7,5 +7,10 @@
   ],
   "top": "blinker",
   "description": "An LED blinker. Module `blinker` with a parameter N (default 4), inputs clk, rst_n (active-low reset) and en, and output led. While en is 1 the LED toggles every N clock cycles: it turns on at the Nth rising clock edge at which en is 1, turns off N edges later, and so on. When en is 0 the LED is off and the count starts over. Reset turns the LED off.",
-  "open_points": []
+  "open_points": [],
+  "starter": {
+    "title": "LED blinker",
+    "summary": "Blinks an LED every N clock cycles while enabled.",
+    "category": "Basics"
+  }
 }
