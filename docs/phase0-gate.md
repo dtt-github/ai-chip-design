@@ -18,7 +18,7 @@ LibreLane 3.0.16 with the IHP SG13G2 PDK pinned by that image.
 | 3:15    | Dev User   | **Run RTL → GDS** on that commit. |
 | 4:30    | both       | Run finished in 48 s: **sign-off clean** (Magic + KLayout DRC, LVS, antenna, setup and hold timing); 166 standard cells, 7 990 µm² die, setup slack 13.5 ns, hold slack 0.184 ns. Layout opens in the viewer. |
 
-The design is in `crates/sc-sim/tests/conformance/uart_8n1.v`; Icarus Verilog and the browser
+The design is in `crates/wafer-sim/tests/conformance/uart_8n1.v`; Icarus Verilog and the browser
 simulator print identical output for it.
 
 What the gate run exposed and what was fixed during it:

@@ -8,11 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends pkg-config cmak
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY crates crates
-# The starter designs are built into the API (crates/sc-api/build.rs).
+# The starter designs are built into the API (crates/wafer-api/build.rs).
 COPY evals/design/tasks evals/design/tasks
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
-    cargo build --release --locked -p sc-api && cp target/release/siliconcommons-api /siliconcommons-api
+    cargo build --release --locked -p wafer-api && cp target/release/wafersmith-api /wafersmith-api
 COPY scripts/fetch-verible.sh scripts/fetch-verible.sh
 RUN bash scripts/fetch-verible.sh && cp -r .tools/verible /verible && chmod -R a+rX /verible
 
@@ -23,11 +23,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --create-home --shell /usr/sbin/nologin sc
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
-COPY --from=build /siliconcommons-api /usr/local/bin/siliconcommons-api
+COPY --from=build /wafersmith-api /usr/local/bin/wafersmith-api
 COPY --from=build /verible /opt/verible
-ENV SC_BIND=0.0.0.0:8090 \
-    SC_VERIBLE_LS=/opt/verible/bin/verible-verilog-ls \
+ENV WAFER_BIND=0.0.0.0:8090 \
+    WAFER_VERIBLE_LS=/opt/verible/bin/verible-verilog-ls \
     RUST_LOG=info
 USER 10001
 EXPOSE 8090
-ENTRYPOINT ["/usr/local/bin/siliconcommons-api"]
+ENTRYPOINT ["/usr/local/bin/wafersmith-api"]

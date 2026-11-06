@@ -2,7 +2,7 @@
 
 The **Agent** panel sends a change request in words ("add an even-parity option"), and so do the
 Design view's "make the examples pass" and "the design is wrong" buttons. The agent runs in the
-API (`sc-api/src/agent.rs`) and changes a private copy of the project; it can't commit. A person
+API (`wafer-api/src/agent.rs`) and changes a private copy of the project; it can't commit. A person
 reviews its proposal and merges it.
 
 ## What it can do
@@ -19,7 +19,7 @@ through five tools:
 ## The simulation gate
 
 When the agent finishes, the server runs every testbench on the files the proposal would produce
-(`sc-api/src/gate.rs`): each must reach `$finish`, print `PASS` and print nothing containing `FAIL`,
+(`wafer-api/src/gate.rs`): each must reach `$finish`, print `PASS` and print nothing containing `FAIL`,
 `ERROR` or `MISMATCH`. Only a proposal whose gate passed, and whose base is still `main`, can be
 merged by an editor; the gate runs again at merge time on the exact files committed. The commit is
 authored by the person who merged, titled with the agent's title, and records the summary, the
@@ -36,5 +36,5 @@ commit, and **Re-run gate** checks that the recorded result reproduces.
 ## Cost and limits
 
 Each proposal's token usage is priced for the model that served it and counted against the person's daily AI budget
-(`SC_AI_DAILY_USD`); each person can have 2 proposals running at once. Without an API key on the
+(`WAFER_AI_DAILY_USD`); each person can have 2 proposals running at once. Without an API key on the
 server, the agent is unavailable ([configuration.md](../configuration.md#ai-assistant-and-agent)).

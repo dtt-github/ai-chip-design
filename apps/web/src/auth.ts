@@ -1,7 +1,7 @@
 import { UserManager, WebStorageStateStore, type User } from "oidc-client-ts";
 
 const authority = import.meta.env.VITE_OIDC_AUTHORITY ?? "http://localhost:8180/auth/v1/";
-const clientId = import.meta.env.VITE_OIDC_CLIENT_ID ?? "siliconcommons-web";
+const clientId = import.meta.env.VITE_OIDC_CLIENT_ID ?? "wafersmith-web";
 
 export const userManager = new UserManager({
   authority,

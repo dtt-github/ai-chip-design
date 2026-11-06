@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to SiliconCommons are recorded here. The format follows
+All notable changes to Wafersmith are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions will follow
 [Semantic Versioning](https://semver.org/) from the first release.
 
@@ -46,6 +46,15 @@ All notable changes to SiliconCommons are recorded here. The format follows
 
 ### Changed
 
+- **Renamed to Wafersmith** (formerly SiliconCommons, a name already used by lowRISC for its
+  open-silicon process). Crates are now `wafer-*` (binary `wafersmith-api`), environment
+  variables `WAFER_*` instead of `SC_*`, the web package `@wafersmith/web`, the adapter modules
+  `wafer_*` in `src/wafer_adapters.v`, and the Docker Compose project, volumes, database and role
+  `wafersmith`/`wafer`; the OIDC clients are `wafersmith-web` and `wafersmith-dev-cli`. Existing
+  projects keep working: files generated under the old name are still recognised as generated,
+  and the old `src/sc_adapters.v` is removed the next time the blocks are saved. To move a local
+  setup, rename the variables in `.env`, copy the `siliconcommons_pdk` and `siliconcommons_pg-data`
+  volumes to `wafersmith_*`, rename the database and role, and let Rauthy bootstrap afresh.
 - Conditions in messages and coverage are printed with only the parentheses precedence needs
   (`cnt == N / 2 - 1`).
 - The assistant counts example timing explicitly (cycle by cycle, with the reasoning), asks whether
@@ -53,7 +62,7 @@ All notable changes to SiliconCommons are recorded here. The format follows
   about as depending on it, and always writes at least one example that holds whatever the answers
   are (a draft without examples is sent back once). From the design eval's baseline failures.
 - AI costs are priced for the model that served each call (Claude Opus 5.5 and Gemini 4 Argon
-  built in, `SC_AI_PRICES` for anything else) instead of always at Opus 5.5 prices, and recorded
+  built in, `WAFER_AI_PRICES` for anything else) instead of always at Opus 5.5 prices, and recorded
   with the model. Drafts return their cost (`usd`), proposals keep it in the evidence log, and the
   eval runner uses the server's figure.
 

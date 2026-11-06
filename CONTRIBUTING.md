@@ -1,6 +1,6 @@
-# Contributing to SiliconCommons
+# Contributing to Wafersmith
 
-SiliconCommons is an initiative of DigitalTwin Technology GmbH. Thank you for helping. This page
+Wafersmith is an initiative of DigitalTwin Technology GmbH. Thank you for helping. This page
 says how changes get in; [docs/development.md](docs/development.md) has the technical details and
 [docs/getting-started.md](docs/getting-started.md) sets up your machine.
 
@@ -15,11 +15,11 @@ says how changes get in; [docs/development.md](docs/development.md) has the tech
 1. Branch from `main`: `feature/<topic>`, `fix/<topic>` or `docs/<topic>`.
 2. Keep the change focused; one pull request does one thing.
 3. Every change ships with:
-   - **tests** (unit tests next to the code, API tests in `crates/sc-api/tests/`);
+   - **tests** (unit tests next to the code, API tests in `crates/wafer-api/tests/`);
    - **documentation**: the relevant page under `docs/`, the [API reference](docs/api.md) and
      [configuration](docs/configuration.md) when they change, and an entry in
      [CHANGELOG.md](CHANGELOG.md) under "Unreleased";
-   - **plain-language messages** for anything a user sees: SiliconCommons is for engineers who
+   - **plain-language messages** for anything a user sees: Wafersmith is for engineers who
      aren't chip-design experts.
 4. Run the checks CI runs ([docs/development.md](docs/development.md#checks-what-ci-runs)).
 5. Open a pull request and fill in the template. CI must pass; a maintainer reviews and merges.

@@ -1,0 +1,16 @@
+[package]
+name = "wafer-gds-wasm"
+description = "WebAssembly bindings for wafer-gds (built with scripts/build-wasm.sh)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wafer-gds = { path = "../wafer-gds" }
+# Must match the wasm-bindgen CLI version used by scripts/build-wasm.sh.
+wasm-bindgen = "=0.2.130"

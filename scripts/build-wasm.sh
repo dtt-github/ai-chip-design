@@ -7,9 +7,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/apps/web/src/wasm"
 PROFILE="${1:-release}"
 cd "$ROOT"
-cargo build -p sc-gds-wasm -p sc-sim-wasm --target wasm32-unknown-unknown --profile "$PROFILE"
+cargo build -p wafer-gds-wasm -p wafer-sim-wasm --target wasm32-unknown-unknown --profile "$PROFILE"
 DIR=$([ "$PROFILE" = dev ] && echo debug || echo "$PROFILE")
-for pair in sc_gds_wasm:sc_gds sc_sim_wasm:sc_sim; do
+for pair in wafer_gds_wasm:wafer_gds wafer_sim_wasm:wafer_sim; do
   crate="${pair%%:*}"; name="${pair##*:}"
   wasm-bindgen --target web --out-dir "$OUT" --out-name "$name" "target/wasm32-unknown-unknown/$DIR/$crate.wasm"
   if command -v wasm-opt >/dev/null; then

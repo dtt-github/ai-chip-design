@@ -29,7 +29,7 @@ The tasks double as the [starter designs](user-guide/starters.md): `task.json`'s
 gives the title, summary and group shown in the gallery, and the server builds the spec and the
 reference design in. Changing a reference changes the starter too.
 
-`cargo test -p sc-api --test evals` checks the references themselves: every reference design
+`cargo test -p wafer-api --test evals` checks the references themselves: every reference design
 passes its examples and its hidden testbench, and a design that drives every output to 0 fails
 both. Writing a hidden testbench that also catches off-by-one variants (a counter one short, a
 FIFO that reads when empty) was checked by hand when the tasks were written.
@@ -66,7 +66,7 @@ into a grading project with the hidden testbench:
 | `example_pass_rate`, `files_touched` | Detail. |
 | **`pass`** | Both. |
 
-Each row also records `cost_usd` (the server's prices, `crates/sc-api/src/spend.rs`), `turns` for
+Each row also records `cost_usd` (the server's prices, `crates/wafer-api/src/spend.rs`), `turns` for
 the agent, the model served and the latency.
 
 ## Running
@@ -78,7 +78,7 @@ the web app does. Results go to `evals/design/results/` (not committed).
    limit, since an eval run spends more than a person's day:
 
    ```bash
-   SC_AI_DAILY_USD=0 cargo run -p sc-api
+   WAFER_AI_DAILY_USD=0 cargo run -p wafer-api
    ```
 
 2. Check the grading without calling the model. `oracle` answers with the reference (every task
@@ -110,22 +110,22 @@ the web app does. Results go to `evals/design/results/` (not committed).
    `_state.json`, e.g. `"metrics": [{"id": "pass", "kind": "binary"}, {"id": "hidden_pass", "kind": "binary"}]`.
 
 Options: `--reps N` (repeats per task; 2 shows how much results vary), `--concurrency N`
-(default 4; the agent eval uses at most 2, the server's limit per person), `--timeout-s N` (per task, default 1800). `SC_EVAL_TASKS=uart_tx,fifo4` runs a subset.
+(default 4; the agent eval uses at most 2, the server's limit per person), `--timeout-s N` (per task, default 1800). `WAFER_EVAL_TASKS=uart_tx,fifo4` runs a subset.
 A run resumes where it stopped; delete the flow directory to start over. `--approve-harness`
 records a hash of the runner, and later runs refuse to start if the runner changed without a new
 approval.
 
 The runner signs in with the development stack's test account. For another server set
-`SC_EVAL_API`, `SC_EVAL_TOKEN_URL`, `SC_EVAL_CLIENT_ID`, `SC_EVAL_CLIENT_SECRET`, `SC_EVAL_USER`
-and `SC_EVAL_PASSWORD`. Each task creates two or three private projects named `eval-…` owned by
+`WAFER_EVAL_API`, `WAFER_EVAL_TOKEN_URL`, `WAFER_EVAL_CLIENT_ID`, `WAFER_EVAL_CLIENT_SECRET`, `WAFER_EVAL_USER`
+and `WAFER_EVAL_PASSWORD`. Each task creates two or three private projects named `eval-…` owned by
 that account.
 
 ## Cost
 
 A live run costs what the model is billed for the drafts or proposals. The runner takes each run's
-cost from the server, which prices it for the model that served it (`SC_AI_PRICES` overrides; see
+cost from the server, which prices it for the model that served it (`WAFER_AI_PRICES` overrides; see
 [configuration.md](configuration.md)) (the runner's figures match the server's `ai_usage` records). Measure it with a small run
-first (`SC_EVAL_TASKS=blinker --reps 1`) and multiply by the task count and repeats.
+first (`WAFER_EVAL_TASKS=blinker --reps 1`) and multiply by the task count and repeats.
 
 The first pilot (2026-11-05; Claude Opus 5.5 via OpenRouter; blinker, uart_tx and traffic, one
 run each) passed all 6 runs and cost $1.32: $0.28 per spec draft (71-103 s) and $0.16 per agent

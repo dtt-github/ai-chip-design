@@ -46,5 +46,5 @@ one combines the licences (`Apache-2.0 AND <yours>`), see [IP registry](ip-regis
 
 They are the [design evals'](../evals.md) tasks: `evals/design/tasks/<id>/`, with a `starter`
 entry in `task.json` (title, summary, group). The server builds the spec, the design and the
-description in (`crates/sc-api/build.rs`; the hidden testbenches stay out), so a starter can't
+description in (`crates/wafer-api/build.rs`; the hidden testbenches stay out), so a starter can't
 drift from what the evals and `tests/evals.rs` check.

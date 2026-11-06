@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Restores a backup made by backup.sh, e.g. onto a fresh host after losing the old one.
-#   ./restore.sh /srv/siliconcommons/backups/<timestamp>
+#   ./restore.sh /srv/wafersmith/backups/<timestamp>
 # Needs the same .env and rauthy/ as the backed-up install (keep copies of them off the host).
 # Replaces the database, the project repositories and sign-in with the backup's; flow run
 # outputs are not in backups (run the flows again).
@@ -25,11 +25,11 @@ $COMPOSE stop caddy api rauthy backup >/dev/null 2>&1 || true
 
 echo "Database"
 $COMPOSE up -d --wait postgres
-$COMPOSE exec -T postgres pg_restore -U sc -d siliconcommons --clean --if-exists --no-owner < "$B/postgres.dump"
+$COMPOSE exec -T postgres pg_restore -U wafer -d wafersmith --clean --if-exists --no-owner < "$B/postgres.dump"
 
 echo "Project repositories and co-editing state"
-mkdir -p "$SC_DATA_DIR"
-docker run --rm -v "$SC_DATA_DIR:/d" -v "$B:/b:ro" alpine:3 \
+mkdir -p "$WAFER_DATA_DIR"
+docker run --rm -v "$WAFER_DATA_DIR:/d" -v "$B:/b:ro" alpine:3 \
     sh -c 'rm -rf /d/repos /d/collab && tar -C /d -xzf /b/repos-collab.tar.gz && chown -R 10001:10001 /d'
 
 if [[ -f "$B/rauthy.sqlite.gz" ]]; then

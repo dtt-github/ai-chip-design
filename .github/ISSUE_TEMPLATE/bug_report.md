@@ -15,7 +15,7 @@ labels: bug
 
 ## Where
 
-- Part of SiliconCommons (Design view, Blocks, Health, Code, runs, agent, IP registry, API…):
+- Part of Wafersmith (Design view, Blocks, Health, Code, runs, agent, IP registry, API…):
 - Commit or deployment:
 - Browser (for web issues):
 

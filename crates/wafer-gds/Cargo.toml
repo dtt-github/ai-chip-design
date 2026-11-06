@@ -1,0 +1,12 @@
+[package]
+name = "wafer-gds"
+description = "GDSII reader for Wafersmith: parse, flatten and tessellate layouts for rendering"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+earcutr = "0.5"
+thiserror.workspace = true

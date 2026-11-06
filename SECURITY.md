@@ -9,7 +9,7 @@ three working days and to agree on a fix and disclosure timeline with you.
 
 ## Scope
 
-SiliconCommons runs untrusted Verilog (simulation in the API process, synthesis in containers) and
+Wafersmith runs untrusted Verilog (simulation in the API process, synthesis in containers) and
 calls an AI provider with project content. The design of those boundaries, what was reviewed before
 the pilot and the risks accepted for it are in [docs/security-review.md](docs/security-review.md)
 and [docs/architecture.md](docs/architecture.md#trust-boundaries).

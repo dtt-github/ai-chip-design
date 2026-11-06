@@ -13,17 +13,17 @@ type Sel = { kind: "block"; name: string } | { kind: "wire"; index: number } | {
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 const ADAPTER_PORTS: Record<string, [string, string]> = {
-  sc_rise_pulse: ["level", "pulse"],
-  sc_sync2: ["d", "q"],
-  sc_invert: ["a", "y"],
-  sc_resize: ["a", "y"],
+  wafer_rise_pulse: ["level", "pulse"],
+  wafer_sync2: ["d", "q"],
+  wafer_invert: ["a", "y"],
+  wafer_resize: ["a", "y"],
 };
 
 const ADAPTER_LABEL: Record<string, string> = {
-  sc_rise_pulse: "level → one-clock pulse",
-  sc_sync2: "synchronizer (outside signal → this clock)",
-  sc_invert: "invert",
-  sc_resize: "change width",
+  wafer_rise_pulse: "level → one-clock pulse",
+  wafer_sync2: "synchronizer (outside signal → this clock)",
+  wafer_invert: "invert",
+  wafer_resize: "change width",
 };
 
 /** A chip from blocks: place modules, wire their connections, check, and save. */
@@ -95,7 +95,7 @@ export function BlocksStep({ projectId, head, canEdit }: { projectId: string; he
         <section className="design-card">
           <h3>Build the chip from blocks</h3>
           <p className="small" style={{ margin: 0 }}>
-            Put your design together with verified starter designs, blocks from the IP registry and small adapters, and connect them. SiliconCommons checks every
+            Put your design together with verified starter designs, blocks from the IP registry and small adapters, and connect them. Wafersmith checks every
             connection and writes the chip's top level for you; saving makes the chip what Health builds.
           </p>
           {canEdit && design && (
@@ -163,7 +163,7 @@ export function BlocksStep({ projectId, head, canEdit }: { projectId: string; he
     while (draft!.blocks.some((b) => b.name === `${base}_${n}`)) n++;
     const name = `${base}_${n}`;
     const params: Record<string, string> =
-      kind === "sc_invert" ? { W: String(widthOf(src)) } : kind === "sc_resize" ? { IN: String(widthOf(src)), OUT: String(widthOf(dst)) } : {};
+      kind === "wafer_invert" ? { W: String(widthOf(src)) } : kind === "wafer_resize" ? { IN: String(widthOf(src)), OUT: String(widthOf(dst)) } : {};
     const pos = (end: string) => endPoint(end, draft!, portsOf, "out");
     const a = pos(src);
     const b = pos(dst);

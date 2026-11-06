@@ -1,14 +1,14 @@
-# SiliconCommons
+# Wafersmith
 
 **AI-assisted chip design in the browser, for engineers who are not Verilog experts.**
 
 Describe what a chip should do in plain words, give examples of how it should behave, and
-SiliconCommons turns them into a specification and tests. An AI agent writes the Verilog until
+Wafersmith turns them into a specification and tests. An AI agent writes the Verilog until
 every example passes. The design then goes from RTL to a sign-off-checked layout (GDS) on the
 IHP SG13G2 130 nm open PDK, and the results are explained in plain language. Engineers who do
 write Verilog work on the same project in a full code editor.
 
-SiliconCommons is an initiative of **[DigitalTwin Technology GmbH](https://digitaltwin.technology)**,
+Wafersmith is an initiative of **[DigitalTwin Technology GmbH](https://digitaltwin.technology)**,
 which started the project and leads its development.
 
 [![CI](https://github.com/dtt-github/ai-chip-design/actions/workflows/ci.yml/badge.svg)](https://github.com/dtt-github/ai-chip-design/actions/workflows/ci.yml)
@@ -42,7 +42,7 @@ docker compose -f deploy/compose/docker-compose.yml up -d
 ```
 
 ```bash
-cp .env.example .env && cargo run -p sc-api
+cp .env.example .env && cargo run -p wafer-api
 ```
 
 ```bash
@@ -73,23 +73,23 @@ Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md); report vulnerabilities 
 
 ```
 crates/
-  sc-api/        HTTP API and workers (binary: siliconcommons-api)
-  sc-git/        per-project bare Git repositories (libgit2)
-  sc-jobs/       flow-run backends: LibreLane in Docker, metrics and report parsing
-  sc-sim/        event-driven Verilog simulator, checked against Icarus Verilog
-  sc-sim-wasm/   the simulator for the browser (WebAssembly)
-  sc-gds/        GDSII reader for the layout viewer
-  sc-gds-wasm/   the GDS reader for the browser (WebAssembly)
-apps/web/        React + TypeScript web app (Vite, Monaco)
-deploy/compose/  local development services (Postgres, Rauthy)
-deploy/pilot/    pilot deployment (Caddy, API, Postgres, Rauthy, backups)
-docs/            documentation
-scripts/         toolchain and PDK setup, code generation
+  wafer-api/       HTTP API and workers (binary: wafersmith-api)
+  wafer-git/       per-project bare Git repositories (libgit2)
+  wafer-jobs/      flow-run backends: LibreLane in Docker, metrics and report parsing
+  wafer-sim/       event-driven Verilog simulator, checked against Icarus Verilog
+  wafer-sim-wasm/  the simulator for the browser (WebAssembly)
+  wafer-gds/       GDSII reader for the layout viewer
+  wafer-gds-wasm/  the GDS reader for the browser (WebAssembly)
+apps/web/          React + TypeScript web app (Vite, Monaco)
+deploy/compose/    local development services (Postgres, Rauthy)
+deploy/pilot/      pilot deployment (Caddy, API, Postgres, Rauthy, backups)
+docs/              documentation
+scripts/           toolchain and PDK setup, code generation
 ```
 
 ## Credits
 
-SiliconCommons was initiated by [DigitalTwin Technology GmbH](https://digitaltwin.technology).
+Wafersmith was initiated by [DigitalTwin Technology GmbH](https://digitaltwin.technology).
 It builds on open-source work including [LibreLane](https://github.com/librelane/librelane), the
 [IHP SG13G2 open PDK](https://github.com/IHP-GmbH/IHP-Open-PDK),
 [Verible](https://github.com/chipsalliance/verible), [Rauthy](https://github.com/sebadob/rauthy),
@@ -98,5 +98,5 @@ It builds on open-source work including [LibreLane](https://github.com/librelane
 
 ## Licence
 
-Copyright 2026 DigitalTwin Technology GmbH and the SiliconCommons contributors. Licensed under the
+Copyright 2026 DigitalTwin Technology GmbH and the Wafersmith contributors. Licensed under the
 [Apache License, Version 2.0](LICENSE).

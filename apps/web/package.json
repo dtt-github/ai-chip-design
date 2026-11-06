@@ -1,5 +1,5 @@
 {
-  "name": "@siliconcommons/web",
+  "name": "@wafersmith/web",
   "private": true,
   "version": "0.1.0",
   "license": "Apache-2.0",
@@ -16,9 +16,9 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "wasm": "../../scripts/build-wasm.sh",
-    "predev": "test -f src/wasm/sc_sim.js -a -f src/wasm/sc_gds.js || ../../scripts/build-wasm.sh",
-    "prebuild": "test -f src/wasm/sc_sim.js -a -f src/wasm/sc_gds.js || ../../scripts/build-wasm.sh",
-    "pretypecheck": "test -f src/wasm/sc_sim.js -a -f src/wasm/sc_gds.js || ../../scripts/build-wasm.sh"
+    "predev": "test -f src/wasm/wafer_sim.js -a -f src/wasm/wafer_gds.js || ../../scripts/build-wasm.sh",
+    "prebuild": "test -f src/wasm/wafer_sim.js -a -f src/wasm/wafer_gds.js || ../../scripts/build-wasm.sh",
+    "pretypecheck": "test -f src/wasm/wafer_sim.js -a -f src/wasm/wafer_gds.js || ../../scripts/build-wasm.sh"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

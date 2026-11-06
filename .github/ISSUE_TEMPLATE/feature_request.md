@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest something SiliconCommons should do
+about: Suggest something Wafersmith should do
 labels: enhancement
 ---
 

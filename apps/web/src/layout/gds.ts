@@ -1,6 +1,6 @@
-// GDSII parsing in WebAssembly (crates/sc-gds-wasm, built by scripts/build-wasm.sh).
-import init, { GdsLayout } from "../wasm/sc_gds.js";
-import wasmUrl from "../wasm/sc_gds_bg.wasm?url";
+// GDSII parsing in WebAssembly (crates/wafer-gds-wasm, built by scripts/build-wasm.sh).
+import init, { GdsLayout } from "../wasm/wafer_gds.js";
+import wasmUrl from "../wasm/wafer_gds_bg.wasm?url";
 
 let ready: Promise<unknown> | null = null;
 

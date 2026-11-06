@@ -1,19 +1,19 @@
 [
     {
-        "email": "dev@siliconcommons.dev",
+        "email": "dev@wafersmith.dev",
         "given_name": "Dev",
         "family_name": "User",
-        "password": {"Plain": "SiliconCommons-dev-2026"},
+        "password": {"Plain": "Wafersmith-dev-2026"},
         "roles": [],
         "groups": [],
         "enabled": true,
         "email_verified": true
     },
     {
-        "email": "dev2@siliconcommons.dev",
+        "email": "dev2@wafersmith.dev",
         "given_name": "Second",
         "family_name": "Dev",
-        "password": {"Plain": "SiliconCommons-dev-2026"},
+        "password": {"Plain": "Wafersmith-dev-2026"},
         "roles": [],
         "groups": [],
         "enabled": true,

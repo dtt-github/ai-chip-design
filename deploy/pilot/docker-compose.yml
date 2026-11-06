@@ -1,8 +1,8 @@
-# SiliconCommons pilot: everything on one host behind HTTPS.
+# Wafersmith pilot: everything on one host behind HTTPS.
 #   ./setup.sh            (once: secrets, sign-in config, PDK, data directories)
 #   docker compose up -d --build
 # See README.md in this directory.
-name: siliconcommons-pilot
+name: wafersmith-pilot
 
 services:
   caddy:
@@ -10,9 +10,9 @@ services:
       context: ../..
       dockerfile: deploy/pilot/Dockerfile.web
       args:
-        SC_DOMAIN: ${SC_DOMAIN:?set SC_DOMAIN in .env}
+        WAFER_DOMAIN: ${WAFER_DOMAIN:?set WAFER_DOMAIN in .env}
     environment:
-      SC_DOMAIN: ${SC_DOMAIN}
+      WAFER_DOMAIN: ${WAFER_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
     ports:
       - "80:80"
@@ -29,29 +29,29 @@ services:
       context: ../..
       dockerfile: deploy/pilot/Dockerfile.api
     environment:
-      DATABASE_URL: postgres://sc:${POSTGRES_PASSWORD}@postgres:5432/siliconcommons
+      DATABASE_URL: postgres://wafer:${POSTGRES_PASSWORD}@postgres:5432/wafersmith
       # Job containers are started on the host's Docker and mount job directories by host path,
       # so the data directory has the same absolute path inside this container as on the host.
-      SC_DATA_DIR: ${SC_DATA_DIR}
-      SC_OIDC_ISSUER: https://${SC_DOMAIN}/auth/v1/
-      SC_OIDC_INTERNAL_URL: http://rauthy:8080/auth/v1/
-      SC_OIDC_AUDIENCES: siliconcommons-web
-      SC_LIBRELANE_IMAGE: ${SC_LIBRELANE_IMAGE}
-      SC_PDK_VOLUME: siliconcommons_pdk
-      SC_JOB_WORKERS: ${SC_JOB_WORKERS:-2}
-      SC_JOB_CPUS: ${SC_JOB_CPUS:-4}
-      SC_JOB_MEMORY: ${SC_JOB_MEMORY:-8g}
-      SC_JOB_TIMEOUT_MIN: ${SC_JOB_TIMEOUT_MIN:-120}
-      SC_JOB_RETENTION_DAYS: ${SC_JOB_RETENTION_DAYS:-30}
-      SC_AI_DAILY_USD: ${SC_AI_DAILY_USD:-3}
-      SC_LSP_MAX_SESSIONS: ${SC_LSP_MAX_SESSIONS:-16}
+      WAFER_DATA_DIR: ${WAFER_DATA_DIR}
+      WAFER_OIDC_ISSUER: https://${WAFER_DOMAIN}/auth/v1/
+      WAFER_OIDC_INTERNAL_URL: http://rauthy:8080/auth/v1/
+      WAFER_OIDC_AUDIENCES: wafersmith-web
+      WAFER_LIBRELANE_IMAGE: ${WAFER_LIBRELANE_IMAGE}
+      WAFER_PDK_VOLUME: wafersmith_pdk
+      WAFER_JOB_WORKERS: ${WAFER_JOB_WORKERS:-2}
+      WAFER_JOB_CPUS: ${WAFER_JOB_CPUS:-4}
+      WAFER_JOB_MEMORY: ${WAFER_JOB_MEMORY:-8g}
+      WAFER_JOB_TIMEOUT_MIN: ${WAFER_JOB_TIMEOUT_MIN:-120}
+      WAFER_JOB_RETENTION_DAYS: ${WAFER_JOB_RETENTION_DAYS:-30}
+      WAFER_AI_DAILY_USD: ${WAFER_AI_DAILY_USD:-3}
+      WAFER_LSP_MAX_SESSIONS: ${WAFER_LSP_MAX_SESSIONS:-16}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       RUST_LOG: info,tower_http=info
     volumes:
       # Starting flow runs needs the host's Docker: see the security notes in README.md.
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${SC_DATA_DIR}:${SC_DATA_DIR}
+      - ${WAFER_DATA_DIR}:${WAFER_DATA_DIR}
     group_add:
       - "${DOCKER_GID:?run setup.sh}"
     depends_on:
@@ -62,13 +62,13 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: sc
+      POSTGRES_USER: wafer
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run setup.sh}
-      POSTGRES_DB: siliconcommons
+      POSTGRES_DB: wafersmith
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sc -d siliconcommons"]
+      test: ["CMD-SHELL", "pg_isready -U wafer -d wafersmith"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -89,16 +89,16 @@ services:
     image: postgres:17-alpine
     environment:
       PGHOST: postgres
-      PGUSER: sc
+      PGUSER: wafer
       PGPASSWORD: ${POSTGRES_PASSWORD}
-      PGDATABASE: siliconcommons
+      PGDATABASE: wafersmith
       BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
       BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-2}
     volumes:
       - ./backup.sh:/backup.sh:ro
-      - ${SC_DATA_DIR}:/data:ro
+      - ${WAFER_DATA_DIR}:/data:ro
       - rauthy-data:/rauthy:ro
-      - ${SC_BACKUP_DIR}:/backups
+      - ${WAFER_BACKUP_DIR}:/backups
     entrypoint: ["/bin/sh", "/backup.sh", "--daily"]
     depends_on:
       postgres:
