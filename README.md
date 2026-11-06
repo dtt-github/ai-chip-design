@@ -11,7 +11,7 @@ write Verilog work on the same project in a full code editor.
 Wafersmith is an initiative of **[DigitalTwin Technology GmbH](https://digitaltwin.technology)**,
 which started the project and leads its development.
 
-[![CI](https://github.com/dtt-github/ai-chip-design/actions/workflows/ci.yml/badge.svg)](https://github.com/dtt-github/ai-chip-design/actions/workflows/ci.yml)
+[![CI](https://github.com/dtt-github/wafersmith/actions/workflows/ci.yml/badge.svg)](https://github.com/dtt-github/wafersmith/actions/workflows/ci.yml)
 · Licensed under [Apache-2.0](LICENSE) · [Changelog](CHANGELOG.md)
 
 ## What it does
