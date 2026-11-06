@@ -2632,3 +2632,16 @@ a.button {
     overflow: visible;
   }
 }
+
+/* The behaviour comparison of an agent proposal. */
+.behaviour h4 {
+  margin: 14px 0 4px;
+}
+
+.behaviour-list {
+  padding-left: 18px;
+}
+
+.behaviour-list > li {
+  margin-bottom: 8px;
+}

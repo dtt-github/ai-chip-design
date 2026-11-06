@@ -1,6 +1,19 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, ApiError, type EvidenceStep, type GateReport, type Proposal, type ProposalListItem, type ProposalStatus } from "../api";
+import {
+  api,
+  ApiError,
+  type Blocks,
+  type EvidenceStep,
+  type GateReport,
+  type Proposal,
+  type ProposalListItem,
+  type ProposalStatus,
+  type Quality,
+  type Spec,
+} from "../api";
+import { compareExamples, type ExampleChange } from "../lib/compare";
 import { hunks, lineDiff } from "../lib/diff";
+import { SimClient } from "../sim/client";
 
 const POLL_MS = 1500;
 
@@ -112,7 +125,7 @@ export function AgentList({
   );
 }
 
-type Tab = "changes" | "gate" | "evidence";
+type Tab = "behaviour" | "changes" | "gate" | "evidence";
 
 /** Review a proposal: diff, gate, evidence; merge when the gate passed. */
 export function AgentView({
@@ -149,7 +162,8 @@ export function AgentView({
         if (stopped) return;
         setP(next);
         if (next.status === "running") timer = window.setTimeout(poll, POLL_MS);
-        else setTab((t) => (t === "evidence" && Object.keys(next.files).length ? "changes" : t));
+        // A finished proposal with changes opens on what it does, not on the code.
+        else setTab((t) => (t === "evidence" && Object.keys(next.files).length ? "behaviour" : t));
       } catch (e) {
         if (!stopped) setError((e as Error).message);
       }
@@ -190,7 +204,7 @@ export function AgentView({
         )}
         <span className="spacer" />
         <div className="run-tabs" role="tablist">
-          {(["changes", "gate", "evidence"] as Tab[]).map((t) => (
+          {(["behaviour", "changes", "gate", "evidence"] as Tab[]).map((t) => (
             <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
               {t}
             </button>
@@ -248,6 +262,7 @@ export function AgentView({
               ))}
             </div>
           )}
+          {tab === "behaviour" && <Behaviour p={p} canRun={canMerge} />}
           {tab === "gate" && <Gate report={p.gate} regate={regate} onRegate={async () => setRegate(await api.regate(p.id))} />}
           {tab === "evidence" && <Evidence p={p} />}
         </div>
@@ -392,4 +407,149 @@ function Evidence({ p }: { p: Proposal }) {
       </ol>
     </div>
   );
+}
+
+/** What the proposal does: each example before and after it, and how well the design is tested. */
+function Behaviour({ p, canRun }: { p: Proposal; canRun: boolean }) {
+  const [examples, setExamples] = useState<ExampleChange[] | null>(null);
+  const [quality, setQuality] = useState<{ before: Quality; after: Quality } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function compare() {
+    setBusy(true);
+    setError(null);
+    const client = new SimClient();
+    try {
+      const snap = await api.snapshot(p.project_id, p.base_commit);
+      const before = snap.files;
+      const after = { ...before, ...p.files };
+      const specText = before["spec.json"];
+      if (!specText) throw new Error("the project has no spec, so there are no examples to compare");
+      const spec = JSON.parse(specText) as Spec;
+      const chip = before["blocks.json"] ? (JSON.parse(before["blocks.json"]) as Blocks) : null;
+      const [ex, q] = await Promise.all([
+        compareExamples(client, spec, chip, before, after),
+        canRun ? api.compareProposal(p.id) : Promise.resolve(null),
+      ]);
+      setExamples(ex);
+      setQuality(q);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      client.dispose();
+      setBusy(false);
+    }
+  }
+
+  if (p.status === "running") return <p className="muted pad">The agent is still working.</p>;
+  const changed = examples?.filter((e) => e.differences.length || e.before !== e.after) ?? [];
+  return (
+    <div className="pad behaviour">
+      <p className="small">
+        Runs every example on the project as it was (<code>{p.base_commit.slice(0, 8)}</code>) and with this change, and compares
+        every output cycle by cycle, including the cycles after each example ends.
+      </p>
+      <button className="primary small" onClick={compare} disabled={busy}>
+        {busy ? "Comparing…" : examples ? "Compare again" : "Compare behaviour"}
+      </button>
+      {error && <p className="error small">{error}</p>}
+      {examples && (
+        <>
+          <h4>The examples</h4>
+          {changed.length === 0 ? (
+            <p className="ok small">
+              Every example behaves exactly as before. The change only affects cases the examples don't try, or none at all; the
+              coverage below says whether that leaves something untested.
+            </p>
+          ) : (
+            <p className="small">
+              {changed.length} of {examples.length} example{examples.length === 1 ? "" : "s"} behave differently:
+            </p>
+          )}
+          <ul className="behaviour-list">
+            {examples
+              .filter((e) => e.differences.length || e.before !== e.after || e.problem)
+              .map((e) => (
+                <li key={e.id}>
+                  <strong>{e.title}</strong>{" "}
+                  <span className="muted small">
+                    {verdict(e.before)} → {verdict(e.after)}
+                  </span>
+                  {e.problem && <p className="error small">{e.problem}</p>}
+                  <ul className="small">
+                    {e.differences.map((d) => (
+                      <li key={d}>{withCode(d)}</li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+          </ul>
+        </>
+      )}
+      {quality && (
+        <>
+          <h4>How well it is tested</h4>
+          <table className="report-table small">
+            <tbody>
+              <tr>
+                <th>Examples passing</th>
+                <td>
+                  {quality.before.passing} of {quality.before.examples} → {quality.after.passing} of {quality.after.examples}
+                </td>
+              </tr>
+              <tr>
+                <th>Cases the examples try</th>
+                <td>
+                  {cov(quality.before)} → {cov(quality.after)}
+                </td>
+              </tr>
+              {moves(quality).map(([label, text]) => (
+                <tr key={label}>
+                  <th>{label}</th>
+                  <td>{text}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {(quality.after.coverage?.gaps.length ?? 0) > (quality.before.coverage?.gaps.length ?? 0) && (
+            <p className="warn small">
+              With this change the examples leave more cases untried; Health lists them once it is merged.
+            </p>
+          )}
+        </>
+      )}
+      {examples && !canRun && <p className="muted small">The coverage comparison needs an editor of the project.</p>}
+    </div>
+  );
+}
+
+const verdict = (v: boolean | null) => (v === null ? "couldn't run" : v ? "passes" : "fails");
+const cov = (q: Quality) => (q.coverage ? `${q.coverage.covered} of ${q.coverage.total}` : "none");
+
+/** State machines and their moves: what the change adds or removes. */
+function moves(q: { before: Quality; after: Quality }): [string, string][] {
+  const key = (m: Quality["machines"][number]) => `${m.module}.${m.state}`;
+  const list = (m: Quality["machines"][number]) => m.transitions.map((t) => `${t.from} → ${t.to} when ${t.when}`);
+  const out: [string, string][] = [];
+  const names = new Set([...q.before.machines.map(key), ...q.after.machines.map(key)]);
+  for (const name of names) {
+    const b = q.before.machines.find((m) => key(m) === name);
+    const a = q.after.machines.find((m) => key(m) === name);
+    const bl = b ? list(b) : [];
+    const al = a ? list(a) : [];
+    const added = al.filter((x) => !bl.includes(x));
+    const removed = bl.filter((x) => !al.includes(x));
+    const label = `State machine ${name}`;
+    if (!b) out.push([label, `new, with ${al.length} moves`]);
+    else if (!a) out.push([label, "removed"]);
+    else if (added.length || removed.length)
+      out.push([label, [...added.map((x) => `+ ${x.replace(/`/g, "")}`), ...removed.map((x) => `− ${x.replace(/`/g, "")}`)].join("; ")]);
+    else out.push([label, `unchanged (${al.length} moves)`]);
+  }
+  return out;
+}
+
+function withCode(text: string) {
+  return text.split("`").map((part, i) => (i % 2 ? <code key={i}>{part}</code> : <span key={i}>{part}</span>));
 }
