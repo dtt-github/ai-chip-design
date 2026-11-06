@@ -10,8 +10,12 @@ Wafersmith has two ways into the same project:
 
 Both work on the same files and Git history, so experts and non-experts can work together.
 
+New here? Start with **[Your first chip, step by step](first-chip.md)**: one design from the start
+page to a checked layout in about ten minutes, with screenshots.
+
 | Page | What it covers |
 |---|---|
+| [Your first chip](first-chip.md) | A walk-through: a starter, its examples, why a value is what it is, Health, the build |
 | [Starter designs](starters.md) | Sixteen verified designs to start a project from or add as blocks |
 | [Design view](design-view.md) | Describe, Examples (and chip examples), what actually happened, Health; the spec format |
 | [Blocks](blocks.md) | Building the chip from blocks, connection checks, adapters, the assistant's review |

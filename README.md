@@ -76,13 +76,14 @@ cp .env.example .env && cargo run -p wafer-api
 pnpm install && pnpm dev:web
 ```
 
-Then open http://localhost:5173.
+Then open http://localhost:5173, sign in, and follow [Your first chip](docs/user-guide/first-chip.md).
 
 ## Documentation
 
 | | |
 |---|---|
 | [Getting started](docs/getting-started.md) | Running everything locally, development accounts, tests |
+| [Your first chip](docs/user-guide/first-chip.md) | Step by step with screenshots: a design from the start page to a checked layout in ten minutes |
 | [User guide](docs/user-guide/README.md) | Design view, Blocks, examples, Health, code editing, runs, agent, IP registry |
 | [Architecture](docs/architecture.md) | Components, data flow, storage, trust boundaries, design decisions |
 | [API reference](docs/api.md) | HTTP and WebSocket endpoints, roles, errors |
