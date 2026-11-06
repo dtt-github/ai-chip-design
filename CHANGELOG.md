@@ -8,6 +8,9 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **Try it on the whole chip**: once the Blocks step has built a chip, Try it can switch from the
+  design to the chip, driving the chip's pins, showing each block's state machine live (read
+  through the chip's hierarchy), and saving the session as a chip example.
 - **Would your examples catch a mistake?** Health can plant small mistakes in a copy of the design,
   one at a time (comparisons turned round, constants one off, conditions and negations reversed,
   `&&`/`||` and `+`/`-` swapped, assignments left out), run the examples against each, and list

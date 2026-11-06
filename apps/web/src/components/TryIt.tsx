@@ -1,12 +1,12 @@
-// "Try it": the design as a small board to play with. Inputs are switches, buttons and number
+// "Try it": the design, or the whole chip from the Blocks view, as a small board to play with. Inputs are switches, buttons and number
 // boxes; outputs are lights and values; the clock moves when you say. Everything you do is
 // recorded as example steps (set, wait, and the checks you tick), simulated from reset each time
 // with the testbench the server would generate for that example, so what you see is exactly what
 // the example will check once saved.
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type Machine, type Spec, type SpecExample, type SpecPort, type SpecStep } from "../api";
-import { extendTestbench, replay, type Replay } from "../lib/replay";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api, type Blocks, type Machine, type Spec, type SpecExample, type SpecPort, type SpecStep } from "../api";
+import { extendTestbench, replay, targetSpec, type Replay } from "../lib/replay";
 import { SimClient } from "../sim/client";
 import { StateMachine } from "./StateMachine";
 
@@ -19,10 +19,13 @@ export function TryIt({
   projectId,
   spec,
   machines,
+  chip,
   canEdit,
   onSave,
   onClose,
 }: {
+  /** The chip from the Blocks view, which can be tried as a whole through its pins. */
+  chip: Blocks | null;
   /** State machines of the design (from the last example run), shown with the current state lit. */
   machines: Machine[];
   projectId: string;
@@ -44,10 +47,27 @@ export function TryIt({
   const client = useRef<SimClient | null>(null);
   const latest = useRef(0);
 
-  // Machines in the design itself (the testbench names it `dut`), whose register can be read live.
-  const mine = useMemo(() => machines.filter((m) => m.module === spec.top), [machines, spec.top]);
-  const inputs = spec.ports.filter((p) => p.dir === "in" && p.name !== spec.clock?.port && p.name !== spec.reset?.port);
-  const outputs = spec.ports.filter((p) => p.dir === "out");
+  // What is tried: the design, or the whole chip through its pins (its examples target the chip).
+  const [target, setTarget] = useState<"design" | "chip">("design");
+  const onChip = target === "chip" && !!chip;
+  const session = useCallback(
+    (s: SpecStep[]): SpecExample => ({ id: "try_it", title: "Try it", given: "", expect: "", params: [], steps: s, ...(onChip ? { target: chip!.top } : {}) }),
+    [onChip, chip],
+  );
+  const tspec = useMemo(() => (onChip ? targetSpec(spec, session([]), chip) : spec), [onChip, spec, session, chip]);
+  // State machines whose register can be read live, by their path in the testbench (`dut` is the
+  // design, or the chip with its blocks inside).
+  const live = useMemo(
+    () =>
+      onChip
+        ? chip!.blocks.flatMap((b) =>
+            machines.filter((m) => m.module === b.module).map((m) => ({ path: `dut.${b.name}.${m.state}`, machine: m, label: `Block ${b.name}` })),
+          )
+        : machines.filter((m) => m.module === spec.top).map((m) => ({ path: `dut.${m.state}`, machine: m, label: null as string | null })),
+    [onChip, chip, machines, spec.top],
+  );
+  const inputs = tspec.ports.filter((p) => p.dir === "in" && p.name !== tspec.clock?.port && p.name !== tspec.reset?.port);
+  const outputs = tspec.ports.filter((p) => p.dir === "out");
   const now = steps.reduce((c, s) => c + (s.op === "wait" ? Math.max(1, s.cycles) : 0), 0);
   const current = (name: string): bigint => {
     for (let i = steps.length - 1; i >= 0; i--) if (steps[i].op === "set" && steps[i].signal === name) return parse(steps[i].value) ?? 0n;
@@ -74,14 +94,14 @@ export function TryIt({
           .map(([name, source]) => ({ name, source }));
       }
       const tb = await api.exampleTestbench(projectId, { spec, example: ex });
-      const sim = await client.current!.run([...files.current, { name: tb.path, source: extendTestbench(tb.source, spec) }], tb.top);
+      const sim = await client.current!.run([...files.current, { name: tb.path, source: extendTestbench(tb.source, tspec) }], tb.top);
       if (id !== latest.current) return;
-      setRep(replay(spec, ex, sim, mine.map((m) => ({ name: `dut.${m.state}`, width: 64 }))));
+      setRep(replay(tspec, ex, sim, live.map((l) => ({ name: l.path, width: 64 }))));
       setError(null);
     })()
       .catch((e: Error) => id === latest.current && setError(e.message))
       .finally(() => id === latest.current && setRunning(false));
-  }, [projectId, spec, steps, mine]);
+  }, [projectId, spec, tspec, steps, live, session]);
 
   const value = (name: string, c = now): bigint | null => rep?.rows.find((r) => r.name === name)?.values[c] ?? null;
   const act = (...s: SpecStep[]) => setActions((a) => [...a, s]);
@@ -106,9 +126,9 @@ export function TryIt({
     setTitle("");
   }
 
-  const tick = spec.clock ? "cycle" : "step";
+  const tick = tspec.clock ? "cycle" : "step";
   const from = Math.max(0, now - HISTORY + 1);
-  const shown = rep ? rep.rows.filter((r) => r.name !== spec.reset?.port) : [];
+  const shown = rep ? rep.rows.filter((r) => r.name !== tspec.reset?.port) : [];
 
   return (
     <section className="design-card tryit">
@@ -116,9 +136,30 @@ export function TryIt({
         <div>
           <h3 style={{ margin: 0 }}>Try it</h3>
           <p className="muted small" style={{ margin: 0 }}>
-            Play with the design: set its inputs, move the clock, and tick the outputs that are right. What you do becomes an
-            example.
+            Play with the {onChip ? "whole chip through its pins" : "design"}: set its inputs, move the clock, and tick the outputs
+            that are right. What you do becomes {onChip ? "a chip example" : "an example"}.
           </p>
+          {chip && (
+            <div className="design-row" role="group" aria-label="What to try" style={{ marginTop: 6 }}>
+              {(["design", "chip"] as const).map((t) => (
+                <button
+                  key={t}
+                  className={`idea small ${target === t ? "on" : ""}`}
+                  aria-pressed={target === t}
+                  onClick={() => {
+                    if (t === target) return;
+                    // A session belongs to what it drives.
+                    setActions([]);
+                    setBuses({});
+                    setRep(null);
+                    setTarget(t);
+                  }}
+                >
+                  {t === "design" ? `The design (${spec.top})` : `The whole chip (${chip.top})`}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <button className="small" onClick={onClose}>
           Close
@@ -139,7 +180,7 @@ export function TryIt({
                 >
                   <code>{p.name}</code> {current(p.name).toString()}
                 </button>
-                {spec.clock && (
+                {tspec.clock && (
                   <button className="small" onClick={() => act(step("set", p.name, "1"), step("wait", "", "", 1), step("set", p.name, "0"))} title="1 for one cycle, then 0">
                     Pulse
                   </button>
@@ -176,7 +217,7 @@ export function TryIt({
         </div>
 
         <div className="tryit-clock">
-          <span className="design-label">{spec.clock ? `Clock, ${spec.clock.mhz} MHz` : "Time"}</span>
+          <span className="design-label">{tspec.clock ? `Clock, ${tspec.clock.mhz} MHz` : "Time"}</span>
           <strong>
             {tick} {now}
           </strong>
@@ -217,10 +258,15 @@ export function TryIt({
 
       {error && <p className="error small">{error}</p>}
 
-      {mine.map((m) => {
-        const v = value(`dut.${m.state}`);
+      {live.map(({ path, machine: m, label }) => {
+        const v = value(path);
         const i = v === null ? -1 : m.values.findIndex((x) => x !== null && BigInt(x) === v);
-        return <StateMachine key={m.state} machine={m} current={i >= 0 ? m.states[i] : null} />;
+        return (
+          <div key={path}>
+            {label && <span className="design-label">{label}</span>}
+            <StateMachine machine={m} current={i >= 0 ? m.states[i] : null} />
+          </div>
+        );
       })}
 
       {rep && (
@@ -285,9 +331,6 @@ export function TryIt({
   );
 }
 
-function session(steps: SpecStep[]): SpecExample {
-  return { id: "try_it", title: "Try it", given: "", expect: "", params: [], steps };
-}
 
 function describe(s: SpecStep, tick: string): string {
   if (s.op === "set") return `set ${s.signal} to ${s.value}`;

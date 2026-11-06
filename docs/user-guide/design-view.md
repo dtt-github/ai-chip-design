@@ -61,7 +61,12 @@ spec to keep it. Each change is simulated from reset with the testbench the exam
 close a gap Health shows ("Never tried: `en` = 0"): set the input, tick the outputs, save. When
 the design has a state machine, its diagram is shown with the current state lit, so you can watch
 it move as you play. It uses
-the committed design and tests the design, not the whole chip.
+the committed design.
+
+Once the Blocks step has built a chip, **The whole chip** switches the board to the chip's pins:
+you play with the chip as a whole (for example a button that goes through a synchronizer before
+reaching your design), every block's state machine is shown with its current state lit, and what
+you save is a [chip example](#chip-examples).
 
 ### Chip examples
 

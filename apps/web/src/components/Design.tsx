@@ -696,6 +696,7 @@ function Examples({
           projectId={projectId}
           spec={spec}
           machines={ran?.machines ?? []}
+          chip={chip}
           canEdit={canEdit}
           onClose={() => setTrying(false)}
           onSave={(ex) => {
@@ -1386,7 +1387,7 @@ function Health({
       title: `How it works: ${m.module} steps through ${m.states.length} states`,
       plain:
         `${m.transitions.length} ways to move between them` +
-        (untested ? `; your examples never take ${untested} of them (dashed red)` : "; your examples take every one that can be told") +
+        (untested ? `; your examples never take ${untested} of them (dashed red)` : "; your examples take every one") +
         ".",
       explain:
         "The design remembers which step of its job it is on in a state register, and moves to another state when a condition holds. This diagram was found in the Verilog: each box is a state, each arrow a move, numbered and listed with when it happens.",
