@@ -5,6 +5,7 @@ import {
   type Blocks,
   type ExampleResult,
   type FindTarget,
+  type FoundExamples,
   type Job,
   type MistakesReport,
   type SmallFix,
@@ -24,6 +25,7 @@ import { TryIt } from "./TryIt";
 import { SimClient } from "../sim/client";
 import { compareExamples } from "../lib/compare";
 import { BlocksStep } from "./Blocks";
+import { narrate } from "../lib/narrate";
 
 type Step = "describe" | "examples" | "blocks" | "health";
 
@@ -297,14 +299,19 @@ export function DesignFlow({ projectId, startIntent, onWide, head, canEdit, onOp
               setExampleSeed({ text });
               setStep("examples");
             }}
-            onFoundExample={(ex) => {
-              if (!draft) return;
-              // Unsaved found examples may already use the id the server picked.
+            spec={draft}
+            onFoundExamples={(found) => {
+              if (!draft || !found.length) return;
+              // Unsaved found examples may already use the ids the server picked.
               const ids = new Set(draft.examples.map((e) => e.id));
-              let id = ex.id;
-              for (let n = 1; ids.has(id); n++) id = `found_${n}`;
-              update({ examples: [...draft.examples, { ...ex, id }] });
-              setExampleSeed({ select: id });
+              const added = found.map((ex) => {
+                let id = ex.id;
+                for (let n = 1; ids.has(id); n++) id = `found_${n}`;
+                ids.add(id);
+                return { ...ex, id };
+              });
+              update({ examples: [...draft.examples, ...added] });
+              setExampleSeed({ select: added[0].id });
               setStep("examples");
             }}
           />
@@ -1573,13 +1580,16 @@ function Health({
   onShowRun,
   onOpenFile,
   onAddExample,
-  onFoundExample,
+  onFoundExamples,
+  spec,
 }: {
   onOpenFile: (path: string) => void;
   /** Opens Examples with "Add an example in words" filled in. */
   onAddExample: (text: string) => void;
-  /** Adds an example "Find an example" found to the spec (unsaved) and opens it. */
-  onFoundExample: (ex: SpecExample) => void;
+  /** Adds examples "Find an example" found to the spec (unsaved) and opens the first. */
+  onFoundExamples: (exs: SpecExample[]) => void;
+  /** The spec as being edited, to describe found examples in words. */
+  spec: Spec | null;
   projectId: string;
   head: string | null;
   /** From the spec, else the flow config's CLOCK_PERIOD. */
@@ -1609,6 +1619,7 @@ function Health({
   }
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const onFoundExample = (ex: SpecExample) => onFoundExamples([ex]);
 
   useEffect(() => {
     api.listJobs(projectId).then(setJobs, (e: Error) => setError(e.message));
@@ -1784,6 +1795,31 @@ function Health({
       ),
     });
   }
+  // Every case no example tries and every planted mistake that slipped through, for one search.
+  const report = mistakes && mistakes.head === head ? mistakes.report : null;
+  const findable: { target: FindTarget; text: string }[] = [
+    ...(cov?.gaps ?? []).filter((g) => g.kind !== "default").map((g) => ({ target: { for: "gap" as const, file: g.file, line: g.line, text: g.text }, text: g.text })),
+    ...(report?.slipped ?? []).map((g) => ({
+      target: { for: "mistake" as const, file: g.file, line: g.line, kind: g.kind, original: g.original, mistake: g.mistake },
+      text: g.text,
+    })),
+  ].slice(0, 60);
+  if (canEdit && spec && findable.length > 1) {
+    const gapsN = findable.filter((f) => f.target.for === "gap").length;
+    const slippedN = findable.length - gapsN;
+    cards.push({
+      id: "find-all",
+      ok: null,
+      title: "Find examples for everything",
+      plain:
+        `The simulator can search for examples for ${[gapsN && `the ${gapsN} untried ${gapsN === 1 ? "case" : "cases"}`, slippedN && `the ${slippedN} slipped ${slippedN === 1 ? "mistake" : "mistakes"}`].filter(Boolean).join(" and ")} above at once, using one example for several where it can. You check each one before it is added.` +
+        (!report && exTotal > 0 ? " Plant mistakes first to include those too." : ""),
+      explain:
+        "It searches for one target at a time, starting from your examples. Each example it finds is run against the targets still open, and every one it also covers is ticked off, so the set stays small. The checks at the end of each example are what the design did: if one looks wrong, you have found a bug.",
+      expert: `search per target ≤ 10 s, all ≤ 90 s; inputs from the examples, changed and fresh; cut to the shortest; covers = takes the branch / kills the mutant`,
+      extra: <FindAll key={`${head}:${findable.length}`} projectId={projectId} spec={spec} items={findable} onAdd={onFoundExamples} />,
+    });
+  }
   for (const [i, m] of (run?.machines ?? []).entries()) {
     const untested = m.transitions.filter((t) => t.covered === false).length;
     cards.push({
@@ -1909,6 +1945,124 @@ const fmt = (v: unknown) => (typeof v === "number" ? Number(v.toPrecision(4)).to
 /** Text with `backticked` parts shown as code. */
 function withCode(text: string) {
   return text.split("`").map((part, i) => (i % 2 ? <code key={i}>{part}</code> : <span key={i}>{part}</span>));
+}
+
+/** What an example covers, in a few words: "tries `up` = 0 while …", "catches `count + 1` as
+ * `count - 1` (line 14)". */
+function covers(item: { target: FindTarget; text: string }): string {
+  const t = item.target;
+  if (t.for === "gap") return item.text.replace(/^Never tried: /, "tries ");
+  if (t.kind === "forget") return `catches \`${t.original}\` left out (line ${t.line})`;
+  if (t.kind === "reverse") return `catches \`${t.original}\` the other way round (line ${t.line})`;
+  return `catches \`${t.original}\` as \`${t.mistake}\` (line ${t.line})`;
+}
+
+/** "Find examples for everything": one search for every untried case and slipped mistake, then a
+ * list of the examples found to check and add together. */
+function FindAll({
+  projectId,
+  spec,
+  items,
+  onAdd,
+}: {
+  projectId: string;
+  spec: Spec;
+  items: { target: FindTarget; text: string }[];
+  onAdd: (exs: SpecExample[]) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [found, setFound] = useState<FoundExamples | null>(null);
+  const [skip, setSkip] = useState<Set<number>>(new Set());
+  async function search() {
+    setBusy(true);
+    setError(null);
+    try {
+      setFound(await api.findExamples(projectId, items.map((i) => i.target)));
+      setSkip(new Set());
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const covered = found ? found.drafts.reduce((n, d) => n + d.covers.length, 0) : 0;
+  const chosen = found ? found.drafts.filter((_, i) => !skip.has(i)) : [];
+  return (
+    <div className="design-col find-all" style={{ gap: 6 }}>
+      <div className="design-row">
+        <button className="small primary" onClick={search} disabled={busy}>
+          {busy ? "Searching… (up to 90 s)" : found ? "Search again" : `Find examples for all ${items.length}`}
+        </button>
+        {error && <span className="error small">{error}</span>}
+      </div>
+      {found && (
+        <>
+          <p className="small" style={{ margin: 0 }}>
+            {found.drafts.length
+              ? `${found.drafts.length} ${found.drafts.length === 1 ? "example covers" : "examples cover"} ${covered} of ${items.length}. Read each one: the checks at the end are what the design did, so make sure that is what it should do.`
+              : `No example found for any of the ${items.length}.`}{" "}
+            <span className="muted">
+              ({found.tried} input sequences tried in {found.elapsed_ms < 100 ? "under 0.1" : (found.elapsed_ms / 1000).toFixed(1)} s)
+            </span>
+          </p>
+          {found.drafts.length > 0 && (
+            <ul className="find-all-list">
+              {found.drafts.map((d, i) => (
+                <li key={d.example.id}>
+                  <label className="find-all-pick">
+                    <input
+                      type="checkbox"
+                      checked={!skip.has(i)}
+                      onChange={() => {
+                        const next = new Set(skip);
+                        if (next.has(i)) next.delete(i);
+                        else next.add(i);
+                        setSkip(next);
+                      }}
+                    />
+                    <strong>{d.example.title}</strong>
+                  </label>
+                  <span className="small">{narrate(spec, d.example)}</span>
+                  <span className="muted small">
+                    Covers: {d.covers.map((c, k) => (
+                      <span key={c}>
+                        {k > 0 && "; "}
+                        {withCode(covers(items[c]))}
+                      </span>
+                    ))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {found.left.length > 0 && (
+            <details className="small">
+              <summary>
+                {found.left.length} not found
+              </summary>
+              <ul className="coverage-gaps">
+                {found.left.map((u) => (
+                  <li key={u.target}>
+                    <span>{withCode(items[u.target].text)}</span>
+                    <span className="muted">{u.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {found.drafts.length > 0 && (
+            <div className="design-row">
+              <button className="small primary" disabled={!chosen.length} onClick={() => onAdd(chosen.map((d) => d.example))}>
+                Add {chosen.length} {chosen.length === 1 ? "example" : "examples"}
+              </button>
+              <span className="muted small">They open in Examples, unsaved, to save with the rest.</span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 /** "Find an example": the simulator searches the design's inputs for an example that reaches the

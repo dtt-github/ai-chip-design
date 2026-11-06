@@ -289,6 +289,16 @@ export interface FoundExample {
   message: string | null;
 }
 
+/** "Find examples for everything" (`POST .../spec/find-examples`): draft examples that between
+ * them cover the targets asked for, each with the targets it covers (indexes into the request),
+ * and why the rest weren't found. */
+export interface FoundExamples {
+  drafts: { example: SpecExample; covers: number[] }[];
+  left: { target: number; message: string }[];
+  tried: number;
+  elapsed_ms: number;
+}
+
 /** "Try a small fix": small repairs after which every example passes (`POST .../spec/small-fix`). */
 export interface SmallFixes {
   fixes: SmallFix[];
@@ -671,6 +681,8 @@ export const api = {
   smallFix: (id: string, focus: { file: string; line: number }[]) =>
     request<SmallFixes>("POST", `/projects/${enc(id)}/spec/small-fix`, { focus }),
   findExample: (id: string, target: FindTarget) => request<FoundExample>("POST", `/projects/${enc(id)}/spec/find-example`, target),
+  findExamples: (id: string, targets: FindTarget[]) =>
+    request<FoundExamples>("POST", `/projects/${enc(id)}/spec/find-examples`, { targets }),
   exampleTestbench: (id: string, body: { spec: Spec; example: SpecExample }) =>
     request<{ path: string; top: string; source: string }>("POST", `/projects/${enc(id)}/spec/testbench`, body),
   draftSpec: (id: string, body: { instruction: string; spec?: Spec | null }) =>

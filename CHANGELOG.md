@@ -8,6 +8,12 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **Find examples for everything**: Health searches for examples for every untried case and every
+  planted mistake that slipped through at once. Each example found is checked against the targets
+  still open, so one example covers several (on the up/down counter with one example, 2 examples
+  covered all 6; in the test, 3 covered 12). The examples found are listed as sentences with what
+  each covers, to untick or add together; those not found say why. No AI and no cost.
+  `POST /api/projects/{id}/spec/find-examples`.
 - **Why? through memories**: in "Why is it this value?", a value read from a memory (`dout =
   mem[rptr]`) now names the word it was (`mem[0] = 17`), and that word can be clicked like any
   value, back to the line that stored it (`mem[wptr] <= din`) and why it ran. The simulator records

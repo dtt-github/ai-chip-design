@@ -315,6 +315,47 @@ pub async fn find_example(
     found.map(Json).map_err(ApiError::Conflict)
 }
 
+/// "Find examples for everything": the most targets one request may ask for, how long the search
+/// for each may take, and how long all of them may.
+const FIND_ALL_MAX: usize = 60;
+const FIND_ALL_EACH: std::time::Duration = std::time::Duration::from_secs(10);
+const FIND_ALL_BUDGET: std::time::Duration = std::time::Duration::from_secs(90);
+
+#[derive(Debug, Deserialize)]
+pub struct FindAllReq {
+    pub targets: Vec<crate::search::Target>,
+}
+
+/// "Find examples for everything" (`crate::search::find_all`) at the branch tip: draft examples
+/// that between them cover the coverage gaps and slipped mistakes asked for, and why the rest
+/// weren't found. Nothing is saved. Editors: it costs server time.
+pub async fn find_examples(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(req): Json<FindAllReq>,
+) -> ApiResult<Json<crate::search::FoundAll>> {
+    authorize(&state, &user, id, Role::Editor).await?;
+    if req.targets.is_empty() || req.targets.len() > FIND_ALL_MAX {
+        return Err(ApiError::BadRequest(format!("ask for 1 to {FIND_ALL_MAX} targets")));
+    }
+    let commit = head(&state, id).await?;
+    let files = files_at(&state, id, &commit).await?;
+    let spec = match files.get(SPEC_FILE) {
+        Some(t) => parse_spec(t)?,
+        None => return Err(ApiError::NotFound("this project has no spec yet".into())),
+    };
+    let found = tokio::task::spawn_blocking(move || {
+        gate::with_slot(|| {
+            wafer_sim::on_big_stack(|| {
+                crate::search::find_all(&spec, &files, &req.targets, FIND_ALL_EACH, FIND_ALL_BUDGET)
+            })
+        })
+    })
+    .await?;
+    found.map(Json).map_err(ApiError::Conflict)
+}
+
 /// How long "Try a small fix" may search.
 const FIX_BUDGET: std::time::Duration = std::time::Duration::from_secs(20);
 
