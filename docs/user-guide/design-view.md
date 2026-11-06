@@ -111,7 +111,7 @@ Lines that only write other constants (`valid <= 0` when 1 was expected) are lef
 If no line can write the expected value, it says so: the design needs one. This answer, too, goes
 with a request to the AI.
 
-Three buttons answer the one question to decide, **Which is wrong?**:
+Four buttons answer the one question to decide, **Which is wrong?**:
 
 - **The design: ask the AI to fix it**, with this explanation;
 - **The example: use what the design did**: rewrites the failing check from the simulation,
@@ -124,7 +124,16 @@ Three buttons answer the one question to decide, **Which is wrong?**:
   and saving the spec keeps them. Use it when the design is right and the example's timing or
   value was a guess;
 - **The example: ask the assistant to correct it**: re-checks the example against the spec in
-  words and corrects it.
+  words and corrects it;
+- **The design: try a small fix**: tries, without AI, the small changes that undo the most common
+  mistakes, one at a time: a comparison the other way round (`<` for `<=`, `==` for `!=`), a
+  constant or limit one off in either direction (`cnt == N` → `cnt == N - 1`), a condition
+  reversed, a `!` or `~` too many or missing, `&&` for `||`, `-` for `+`, and an assigned value one
+  off (`1'b0` for `1'b1`). The lines "Why not?" and "Why?" pointed at are tried first. After each
+  change every example is simulated, and only changes after which all of them pass are offered
+  (up to three), each as a one-line diff that keeps the rest of the line as written, with what it
+  changes in the examples' outputs ("`led` at cycle 4 was 0, now 1"). **Use this change** commits
+  it. If none works, it says how many it tried, and asking the AI then tells it what was tried.
 
 ## Health
 

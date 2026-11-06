@@ -2682,3 +2682,27 @@ a.button {
 .why-chain button.link {
   padding: 0;
 }
+
+/* "Try a small fix": each repair found, as a one-line diff. */
+.small-fix {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.small-fix-diff {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+
+.small-fix-diff .del {
+  color: var(--danger);
+}
+
+.small-fix-diff .add {
+  color: var(--ok);
+}
