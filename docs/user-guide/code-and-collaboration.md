@@ -47,8 +47,9 @@ and procedural assignments, `if`/`case`/`casez`/loops/`wait`, `#` delays and `@`
 - **generate**: `for` loops, `if` and `case` on parameters, and named blocks, with their own names
   and parameters (`g[2].w`, `%m` printing `tb.g[2].u`).
 
-It counts how often each `if`/`else` branch and `case` arm runs (branch coverage), which Health
-uses to show what the examples don't try.
+It counts how often each `if`/`else` branch and `case` arm runs, each part of an `&&`/`||`
+condition is true or false when it is decided, and each side of a `?:` choice is taken
+(coverage), which Health uses to show what the examples don't try.
 
 It is 2-state (x and z read as 0) and limited to 64-bit signals; anything else it doesn't support is
 reported with file and line. `%t` prints time in the timescale's unit, not its precision as Icarus

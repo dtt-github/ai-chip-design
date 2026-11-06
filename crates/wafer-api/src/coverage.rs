@@ -21,7 +21,8 @@ pub struct Coverage {
 pub struct Gap {
     pub file: String,
     pub line: u32,
-    /// `then`, `else`, `arm` or `default`.
+    /// `then`, `else`, `arm`, `default`, `part` (one part of a combined condition) or `side` (of a
+    /// `?:` choice).
     pub kind: String,
     /// The condition or `case` selector as written.
     pub what: String,
@@ -75,6 +76,19 @@ fn gap(file: &str, line: u32, kind: &CoverKind, what: &str) -> Gap {
             format!("Never tried: `{what}` = {}", labels.replace(", ", " or ")),
             format!("An example where {what} is {} ({at}).", labels.replace(", ", " or ")),
         ),
+        CoverKind::Part { atom, value } => {
+            let (sym, words) = situation(atom, *value);
+            (
+                "part",
+                None,
+                format!("Never tried: {sym} while deciding `{what}`"),
+                format!("An example where {words} at the moment {what} is decided ({at})."),
+            )
+        }
+        CoverKind::Side { value } => {
+            let (sym, words) = situation(what, *value);
+            ("side", None, format!("Never tried: {sym} in a ?: choice"), format!("An example where {words} ({at})."))
+        }
         CoverKind::Default { .. } => (
             "default",
             None,
@@ -151,6 +165,24 @@ mod tests {
         assert_eq!(c.gaps[0].text, "Never tried: `state` = 2'h2");
         assert!(c.gaps[0].suggestion.contains("checked at line 20 of src/f.v"));
         assert_eq!(of(&[&run(vec![])]), None);
+    }
+
+    #[test]
+    fn condition_parts_and_choices_in_words() {
+        let c = of(&[&run(vec![
+            (point("src/f.v", 10, CoverKind::Part { atom: "!full".into(), value: false }, "wr && !full"), 0),
+            (point("src/f.v", 12, CoverKind::Side { value: true }, "sel"), 0),
+        ])])
+        .expect("coverage");
+        let texts: Vec<&str> = c.gaps.iter().map(|g| g.text.as_str()).collect();
+        assert_eq!(
+            texts,
+            ["Never tried: `full` ≠ 0 while deciding `wr && !full`", "Never tried: `sel` ≠ 0 in a ?: choice"]
+        );
+        assert_eq!(
+            c.gaps[0].suggestion,
+            "An example where full is not 0 at the moment wr && !full is decided (checked at line 10 of src/f.v)."
+        );
     }
 
     #[test]

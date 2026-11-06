@@ -113,7 +113,8 @@ pub struct Sim<'d> {
     waves: Vec<Option<WaveSignal>>,
     changes: usize,
     warnings: Vec<String>,
-    cover_hits: Vec<u64>,
+    /// Read by expression evaluation too (`?:` sides), hence cells.
+    cover_hits: Vec<std::cell::Cell<u64>>,
 }
 
 const fn mask(w: u32) -> u64 {
@@ -170,7 +171,7 @@ impl<'d> Sim<'d> {
             waves,
             changes: 0,
             warnings: d.warnings.clone(),
-            cover_hits: vec![0; d.cover.len()],
+            cover_hits: (0..d.cover.len()).map(|_| std::cell::Cell::new(0)).collect(),
         }
     }
 
@@ -190,7 +191,7 @@ impl<'d> Sim<'d> {
             signals,
             warnings: self.warnings,
             steps: self.steps,
-            coverage: self.d.cover.iter().cloned().zip(self.cover_hits).collect(),
+            coverage: self.d.cover.iter().cloned().zip(self.cover_hits.iter().map(|c| c.get())).collect(),
         })
     }
 
@@ -388,7 +389,13 @@ impl<'d> Sim<'d> {
                     self.procs[p].state = State::Done;
                     return Ok(());
                 }
-                Op::Cover(n) => self.cover_hits[*n] += 1,
+                Op::Cover(n) => self.hit(*n),
+                Op::CoverParts(parts) => {
+                    for (e, id) in parts {
+                        let v = self.eval(e) != 0;
+                        self.hit(id + usize::from(!v));
+                    }
+                }
             }
         }
     }
@@ -542,6 +549,11 @@ impl<'d> Sim<'d> {
         Some(oa.min(ob))
     }
 
+    fn hit(&self, n: usize) {
+        let c = &self.cover_hits[n];
+        c.set(c.get() + 1);
+    }
+
     pub fn eval(&self, e: &CExpr) -> u64 {
         let w = e.width(self.d);
         self.eval_ctx(e, w)
@@ -618,12 +630,12 @@ impl<'d> Sim<'d> {
                 }
             },
             CExpr::Binary(op, a, b) => self.binary(*op, a, b, w),
-            CExpr::Ternary(c, t, f) => {
-                if self.eval(c) != 0 {
-                    self.eval_ctx(t, w)
-                } else {
-                    self.eval_ctx(f, w)
+            CExpr::Ternary(c, t, f, cover) => {
+                let v = self.eval(c) != 0;
+                if let Some(id) = cover {
+                    self.hit(id + usize::from(!v));
                 }
+                if v { self.eval_ctx(t, w) } else { self.eval_ctx(f, w) }
             }
             CExpr::Time => self.now & m,
             CExpr::Random(_) => {

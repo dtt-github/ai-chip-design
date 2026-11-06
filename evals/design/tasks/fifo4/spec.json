@@ -281,6 +281,134 @@
           "value": "1"
         }
       ]
+    },
+    {
+      "id": "read_and_write",
+      "title": "A read and a write in the same cycle",
+      "given": "two bytes in, then one cycle that reads and writes",
+      "expect": "the oldest byte leaves, the new one joins the queue",
+      "params": [],
+      "steps": [
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0x11",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "wr",
+          "value": "1",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 1,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0x22",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 1,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "din",
+          "value": "0x33",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rd",
+          "value": "1",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 1,
+          "note": "read 0x11, write 0x33"
+        },
+        {
+          "op": "set",
+          "signal": "wr",
+          "value": "0",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rd",
+          "value": "0",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0x22",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "expect",
+          "signal": "full",
+          "value": "0",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "set",
+          "signal": "rd",
+          "value": "1",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 1,
+          "note": ""
+        },
+        {
+          "op": "expect",
+          "signal": "dout",
+          "value": "0x33",
+          "cycles": 0,
+          "note": ""
+        },
+        {
+          "op": "wait",
+          "signal": "",
+          "value": "",
+          "cycles": 1,
+          "note": ""
+        },
+        {
+          "op": "expect",
+          "signal": "empty",
+          "value": "1",
+          "cycles": 0,
+          "note": ""
+        }
+      ]
     }
   ]
 }

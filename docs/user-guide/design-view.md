@@ -92,9 +92,11 @@ mean?** and the expert numbers underneath:
 - **It works**: how many examples pass in simulation, and how many ran and passed on the
   synthesised gates (examples for other settings, or that test a block rather than the chip, are
   counted separately).
-- **Tested by the examples**: how many of the design's decisions (each `if`/`else` branch and
-  `case` choice) the examples go through, and each one they never try, in plain terms ("Never
-  tried: `en` = 0", "Never tried: `state` = 2"). Passing examples only vouch for the cases they
+- **Tested by the examples**: how many of the cases the design tells apart the examples go
+  through: each `if`/`else` branch and `case` choice, each part of a combined condition both ways
+  (in `wr && !full`, `full` both 0 and 1 when it is decided), and both sides of each `?:` choice.
+  Each one they never try is shown in plain terms ("Never tried: `en` = 0", "Never tried: `state`
+  = 2", "Never tried: `full` ≠ 0 while deciding `wr && !full`"). Passing examples only vouch for the cases they
   try. **Add an example** opens Examples with the missing case written out as a new example's
   description; the file and line link opens the code. A `default` choice that no example reaches
   is shown but doesn't hold the project back, since it is often impossible by design.
@@ -109,7 +111,7 @@ mean?** and the expert numbers underneath:
 - **How it works**: each state machine found in the Verilog, drawn as states (boxes, with the one
   after reset marked) and numbered moves between them, listed with when they happen ("state 0 →
   state 1 when `rx` = 0"). Moves an example takes are solid; dashed red ones no example takes yet;
-  dotted ones can't be told apart (both sides of a `?:` choice). A machine is a `case` on a register
+  dotted ones before the examples have run. A machine is a `case` on a register
   whose arms set that register, directly or through a next-state variable; named states come from
   `localparam`s.
 - **Fast enough**: whether the clock target is met, and by how much ("could run about 4× faster").

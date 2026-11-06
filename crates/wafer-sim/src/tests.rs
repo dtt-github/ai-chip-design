@@ -374,7 +374,7 @@ endmodule"#);
     let hits: Vec<(String, String, u64)> = r
         .coverage
         .iter()
-        .filter(|(p, _)| p.scope == "tb.d")
+        .filter(|(p, _)| p.scope == "tb.d" && !matches!(p.kind, crate::elab::CoverKind::Part { .. }))
         .map(|(p, n)| (format!("{:?}", p.kind), p.what.clone(), *n))
         .collect();
     let taken = |k: &str| hits.iter().find(|(kind, _, _)| kind.starts_with(k)).map(|h| h.2).unwrap();
@@ -383,4 +383,37 @@ endmodule"#);
     assert_eq!(taken("Default { written: true }"), 0, "sel was never 2 or 3: {hits:?}");
     assert!(taken("Then") > 0 && taken("Else { written: false }") > 0, "{hits:?}");
     assert_eq!(hits.iter().find(|h| h.0 == "Then").unwrap().1, "go && sel != 3");
+}
+
+#[test]
+fn condition_parts_and_choices_are_counted() {
+    // `full` is never 1 when `wr && !full` is decided, and `full ? a : b` never takes its true side.
+    let r = run(r#"
+module dut(input wire clk, input wire wr, input wire full, input wire sel, output reg n, output wire y);
+    always @(posedge clk) if (wr && !full) n <= ~n;
+    assign y = full ? 1'b1 : 1'b0;
+endmodule
+module tb;
+    reg clk = 0, wr = 0, full = 0, sel = 1;
+    wire n, y;
+    dut d (.clk(clk), .wr(wr), .full(full), .sel(sel), .n(n), .y(y));
+    initial begin
+        #1 clk = 1; #1 clk = 0;
+        wr = 1;
+        #1 clk = 1; #1 clk = 0;
+        $finish;
+    end
+endmodule"#);
+    let count = |want: &str| {
+        r.coverage
+            .iter()
+            .filter(|(p, _)| p.scope == "tb.d" && format!("{:?}", p.kind) == want)
+            .map(|(_, n)| *n)
+            .sum::<u64>()
+    };
+    assert!(count(r#"Part { atom: "wr", value: true }"#) > 0 && count(r#"Part { atom: "wr", value: false }"#) > 0);
+    assert!(count(r#"Part { atom: "!full", value: true }"#) > 0);
+    assert_eq!(count(r#"Part { atom: "!full", value: false }"#), 0, "full was never 1");
+    assert!(count("Side { value: false }") > 0);
+    assert_eq!(count("Side { value: true }"), 0, "full was always 0");
 }

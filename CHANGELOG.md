@@ -54,6 +54,11 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Changed
 
+- Coverage is stricter: besides `if`/`else` branches and `case` arms, each part of an `&&`/`||`
+  condition must be seen both ways when it is decided ("Never tried: `full` ≠ 0 while deciding
+  `wr && !full`"), and both sides of each `?:` choice must be taken. The state diagram's `?:` moves
+  are now measured like the others. It found gaps in two starters' examples (the up/down counter never
+  had neither button pressed, the FIFO never read and wrote at once); each has a new example.
 - The UART receiver starter (and eval task) has two more examples, a half-bit glitch being ignored
   and two bytes back to back, and says in its description that such glitches are ignored. Its
   examples now catch 32 of 34 planted mistakes (were 28); the other two are timing the description

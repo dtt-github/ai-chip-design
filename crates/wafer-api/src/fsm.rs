@@ -35,8 +35,7 @@ pub struct Transition {
     /// When it happens, with conditions in backticks ("`rx` = 0"), or "always".
     pub when: String,
     pub line: u32,
-    /// Whether any example took it; `None` before the examples run, or when it can't be told (a
-    /// `?:` choice: the branch it is in counts both sides together).
+    /// Whether any example took it; `None` before the examples run.
     pub covered: Option<bool>,
     #[serde(skip)]
     key: Option<(u32, CoverKind, String)>,
@@ -282,12 +281,15 @@ impl Found<'_> {
                 if self.targets.contains(l) =>
             {
                 match rhs {
-                    // `state <= go ? A : B`: two transitions, on the condition.
+                    // `state <= go ? A : B`: two transitions, on the condition; each side of the
+                    // choice is its own coverage point.
                     Expr::Ternary(c, a, b) => {
+                        let cline = c.line().unwrap_or(*line);
                         for (e, truth) in [(a, true), (b, false)] {
                             if let Some(to) = constant(e, self.params) {
                                 path.push((c.to_string(), truth));
-                                self.add(from, to, path, *line, None);
+                                let side = (cline, CoverKind::Side { value: truth }, c.to_string());
+                                self.add(from, to, path, *line, Some(&side));
                                 path.pop();
                             }
                         }

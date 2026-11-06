@@ -17,7 +17,7 @@ inputs, so the design does what the spec says in cases the examples don't cover.
 ## Starting a project from one
 
 On the projects page, pick a design under **Start from a working design** (each card shows what
-goes in and comes out, how many examples it has, how many of the design's decisions they try, and
+goes in and comes out, how many examples it has, how many of the cases the design tells apart they try, and
 its clock), then **Create**. The new project has:
 
 - `spec.json`: the description, connections, settings and examples, ready in the Design view;
