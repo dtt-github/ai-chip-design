@@ -95,6 +95,22 @@ block are followed into the block; an input the example sets ends the chain ("se
 the example"). When you then ask the AI to fix the design or the assistant to correct the
 example, the explanation you followed goes with the request.
 
+**Why wasn't it the expected value?** When an example fails, the account of the difference ends
+with a **Why wasn't it N?** link. It lists every line of the design that could have given the
+signal the value the example expected, and what happened to each the last time it could have run:
+
+- **Blocked**: a decision went the other way. "Line 20 of blinker.v: `led <= ~led`. Didn't run for
+  cycle 3 (`!rst_n` was false, `!en` was false) because **`cnt == N - 1` was false** (cnt = 2)."
+  The values shown can be clicked to ask why they were what they were (here: why `cnt` was only
+  2), so you can follow the cause back.
+- **Ran**: it ran, with the values shown, and computed something else (or a later line changed
+  the value again).
+- **Hadn't run yet**: nothing had reached its decisions by then.
+
+Lines that only write other constants (`valid <= 0` when 1 was expected) are left out and counted.
+If no line can write the expected value, it says so: the design needs one. This answer, too, goes
+with a request to the AI.
+
 Three buttons answer the one question to decide, **Which is wrong?**:
 
 - **The design: ask the AI to fix it**, with this explanation;

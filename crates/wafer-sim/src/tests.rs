@@ -486,4 +486,26 @@ endmodule
     assert_eq!(origin("tb.dut.up", 1).text, "input up of tb.dut");
     assert_eq!(origin("tb.up", 1).text, "up = 1");
     assert_eq!(origin("tb.dut.top", 0).text, "assign top = count == 4'hf", "computed at time 0");
+    assert_eq!(up.writes, "tb.dut.count");
+    assert_eq!(port.writes, "tb.count");
+
+    // Every decision is recorded with the branch it took: at the last clock edge (35), the
+    // `up && !down` decision went the other way and the case took its `1` arm.
+    let decision = |point: usize| r.cover_decision[point];
+    let at = |t: u64, d: u32| {
+        r.decisions
+            .iter()
+            .filter(|&&(tm, p)| tm == t && decision(p as usize) == d)
+            .map(|&(_, p)| p as usize)
+            .collect::<Vec<_>>()
+    };
+    let (if_up, arm) = (&up.conds[1], down.conds.last().unwrap());
+    assert_ne!(decision(if_up.point), crate::elab::NO_DECISION);
+    let other = at(35, decision(if_up.point));
+    assert_eq!(other.len(), 1);
+    assert_ne!(other[0], if_up.point, "up && !down was false");
+    assert_eq!(at(35, decision(arm.point)), [arm.point]);
+    assert_eq!(at(25, decision(if_up.point)), [if_up.point], "and true one edge earlier");
+    assert!(r.decisions.windows(2).all(|w| w[0].0 <= w[1].0), "in time order");
+    assert!(!r.decisions_cut);
 }

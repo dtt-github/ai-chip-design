@@ -8,6 +8,13 @@ All notable changes to Wafersmith are recorded here. The format follows
 
 ### Added
 
+- **Why wasn't it the expected value?**: a failing example's account ends with a link that lists
+  every line of the design that could have written the value the example expected, and for each
+  the decision that kept it from running ("`cnt == N - 1` was false (cnt = 2)"), or that it ran and
+  computed something else. Its values can be clicked to follow the cause back, and the answer goes
+  with a request to the AI. The simulator now records every `if`/`case` decision with the branch
+  taken (`SimResult::decisions`) and which signal each assignment writes (`Origin::writes`). Runs
+  in the browser; no AI and no cost.
 - **Why is it this value?**: click any value in an example's "What actually happened" timeline to
   see the line of the design that wrote it, why that line ran (each `if`/`case` around it and
   which way it went, with the values decided on) and the values it used; each of those can be

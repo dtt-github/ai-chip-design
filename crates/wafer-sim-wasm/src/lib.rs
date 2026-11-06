@@ -95,8 +95,32 @@ impl Simulation {
         self.r.signals.get(i).map(|s| s.by.clone()).unwrap_or_default()
     }
 
-    /// Where written values come from, as JSON: `[{file, line, scope, text, reads, conds: [{line,
-    /// text, reads, taken}]}]`.
+    /// When each `if`/`case` decision was made, in order (simulation time units).
+    #[wasm_bindgen(js_name = decisionTimes)]
+    pub fn decision_times(&self) -> Vec<f64> {
+        self.r.decisions.iter().map(|&(t, _)| t as f64).collect()
+    }
+
+    /// The branch each decision took (a coverage point), in the same order as `decisionTimes`.
+    #[wasm_bindgen(js_name = decisionBranches)]
+    pub fn decision_branches(&self) -> Vec<u32> {
+        self.r.decisions.iter().map(|&(_, p)| p).collect()
+    }
+
+    /// The decision each coverage point is a branch of; 0xFFFFFFFF for one that isn't a branch.
+    #[wasm_bindgen(js_name = branchDecision)]
+    pub fn branch_decision(&self) -> Vec<u32> {
+        self.r.cover_decision.clone()
+    }
+
+    /// The run made more decisions than are recorded.
+    #[wasm_bindgen(getter, js_name = decisionsCut)]
+    pub fn decisions_cut(&self) -> bool {
+        self.r.decisions_cut
+    }
+
+    /// Where written values come from, as JSON: `[{file, line, scope, text, reads, writes, conds:
+    /// [{line, text, reads, taken, point}]}]`.
     pub fn origins(&self) -> String {
         let list: Vec<String> = self
             .r
@@ -108,21 +132,23 @@ impl Simulation {
                     .iter()
                     .map(|c| {
                         format!(
-                            r#"{{"line":{},"text":{},"reads":{},"taken":{}}}"#,
+                            r#"{{"line":{},"text":{},"reads":{},"taken":{},"point":{}}}"#,
                             c.line,
                             json(&c.text),
                             strings(&c.reads),
-                            json(&c.taken)
+                            json(&c.taken),
+                            c.point
                         )
                     })
                     .collect();
                 format!(
-                    r#"{{"file":{},"line":{},"scope":{},"text":{},"reads":{},"conds":[{}]}}"#,
+                    r#"{{"file":{},"line":{},"scope":{},"text":{},"reads":{},"writes":{},"conds":[{}]}}"#,
                     json(&o.file),
                     o.line,
                     json(&o.scope),
                     json(&o.text),
                     strings(&o.reads),
+                    json(&o.writes),
                     conds.join(",")
                 )
             })

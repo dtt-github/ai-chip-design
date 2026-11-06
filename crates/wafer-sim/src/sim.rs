@@ -66,7 +66,17 @@ pub struct SimResult {
     pub coverage: Vec<(crate::elab::CoverPoint, u64)>,
     /// Where written values come from ([`WaveSignal::by`]).
     pub origins: Vec<crate::elab::Origin>,
+    /// Every `if`/`case` decision made, in order: when, and the branch taken (a coverage point).
+    /// [`crate::elab::Design::cover_decision`] says which decision a branch belongs to.
+    pub decisions: Vec<(u64, u32)>,
+    /// The decision of each coverage point ([`crate::elab::NO_DECISION`] for one that isn't a branch).
+    pub cover_decision: Vec<u32>,
+    /// Set when the run made more than [`MAX_DECISIONS`] decisions: only the first are recorded.
+    pub decisions_cut: bool,
 }
+
+/// Decisions recorded per run, at most.
+pub const MAX_DECISIONS: usize = 1 << 21;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum State {
@@ -127,6 +137,8 @@ pub struct Sim<'d> {
     warnings: Vec<String>,
     /// Read by expression evaluation too (`?:` sides), hence cells.
     cover_hits: Vec<std::cell::Cell<u64>>,
+    decisions: Vec<(u64, u32)>,
+    decisions_cut: bool,
 }
 
 const fn mask(w: u32) -> u64 {
@@ -192,6 +204,8 @@ impl<'d> Sim<'d> {
             changes: 0,
             warnings: d.warnings.clone(),
             cover_hits: (0..d.cover.len()).map(|_| std::cell::Cell::new(0)).collect(),
+            decisions: Vec::new(),
+            decisions_cut: false,
         }
     }
 
@@ -213,6 +227,9 @@ impl<'d> Sim<'d> {
             steps: self.steps,
             coverage: self.d.cover.iter().cloned().zip(self.cover_hits.iter().map(|c| c.get())).collect(),
             origins: self.d.origins.clone(),
+            decisions: std::mem::take(&mut self.decisions),
+            cover_decision: self.d.cover_decision.clone(),
+            decisions_cut: self.decisions_cut,
         })
     }
 
@@ -411,7 +428,16 @@ impl<'d> Sim<'d> {
                     self.procs[p].state = State::Done;
                     return Ok(());
                 }
-                Op::Cover(n) => self.hit(*n),
+                Op::Cover(n) => {
+                    self.hit(*n);
+                    if self.d.cover_decision[*n] != crate::elab::NO_DECISION {
+                        if self.decisions.len() < MAX_DECISIONS {
+                            self.decisions.push((self.now, *n as u32));
+                        } else {
+                            self.decisions_cut = true;
+                        }
+                    }
+                }
                 Op::CoverParts(parts) => {
                     for (e, id) in parts {
                         let v = self.eval(e) != 0;
